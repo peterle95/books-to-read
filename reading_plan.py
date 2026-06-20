@@ -149,6 +149,21 @@ def collect_books(count: int) -> list[Book]:
     return books
 
 
+def prompt_book_replacement(books: list[Book]) -> None:
+    """Replace one book while keeping its original position in the plan."""
+    while True:
+        book_id = prompt_int("Book ID to replace")
+        if book_id <= len(books):
+            break
+        print(f"Please enter a Book ID from 1 to {len(books)}.")
+
+    old_book = books[book_id - 1]
+    print(f"\nNew details for Book {book_id} ({old_book.title})")
+    title = input(f"Title [{old_book.title}]: ").strip() or old_book.title
+    pages = prompt_int("Pages", default=old_book.pages)
+    books[book_id - 1] = Book(number=book_id, title=title, pages=pages)
+
+
 def calculate_deadlines(
     books: list[Book],
     start_date: date,
@@ -162,9 +177,13 @@ def calculate_deadlines(
     for book in books:
         cumulative_pages += book.pages
         # Use cumulative pages so rounding does not compound from book to book.
-        cumulative_days = math.ceil(cumulative_pages / daily_pace)
+        # The tiny tolerance avoids floating-point noise turning an exact
+        # whole-day pace into one extra day (for example, 103.00000000000001).
+        cumulative_days = max(1, math.ceil(cumulative_pages / daily_pace - 1e-9))
         days_allocated = cumulative_days - previous_cumulative_days
-        deadline = start_date + timedelta(days=cumulative_days)
+        # The start date is the end of the first reading day, so a one-day
+        # book has a deadline of the start date rather than the next day.
+        deadline = start_date + timedelta(days=cumulative_days - 1)
 
         if deadline < end_date:
             status = "before end"
@@ -185,6 +204,21 @@ def calculate_deadlines(
         previous_cumulative_days = cumulative_days
 
     return deadlines
+
+
+def build_plan(
+    books: list[Book],
+    start_date: date,
+    end_date: date,
+    daily_pace: float,
+) -> tuple[list[BookDeadline], int, float, str]:
+    """Calculate all values needed to display or export the current plan."""
+    total_pages = sum(book.pages for book in books)
+    period_days = inclusive_days_between(start_date, end_date)
+    required_pace = total_pages / period_days
+    overall_status = "achievable" if daily_pace >= required_pace else "not achievable"
+    deadlines = calculate_deadlines(books, start_date, end_date, daily_pace)
+    return deadlines, total_pages, required_pace, overall_status
 
 
 def format_table(deadlines: list[BookDeadline]) -> str:
@@ -330,23 +364,32 @@ def main() -> None:
     book_count = prompt_int("Number of books", default=5)
     books = collect_books(book_count)
 
-    total_pages = sum(book.pages for book in books)
-    period_days = inclusive_days_between(start_date, end_date)
-    required_pace = total_pages / period_days
-    overall_status = "achievable" if daily_pace >= required_pace else "not achievable"
-    deadlines = calculate_deadlines(books, start_date, end_date, daily_pace)
+    while True:
+        deadlines, total_pages, required_pace, overall_status = build_plan(
+            books, start_date, end_date, daily_pace
+        )
+        print_plan(
+            deadlines=deadlines,
+            start_date=start_date,
+            end_date=end_date,
+            daily_pace=daily_pace,
+            total_pages=total_pages,
+            required_pace=required_pace,
+            overall_status=overall_status,
+            end_label=end_label,
+            end_name=end_name,
+        )
 
-    print_plan(
-        deadlines=deadlines,
-        start_date=start_date,
-        end_date=end_date,
-        daily_pace=daily_pace,
-        total_pages=total_pages,
-        required_pace=required_pace,
-        overall_status=overall_status,
-        end_label=end_label,
-        end_name=end_name,
-    )
+        if overall_status == "achievable":
+            break
+
+        if prompt_yes_no(
+            "\nUse the proposed required pace to finish by the deadline?"
+        ):
+            daily_pace = required_pace
+            continue
+
+        prompt_book_replacement(books)
 
     if prompt_yes_no("\nSave this plan to a CSV file?"):
         filename = input("CSV filename [reading_plan.csv]: ").strip() or "reading_plan.csv"
