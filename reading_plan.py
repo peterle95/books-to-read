@@ -23,6 +23,7 @@ class Book:
 class BookDeadline:
     book: Book
     cumulative_pages: int
+    start_date: date
     deadline: date
     days_allocated: int
     status: str
@@ -209,6 +210,10 @@ def calculate_deadlines(
         # The start date is the end of the first reading day, so a one-day
         # book has a deadline of the start date rather than the next day.
         deadline = start_date + timedelta(days=cumulative_days - 1)
+        # Books that need no additional full reading day are completed on the
+        # same date as the preceding book, rather than starting after their
+        # displayed deadline.
+        book_start_date = deadline - timedelta(days=max(days_allocated - 1, 0))
 
         if deadline < end_date:
             status = "before end"
@@ -221,6 +226,7 @@ def calculate_deadlines(
             BookDeadline(
                 book=book,
                 cumulative_pages=cumulative_pages,
+                start_date=book_start_date,
                 deadline=deadline,
                 days_allocated=days_allocated,
                 status=status,
@@ -252,6 +258,7 @@ def format_table(deadlines: list[BookDeadline]) -> str:
         "Title",
         "Pages",
         "Cumulative pages",
+        "Start date",
         "Deadline",
         "Days allocated",
         "Status",
@@ -262,6 +269,7 @@ def format_table(deadlines: list[BookDeadline]) -> str:
             deadline.book.title,
             str(deadline.book.pages),
             str(deadline.cumulative_pages),
+            deadline.start_date.isoformat(),
             deadline.deadline.isoformat(),
             str(deadline.days_allocated),
             deadline.status,
@@ -310,7 +318,9 @@ def write_csv(
         writer.writerow(["Reading plan"])
         writer.writerow(["Start date", start_date.isoformat()])
         writer.writerow([end_label, end_date.isoformat()])
-        writer.writerow(["Daily pace", f"{daily_pace:g} pages/day"])
+        # Keep enough precision for a reopened plan to retain its exact final
+        # deadline after a replacement recalculates the pace.
+        writer.writerow(["Daily pace", f"{daily_pace:.15g} pages/day"])
         writer.writerow(["Total pages", total_pages])
         writer.writerow(["Required pace", f"{required_pace:.2f} pages/day"])
         writer.writerow(["Status", overall_status])
@@ -321,6 +331,7 @@ def write_csv(
                 "Title",
                 "Pages",
                 "Cumulative pages",
+                "Start date",
                 "Deadline",
                 "Days allocated",
                 "Status",
@@ -334,6 +345,7 @@ def write_csv(
                     deadline.book.title,
                     deadline.book.pages,
                     deadline.cumulative_pages,
+                    deadline.start_date.isoformat(),
                     deadline.deadline.isoformat(),
                     deadline.days_allocated,
                     deadline.status,
