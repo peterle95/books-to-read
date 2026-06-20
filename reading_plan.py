@@ -515,10 +515,12 @@ def main() -> None:
     )
 
     plan_changed = False
+    replacement_made = False
     if loaded_from_csv:
         if prompt_yes_no("\nReplace a book in the imported plan?"):
             prompt_book_replacement(books)
             plan_changed = True
+            replacement_made = True
         elif prompt_yes_no("Change the order of books in the imported plan?"):
             prompt_book_reorder(books)
             plan_changed = True
@@ -527,6 +529,13 @@ def main() -> None:
         plan_changed = True
 
     if plan_changed:
+        if replacement_made:
+            # A replacement changes the total pages. Recalculate the daily
+            # pace from the fixed reading window so the final book remains
+            # scheduled for the chosen end date.
+            daily_pace = sum(book.pages for book in books) / inclusive_days_between(
+                start_date, end_date
+            )
         daily_pace, deadlines, total_pages, required_pace, overall_status = resolve_plan(
             books, start_date, end_date, daily_pace, end_label, end_name
         )
