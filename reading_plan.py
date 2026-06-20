@@ -26,6 +26,7 @@ class BookDeadline:
     start_date: date
     deadline: date
     days_allocated: int
+    daily_pages: float
     status: str
 
 
@@ -190,18 +191,79 @@ def prompt_book_reorder(books: list[Book]) -> None:
     renumber_books(books)
 
 
+def validate_simultaneous_groups(
+    books: list[Book], groups: list[tuple[int, ...]]
+) -> list[tuple[int, ...]]:
+    """Validate groups of consecutive Book IDs that are read in parallel."""
+    used_ids: set[int] = set()
+    valid_groups: list[tuple[int, ...]] = []
+
+    for group in groups:
+        ids = tuple(sorted(group))
+        if len(ids) < 2:
+            raise ValueError("choose at least two Book IDs")
+        if len(set(ids)) != len(ids):
+            raise ValueError("each Book ID can appear only once in a group")
+        if ids[0] < 1 or ids[-1] > len(books):
+            raise ValueError(f"Book IDs must be from 1 to {len(books)}")
+        if ids != tuple(range(ids[0], ids[-1] + 1)):
+            raise ValueError("Book IDs read together must be consecutive")
+        if used_ids.intersection(ids):
+            raise ValueError("a book can belong to only one simultaneous group")
+
+        used_ids.update(ids)
+        valid_groups.append(ids)
+
+    return valid_groups
+
+
+def prompt_simultaneous_groups(
+    books: list[Book], groups: list[tuple[int, ...]]
+) -> list[tuple[int, ...]]:
+    """Let the reader add consecutive books that should be read together."""
+    groups = list(groups)
+
+    while prompt_yes_no("\nRead books simultaneously?"):
+        raw_ids = input("Consecutive Book IDs to read together (for example 2,3): ").strip()
+        try:
+            group = tuple(int(value.strip()) for value in raw_ids.split(","))
+            groups = validate_simultaneous_groups(books, [*groups, group])
+        except ValueError as error:
+            print(f"Could not add simultaneous books: {error}")
+            continue
+
+        print(f"Books {', '.join(map(str, group))} will be read together.")
+
+    return groups
+
+
 def calculate_deadlines(
     books: list[Book],
     start_date: date,
     end_date: date,
     daily_pace: float,
+    simultaneous_groups: list[tuple[int, ...]] | None = None,
 ) -> list[BookDeadline]:
+    simultaneous_groups = validate_simultaneous_groups(
+        books, simultaneous_groups or []
+    )
+    group_by_first_book = {group[0]: group for group in simultaneous_groups}
+    grouped_book_ids = {book_id for group in simultaneous_groups for book_id in group}
     deadlines: list[BookDeadline] = []
     cumulative_pages = 0
     previous_cumulative_days = 0
+    book_index = 0
 
-    for book in books:
-        cumulative_pages += book.pages
+    while book_index < len(books):
+        book = books[book_index]
+        if book.number in grouped_book_ids and book.number not in group_by_first_book:
+            book_index += 1
+            continue
+
+        group_ids = group_by_first_book.get(book.number, (book.number,))
+        group_books = books[book_index : book_index + len(group_ids)]
+        group_pages = sum(group_book.pages for group_book in group_books)
+        cumulative_pages += group_pages
         # Use cumulative pages so rounding does not compound from book to book.
         # The tiny tolerance avoids floating-point noise turning an exact
         # whole-day pace into one extra day (for example, 103.00000000000001).
@@ -210,10 +272,11 @@ def calculate_deadlines(
         # The start date is the end of the first reading day, so a one-day
         # book has a deadline of the start date rather than the next day.
         deadline = start_date + timedelta(days=cumulative_days - 1)
-        # Books that need no additional full reading day are completed on the
-        # same date as the preceding book, rather than starting after their
-        # displayed deadline.
-        book_start_date = deadline - timedelta(days=max(days_allocated - 1, 0))
+        group_start_date = (
+            deadline
+            if days_allocated == 0
+            else start_date + timedelta(days=previous_cumulative_days)
+        )
 
         if deadline < end_date:
             status = "before end"
@@ -222,17 +285,28 @@ def calculate_deadlines(
         else:
             status = "after end"
 
-        deadlines.append(
-            BookDeadline(
-                book=book,
-                cumulative_pages=cumulative_pages,
-                start_date=book_start_date,
-                deadline=deadline,
-                days_allocated=days_allocated,
-                status=status,
+        individual_cumulative_pages = cumulative_pages - group_pages
+        for group_book in group_books:
+            individual_cumulative_pages += group_book.pages
+            daily_pages = (
+                daily_pace
+                if len(group_books) == 1
+                else daily_pace * group_book.pages / group_pages
             )
-        )
+            deadlines.append(
+                BookDeadline(
+                    book=group_book,
+                    cumulative_pages=individual_cumulative_pages,
+                    start_date=group_start_date,
+                    deadline=deadline,
+                    days_allocated=days_allocated,
+                    daily_pages=daily_pages,
+                    status=status,
+                )
+            )
+
         previous_cumulative_days = cumulative_days
+        book_index += len(group_books)
 
     return deadlines
 
@@ -242,13 +316,16 @@ def build_plan(
     start_date: date,
     end_date: date,
     daily_pace: float,
+    simultaneous_groups: list[tuple[int, ...]] | None = None,
 ) -> tuple[list[BookDeadline], int, float, str]:
     """Calculate all values needed to display or export the current plan."""
     total_pages = sum(book.pages for book in books)
     period_days = inclusive_days_between(start_date, end_date)
     required_pace = total_pages / period_days
     overall_status = "achievable" if daily_pace >= required_pace else "not achievable"
-    deadlines = calculate_deadlines(books, start_date, end_date, daily_pace)
+    deadlines = calculate_deadlines(
+        books, start_date, end_date, daily_pace, simultaneous_groups
+    )
     return deadlines, total_pages, required_pace, overall_status
 
 
@@ -257,6 +334,7 @@ def format_table(deadlines: list[BookDeadline]) -> str:
         "Book",
         "Title",
         "Pages",
+        "Daily pages",
         "Cumulative pages",
         "Start date",
         "Deadline",
@@ -268,6 +346,7 @@ def format_table(deadlines: list[BookDeadline]) -> str:
             str(deadline.book.number),
             deadline.book.title,
             str(deadline.book.pages),
+            f"{deadline.daily_pages:.2f}",
             str(deadline.cumulative_pages),
             deadline.start_date.isoformat(),
             deadline.deadline.isoformat(),
@@ -310,6 +389,7 @@ def write_csv(
     required_pace: float,
     overall_status: str,
     end_label: str,
+    simultaneous_groups: list[tuple[int, ...]],
 ) -> None:
     path = Path(filename)
 
@@ -324,12 +404,20 @@ def write_csv(
         writer.writerow(["Total pages", total_pages])
         writer.writerow(["Required pace", f"{required_pace:.2f} pages/day"])
         writer.writerow(["Status", overall_status])
+        if simultaneous_groups:
+            writer.writerow(
+                [
+                    "Simultaneous groups",
+                    ";".join(",".join(map(str, group)) for group in simultaneous_groups),
+                ]
+            )
         writer.writerow([])
         writer.writerow(
             [
                 "Book",
                 "Title",
                 "Pages",
+                "Daily pages",
                 "Cumulative pages",
                 "Start date",
                 "Deadline",
@@ -344,6 +432,7 @@ def write_csv(
                     deadline.book.number,
                     deadline.book.title,
                     deadline.book.pages,
+                    f"{deadline.daily_pages:.15g}",
                     deadline.cumulative_pages,
                     deadline.start_date.isoformat(),
                     deadline.deadline.isoformat(),
@@ -353,7 +442,9 @@ def write_csv(
             )
 
 
-def load_csv_plan(filename: str) -> tuple[list[Book], date, date, float, str, str]:
+def load_csv_plan(
+    filename: str,
+) -> tuple[list[Book], date, date, float, str, str, list[tuple[int, ...]]]:
     """Load the books and settings written by ``write_csv``."""
     with Path(filename).open(newline="", encoding="utf-8") as csv_file:
         rows = list(csv.reader(csv_file))
@@ -419,10 +510,32 @@ def load_csv_plan(filename: str) -> tuple[list[Book], date, date, float, str, st
         raise ValueError("no books found")
 
     renumber_books(books)
-    return books, start_date, end_date, daily_pace, end_label, end_name
+    raw_groups = metadata.get("Simultaneous groups", "").strip()
+    try:
+        simultaneous_groups = validate_simultaneous_groups(
+            books,
+            [
+                tuple(int(book_id) for book_id in group.split(","))
+                for group in raw_groups.split(";")
+                if group
+            ],
+        )
+    except ValueError as error:
+        raise ValueError(f"invalid simultaneous groups: {error}") from error
+
+    return (
+        books,
+        start_date,
+        end_date,
+        daily_pace,
+        end_label,
+        end_name,
+        simultaneous_groups,
+    )
 
 
-def prompt_csv_plan() -> tuple[list[Book], date, date, float, str, str]:
+def prompt_csv_plan(
+) -> tuple[list[Book], date, date, float, str, str, list[tuple[int, ...]]]:
     """Keep asking for a saved CSV file until a valid plan is loaded."""
     while True:
         filename = input("CSV filename [reading_plan.csv]: ").strip() or "reading_plan.csv"
@@ -464,11 +577,12 @@ def resolve_plan(
     daily_pace: float,
     end_label: str,
     end_name: str,
+    simultaneous_groups: list[tuple[int, ...]],
 ) -> tuple[float, list[BookDeadline], int, float, str]:
     """Show the plan and resolve any pace shortfall before it can be saved."""
     while True:
         deadlines, total_pages, required_pace, overall_status = build_plan(
-            books, start_date, end_date, daily_pace
+            books, start_date, end_date, daily_pace, simultaneous_groups
         )
         print_plan(
             deadlines=deadlines,
@@ -498,7 +612,15 @@ def main() -> None:
 
     loaded_from_csv = prompt_yes_no("Import a previously saved CSV plan?")
     if loaded_from_csv:
-        books, start_date, end_date, daily_pace, end_label, end_name = prompt_csv_plan()
+        (
+            books,
+            start_date,
+            end_date,
+            daily_pace,
+            end_label,
+            end_name,
+            simultaneous_groups,
+        ) = prompt_csv_plan()
     else:
         daily_pace = prompt_float("Daily reading pace in pages")
         start_date = prompt_date("Quarter start date", default=next_quarter_start())
@@ -521,9 +643,16 @@ def main() -> None:
 
         book_count = prompt_int("Number of books", default=5)
         books = collect_books(book_count)
+        simultaneous_groups: list[tuple[int, ...]] = []
 
     daily_pace, deadlines, total_pages, required_pace, overall_status = resolve_plan(
-        books, start_date, end_date, daily_pace, end_label, end_name
+        books,
+        start_date,
+        end_date,
+        daily_pace,
+        end_label,
+        end_name,
+        simultaneous_groups,
     )
 
     plan_changed = False
@@ -536,6 +665,7 @@ def main() -> None:
         elif prompt_yes_no("Change the order of books in the imported plan?"):
             prompt_book_reorder(books)
             plan_changed = True
+            simultaneous_groups = []
     elif prompt_yes_no("\nChange the order of a book before saving?"):
         prompt_book_reorder(books)
         plan_changed = True
@@ -549,7 +679,28 @@ def main() -> None:
                 start_date, end_date
             )
         daily_pace, deadlines, total_pages, required_pace, overall_status = resolve_plan(
-            books, start_date, end_date, daily_pace, end_label, end_name
+            books,
+            start_date,
+            end_date,
+            daily_pace,
+            end_label,
+            end_name,
+            simultaneous_groups,
+        )
+
+    updated_simultaneous_groups = prompt_simultaneous_groups(
+        books, simultaneous_groups
+    )
+    if updated_simultaneous_groups != simultaneous_groups:
+        simultaneous_groups = updated_simultaneous_groups
+        daily_pace, deadlines, total_pages, required_pace, overall_status = resolve_plan(
+            books,
+            start_date,
+            end_date,
+            daily_pace,
+            end_label,
+            end_name,
+            simultaneous_groups,
         )
 
     if prompt_yes_no("\nSave this plan to a CSV file?"):
@@ -564,6 +715,7 @@ def main() -> None:
             required_pace=required_pace,
             overall_status=overall_status,
             end_label=end_label,
+            simultaneous_groups=simultaneous_groups,
         )
         print(f"Saved to {Path(filename).resolve()}")
 
