@@ -1126,26 +1126,27 @@ def main() -> None:
 
         sections = collect_book_sections()
 
-    stats_options = prompt_summary_stats_options()
-
     if loaded_from_csv:
-        section_plans, total_pages, highest_daily_pace, overall_status = show_plan(
-            sections,
-            start_date,
-            end_date,
-            end_label,
-            end_name,
-            stats_options,
+        # Skip the optional-stats questionnaire for an imported plan: go
+        # straight from loading the file to showing every stat and table.
+        stats_options = SummaryStatsOptions(
+            book_counts=True,
+            page_share=True,
+            average_pages=True,
+            reading_period=True,
+            pace_driver=True,
         )
     else:
-        section_plans, total_pages, highest_daily_pace, overall_status = show_plan(
-            sections,
-            start_date,
-            end_date,
-            end_label,
-            end_name,
-            stats_options,
-        )
+        stats_options = prompt_summary_stats_options()
+
+    section_plans, total_pages, highest_daily_pace, overall_status = show_plan(
+        sections,
+        start_date,
+        end_date,
+        end_label,
+        end_name,
+        stats_options,
+    )
 
     plan_changed = False
     if loaded_from_csv:
