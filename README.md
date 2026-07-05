@@ -9,14 +9,16 @@ python reading_plan.py
 ```
 
 You'll be prompted for:
-- Daily reading pace (pages/day)
+- Daily reading pace per format (pages/day)
 - Quarter start date (defaults to next quarter start)
 - Optional custom target finish date
-- Number of books and their titles/pages
+- Physical books first, then digital books, including their titles/pages
 
 If the plan isn't achievable, you can adjust the pace or replace books. The final plan can be exported to CSV.
 
-After the first table is shown, you can choose consecutive Book IDs to read simultaneously. The books start and finish together, their daily page allocation is split according to their page counts, and the table is recalculated. Simultaneous groups are saved in CSV exports and restored on import.
+The output shows a physical-books table followed by a digital-books table. Each format is planned as a parallel reading stream, so the required pace is the higher pace needed by either table.
+
+After the tables are shown, you can choose consecutive Book IDs within each table to read simultaneously. The books start and finish together, their daily page allocation is split according to their page counts, and the table is recalculated. Simultaneous groups are saved in CSV exports and restored on import.
 
 ## Requirements
 

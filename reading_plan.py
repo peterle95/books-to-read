@@ -10,6 +10,9 @@ from pathlib import Path
 
 DATE_FORMAT = "%Y-%m-%d"
 QUARTER_START_MONTHS = (1, 4, 7, 10)
+PHYSICAL_BOOKS_LABEL = "Physical books"
+DIGITAL_BOOKS_LABEL = "Digital books"
+BOOK_SECTION_LABELS = (PHYSICAL_BOOKS_LABEL, DIGITAL_BOOKS_LABEL)
 
 
 @dataclass
@@ -17,6 +20,13 @@ class Book:
     number: int
     title: str
     pages: int
+
+
+@dataclass
+class BookSection:
+    label: str
+    books: list[Book]
+    simultaneous_groups: list[tuple[int, ...]]
 
 
 @dataclass
@@ -28,6 +38,15 @@ class BookDeadline:
     days_allocated: int
     daily_pages: float
     status: str
+
+
+@dataclass
+class SectionPlan:
+    section: BookSection
+    deadlines: list[BookDeadline]
+    total_pages: int
+    required_pace: float
+    overall_status: str
 
 
 def parse_date(value: str) -> date:
@@ -88,7 +107,7 @@ def prompt_float(prompt: str, default: float | None = None) -> float:
         return value
 
 
-def prompt_int(prompt: str, default: int | None = None) -> int:
+def prompt_int(prompt: str, default: int | None = None, minimum: int = 1) -> int:
     while True:
         suffix = f" [{default}]" if default is not None else ""
         raw_value = input(f"{prompt}{suffix}: ").strip()
@@ -102,8 +121,11 @@ def prompt_int(prompt: str, default: int | None = None) -> int:
             print("Please enter a whole number.")
             continue
 
-        if value <= 0:
-            print("Please enter a positive integer.")
+        if value < minimum:
+            if minimum == 0:
+                print("Please enter zero or a positive integer.")
+            else:
+                print("Please enter a positive integer.")
             continue
 
         return value
@@ -139,16 +161,36 @@ def prompt_yes_no(prompt: str, default: bool = False) -> bool:
         print("Please enter y or n.")
 
 
-def collect_books(count: int) -> list[Book]:
+def collect_books(count: int, label: str = "Book") -> list[Book]:
     books: list[Book] = []
 
     for number in range(1, count + 1):
-        print(f"\nBook {number}")
-        title = input(f"Title [Book {number}]: ").strip() or f"Book {number}"
+        default_title = f"{label} {number}"
+        print(f"\n{default_title}")
+        title = input(f"Title [{default_title}]: ").strip() or default_title
         pages = prompt_int("Pages")
         books.append(Book(number=number, title=title, pages=pages))
 
     return books
+
+
+def collect_book_sections() -> list[BookSection]:
+    """Collect physical books first, then digital books."""
+    while True:
+        physical_count = prompt_int(
+            "Number of physical books", default=5, minimum=0
+        )
+        physical_books = collect_books(physical_count, "Physical book")
+        digital_count = prompt_int("Number of digital books", default=0, minimum=0)
+        digital_books = collect_books(digital_count, "Digital book")
+
+        if physical_books or digital_books:
+            return [
+                BookSection(PHYSICAL_BOOKS_LABEL, physical_books, []),
+                BookSection(DIGITAL_BOOKS_LABEL, digital_books, []),
+            ]
+
+        print("Please enter at least one physical or digital book.")
 
 
 def prompt_book_replacement(books: list[Book]) -> None:
@@ -212,8 +254,8 @@ def prompt_book_deletion(
     books: list[Book], simultaneous_groups: list[tuple[int, ...]]
 ) -> tuple[bool, list[tuple[int, ...]]]:
     """Delete one book and preserve simultaneous groups among remaining books."""
-    if len(books) == 1:
-        print("Cannot delete the only book in the plan.")
+    if not books:
+        print("No books to delete.")
         return False, simultaneous_groups
 
     while True:
@@ -264,6 +306,58 @@ def prompt_book_addition(
     return remap_simultaneous_groups_after_addition(
         simultaneous_groups, position, books
     )
+
+
+def prompt_section_choice(
+    sections: list[BookSection], question: str, require_books: bool = True
+) -> BookSection:
+    available_sections = [
+        section for section in sections if section.books or not require_books
+    ]
+    if len(available_sections) == 1:
+        return available_sections[0]
+
+    print(f"\n{question}")
+    for index, section in enumerate(available_sections, start=1):
+        print(f"{index}. {section.label}")
+
+    while True:
+        section_id = prompt_int("Table", default=1)
+        if section_id <= len(available_sections):
+            return available_sections[section_id - 1]
+        print(f"Please enter a table from 1 to {len(available_sections)}.")
+
+
+def prompt_plan_book_replacement(sections: list[BookSection]) -> None:
+    section = prompt_section_choice(sections, "Which table contains the book to replace?")
+    prompt_book_replacement(section.books)
+
+
+def prompt_plan_book_deletion(sections: list[BookSection]) -> bool:
+    if sum(len(section.books) for section in sections) == 1:
+        print("Cannot delete the only book in the plan.")
+        return False
+
+    section = prompt_section_choice(sections, "Which table contains the book to delete?")
+    book_deleted, section.simultaneous_groups = prompt_book_deletion(
+        section.books, section.simultaneous_groups
+    )
+    return book_deleted
+
+
+def prompt_plan_book_addition(sections: list[BookSection]) -> None:
+    section = prompt_section_choice(
+        sections, "Which table should the new book be added to?", require_books=False
+    )
+    section.simultaneous_groups = prompt_book_addition(
+        section.books, section.simultaneous_groups
+    )
+
+
+def prompt_plan_book_reorder(sections: list[BookSection]) -> None:
+    section = prompt_section_choice(sections, "Which table contains the book to reorder?")
+    prompt_book_reorder(section.books)
+    section.simultaneous_groups = []
 
 
 def renumber_books(books: list[Book]) -> None:
@@ -359,12 +453,13 @@ def add_or_update_simultaneous_group(
 
 
 def prompt_simultaneous_groups(
-    books: list[Book], groups: list[tuple[int, ...]]
+    books: list[Book], groups: list[tuple[int, ...]], label: str = "books"
 ) -> list[tuple[int, ...]]:
     """Let the reader add consecutive books that should be read together."""
     groups = list(groups)
+    label_text = label.lower()
 
-    while prompt_yes_no("\nRead books simultaneously?"):
+    while prompt_yes_no(f"\nRead {label_text} simultaneously?"):
         raw_ids = input("Consecutive Book IDs to read together (for example 2,3): ").strip()
         try:
             group = tuple(int(value.strip()) for value in raw_ids.split(","))
@@ -380,6 +475,22 @@ def prompt_simultaneous_groups(
         print(f"Books {', '.join(map(str, group))} will be read together.")
 
     return groups
+
+
+def prompt_plan_simultaneous_groups(sections: list[BookSection]) -> bool:
+    changed = False
+
+    for section in sections:
+        if not section.books:
+            continue
+        updated_groups = prompt_simultaneous_groups(
+            section.books, section.simultaneous_groups, section.label
+        )
+        if updated_groups != section.simultaneous_groups:
+            section.simultaneous_groups = updated_groups
+            changed = True
+
+    return changed
 
 
 def calculate_deadlines(
@@ -476,6 +587,55 @@ def build_plan(
     return deadlines, total_pages, required_pace, overall_status
 
 
+def build_section_plan(
+    section: BookSection, start_date: date, end_date: date, daily_pace: float
+) -> SectionPlan:
+    """Calculate one physical or digital table."""
+    if not section.books:
+        return SectionPlan(section, [], 0, 0.0, "achievable")
+
+    deadlines, total_pages, required_pace, overall_status = build_plan(
+        section.books, start_date, end_date, daily_pace, section.simultaneous_groups
+    )
+    return SectionPlan(section, deadlines, total_pages, required_pace, overall_status)
+
+
+def build_section_plans(
+    sections: list[BookSection], start_date: date, end_date: date, daily_pace: float
+) -> tuple[list[SectionPlan], int, float, str]:
+    section_plans = [
+        build_section_plan(section, start_date, end_date, daily_pace)
+        for section in sections
+    ]
+    total_pages = sum(section_plan.total_pages for section_plan in section_plans)
+    required_pace = max(
+        (section_plan.required_pace for section_plan in section_plans), default=0.0
+    )
+    overall_status = (
+        "achievable"
+        if all(
+            section_plan.overall_status == "achievable"
+            for section_plan in section_plans
+        )
+        else "not achievable"
+    )
+    return section_plans, total_pages, required_pace, overall_status
+
+
+def required_daily_pace_for_sections(
+    sections: list[BookSection], start_date: date, end_date: date
+) -> float:
+    period_days = inclusive_days_between(start_date, end_date)
+    return max(
+        (
+            sum(book.pages for book in section.books) / period_days
+            for section in sections
+            if section.books
+        ),
+        default=0.0,
+    )
+
+
 def format_table(deadlines: list[BookDeadline]) -> str:
     headers = [
         "Book",
@@ -528,7 +688,7 @@ def final_result_message(final_deadline: date, end_date: date, end_name: str) ->
 
 def write_csv(
     filename: str,
-    deadlines: list[BookDeadline],
+    section_plans: list[SectionPlan],
     start_date: date,
     end_date: date,
     daily_pace: float,
@@ -536,7 +696,6 @@ def write_csv(
     required_pace: float,
     overall_status: str,
     end_label: str,
-    simultaneous_groups: list[tuple[int, ...]],
 ) -> None:
     path = Path(filename)
 
@@ -547,58 +706,124 @@ def write_csv(
         writer.writerow([end_label, end_date.isoformat()])
         # Keep enough precision for a reopened plan to retain its exact final
         # deadline after a replacement recalculates the pace.
-        writer.writerow(["Daily pace", f"{daily_pace:.15g} pages/day"])
+        writer.writerow(["Daily pace", f"{daily_pace:.15g} pages/day per format"])
         writer.writerow(["Total pages", total_pages])
-        writer.writerow(["Required pace", f"{required_pace:.2f} pages/day"])
+        writer.writerow(["Required pace", f"{required_pace:.2f} pages/day per format"])
         writer.writerow(["Status", overall_status])
-        if simultaneous_groups:
-            writer.writerow(
-                [
-                    "Simultaneous groups",
-                    ";".join(",".join(map(str, group)) for group in simultaneous_groups),
-                ]
-            )
-        writer.writerow([])
-        writer.writerow(
-            [
-                "Book",
-                "Title",
-                "Pages",
-                "Daily pages",
-                "Cumulative pages",
-                "Start date",
-                "Deadline",
-                "Days allocated",
-                "Status",
-            ]
-        )
 
-        for deadline in deadlines:
+        for section_plan in section_plans:
+            writer.writerow([])
+            writer.writerow([section_plan.section.label])
+            if section_plan.section.simultaneous_groups:
+                writer.writerow(
+                    [
+                        "Simultaneous groups",
+                        ";".join(
+                            ",".join(map(str, group))
+                            for group in section_plan.section.simultaneous_groups
+                        ),
+                    ]
+                )
             writer.writerow(
                 [
-                    deadline.book.number,
-                    deadline.book.title,
-                    deadline.book.pages,
-                    f"{deadline.daily_pages:.15g}",
-                    deadline.cumulative_pages,
-                    deadline.start_date.isoformat(),
-                    deadline.deadline.isoformat(),
-                    deadline.days_allocated,
-                    deadline.status,
+                    "Book",
+                    "Title",
+                    "Pages",
+                    "Daily pages",
+                    "Cumulative pages",
+                    "Start date",
+                    "Deadline",
+                    "Days allocated",
+                    "Status",
                 ]
             )
+
+            for deadline in section_plan.deadlines:
+                writer.writerow(
+                    [
+                        deadline.book.number,
+                        deadline.book.title,
+                        deadline.book.pages,
+                        f"{deadline.daily_pages:.15g}",
+                        deadline.cumulative_pages,
+                        deadline.start_date.isoformat(),
+                        deadline.deadline.isoformat(),
+                        deadline.days_allocated,
+                        deadline.status,
+                    ]
+                )
+
+
+def parse_csv_book_table(
+    rows: list[list[str]], header_index: int, stop_at_blank: bool
+) -> tuple[list[Book], int]:
+    books: list[Book] = []
+    index = header_index + 1
+
+    while index < len(rows):
+        row = rows[index]
+        if row and row[0] in BOOK_SECTION_LABELS:
+            break
+        if not row or not any(cell.strip() for cell in row):
+            if stop_at_blank:
+                break
+            index += 1
+            continue
+        if len(row) < 3:
+            raise ValueError("a book row is incomplete")
+        try:
+            number = int(row[0])
+            pages = int(row[2])
+        except ValueError as error:
+            raise ValueError("book IDs and pages must be whole numbers") from error
+        title = row[1].strip()
+        if number <= 0 or pages <= 0 or not title:
+            raise ValueError("each book needs a positive ID, title, and page count")
+        books.append(Book(number=number, title=title, pages=pages))
+        index += 1
+
+    renumber_books(books)
+    return books, index
+
+
+def parse_csv_simultaneous_groups(
+    books: list[Book], raw_groups: str, label: str
+) -> list[tuple[int, ...]]:
+    try:
+        return validate_simultaneous_groups(
+            books,
+            [
+                tuple(int(book_id) for book_id in group.split(","))
+                for group in raw_groups.split(";")
+                if group
+            ],
+        )
+    except ValueError as error:
+        raise ValueError(f"invalid {label} simultaneous groups: {error}") from error
 
 
 def load_csv_plan(
     filename: str,
-) -> tuple[list[Book], date, date, float, str, str, list[tuple[int, ...]]]:
+) -> tuple[list[BookSection], date, date, float, str, str]:
     """Load the books and settings written by ``write_csv``."""
     with Path(filename).open(newline="", encoding="utf-8") as csv_file:
         rows = list(csv.reader(csv_file))
 
+    first_plan_row_index = next(
+        (
+            index
+            for index, row in enumerate(rows)
+            if row
+            and (
+                row[0] in BOOK_SECTION_LABELS
+                or row[:3] == ["Book", "Title", "Pages"]
+            )
+        ),
+        len(rows),
+    )
     metadata = {
         row[0]: row[1]
-        for row in rows
+        for row in rows[:first_plan_row_index]
         if len(row) >= 2 and row[0] and row[0] != "Book"
     }
     required_fields = {"Start date", "Daily pace"}
@@ -628,61 +853,78 @@ def load_csv_plan(
     if end_date < start_date:
         raise ValueError("finish date must be on or after the start date")
 
-    try:
-        header_index = next(
-            index
-            for index, row in enumerate(rows)
-            if row[:3] == ["Book", "Title", "Pages"]
-        )
-    except StopIteration as error:
-        raise ValueError("missing book table header") from error
+    has_section_labels = any(row and row[0] in BOOK_SECTION_LABELS for row in rows)
+    if has_section_labels:
+        sections_by_label = {
+            label: BookSection(label, [], []) for label in BOOK_SECTION_LABELS
+        }
+        index = 0
+        while index < len(rows):
+            row = rows[index]
+            if not row or row[0] not in BOOK_SECTION_LABELS:
+                index += 1
+                continue
 
-    books: list[Book] = []
-    for row in rows[header_index + 1 :]:
-        if not row or not any(cell.strip() for cell in row):
-            continue
-        if len(row) < 3:
-            raise ValueError("a book row is incomplete")
+            label = row[0]
+            index += 1
+            raw_groups = ""
+            while index < len(rows) and (
+                not rows[index] or not any(cell.strip() for cell in rows[index])
+            ):
+                index += 1
+            if (
+                index < len(rows)
+                and len(rows[index]) >= 2
+                and rows[index][0] == "Simultaneous groups"
+            ):
+                raw_groups = rows[index][1].strip()
+                index += 1
+            while index < len(rows) and (
+                not rows[index] or not any(cell.strip() for cell in rows[index])
+            ):
+                index += 1
+            if index >= len(rows) or rows[index][:3] != ["Book", "Title", "Pages"]:
+                raise ValueError(f"missing {label} book table header")
+
+            books, index = parse_csv_book_table(rows, index, stop_at_blank=True)
+            groups = parse_csv_simultaneous_groups(books, raw_groups, label)
+            sections_by_label[label] = BookSection(label, books, groups)
+
+        sections = [sections_by_label[label] for label in BOOK_SECTION_LABELS]
+    else:
         try:
-            number = int(row[0])
-            pages = int(row[2])
-        except ValueError as error:
-            raise ValueError("book IDs and pages must be whole numbers") from error
-        title = row[1].strip()
-        if number <= 0 or pages <= 0 or not title:
-            raise ValueError("each book needs a positive ID, title, and page count")
-        books.append(Book(number=number, title=title, pages=pages))
+            header_index = next(
+                index
+                for index, row in enumerate(rows)
+                if row[:3] == ["Book", "Title", "Pages"]
+            )
+        except StopIteration as error:
+            raise ValueError("missing book table header") from error
 
-    if not books:
+        books, _ = parse_csv_book_table(rows, header_index, stop_at_blank=False)
+        groups = parse_csv_simultaneous_groups(
+            books, metadata.get("Simultaneous groups", "").strip(), PHYSICAL_BOOKS_LABEL
+        )
+        sections = [
+            BookSection(PHYSICAL_BOOKS_LABEL, books, groups),
+            BookSection(DIGITAL_BOOKS_LABEL, [], []),
+        ]
+
+    if not any(section.books for section in sections):
         raise ValueError("no books found")
 
-    renumber_books(books)
-    raw_groups = metadata.get("Simultaneous groups", "").strip()
-    try:
-        simultaneous_groups = validate_simultaneous_groups(
-            books,
-            [
-                tuple(int(book_id) for book_id in group.split(","))
-                for group in raw_groups.split(";")
-                if group
-            ],
-        )
-    except ValueError as error:
-        raise ValueError(f"invalid simultaneous groups: {error}") from error
-
     return (
-        books,
+        sections,
         start_date,
         end_date,
         daily_pace,
         end_label,
         end_name,
-        simultaneous_groups,
     )
 
 
 def prompt_csv_plan(
-) -> tuple[list[Book], date, date, float, str, str, list[tuple[int, ...]]]:
+) -> tuple[list[BookSection], date, date, float, str, str]:
     """Keep asking for a saved CSV file until a valid plan is loaded."""
     while True:
         filename = input("CSV filename [reading_plan.csv]: ").strip() or "reading_plan.csv"
@@ -693,7 +935,7 @@ def prompt_csv_plan(
 
 
 def print_plan(
-    deadlines: list[BookDeadline],
+    section_plans: list[SectionPlan],
     start_date: date,
     end_date: date,
     daily_pace: float,
@@ -706,32 +948,41 @@ def print_plan(
     print("\nReading plan")
     print(f"Start date: {start_date.isoformat()}")
     print(f"{end_label}: {end_date.isoformat()}")
-    print(f"Daily pace: {daily_pace:g} pages/day")
+    print(f"Daily pace: {daily_pace:g} pages/day per format")
     print(f"Total pages: {total_pages}")
-    print(f"Required pace: {required_pace:.2f} pages/day")
+    print(f"Required pace: {required_pace:.2f} pages/day per format")
     print(f"Status: {overall_status}")
-    print()
-    print(format_table(deadlines))
-    print()
-    print("Final result:")
-    print(final_result_message(deadlines[-1].deadline, end_date, end_name))
+
+    for section_plan in section_plans:
+        print(f"\n{section_plan.section.label}")
+        if not section_plan.deadlines:
+            print("No books.")
+            continue
+
+        print(format_table(section_plan.deadlines))
+        print()
+        print("Final result:")
+        print(
+            final_result_message(
+                section_plan.deadlines[-1].deadline, end_date, end_name
+            )
+        )
 
 
 def show_plan(
-    books: list[Book],
+    sections: list[BookSection],
     start_date: date,
     end_date: date,
     daily_pace: float,
     end_label: str,
     end_name: str,
-    simultaneous_groups: list[tuple[int, ...]],
-) -> tuple[list[BookDeadline], int, float, str]:
+) -> tuple[list[SectionPlan], int, float, str]:
     """Build and print the current plan without prompting for edits."""
-    deadlines, total_pages, required_pace, overall_status = build_plan(
-        books, start_date, end_date, daily_pace, simultaneous_groups
+    section_plans, total_pages, required_pace, overall_status = build_section_plans(
+        sections, start_date, end_date, daily_pace
     )
     print_plan(
-        deadlines=deadlines,
+        section_plans=section_plans,
         start_date=start_date,
         end_date=end_date,
         daily_pace=daily_pace,
@@ -741,39 +992,37 @@ def show_plan(
         end_label=end_label,
         end_name=end_name,
     )
-    return deadlines, total_pages, required_pace, overall_status
+    return section_plans, total_pages, required_pace, overall_status
 
 
 def resolve_plan(
-    books: list[Book],
+    sections: list[BookSection],
     start_date: date,
     end_date: date,
     daily_pace: float,
     end_label: str,
     end_name: str,
-    simultaneous_groups: list[tuple[int, ...]],
-) -> tuple[float, list[BookDeadline], int, float, str]:
+) -> tuple[float, list[SectionPlan], int, float, str]:
     """Show the plan and resolve any pace shortfall before it can be saved."""
     while True:
-        deadlines, total_pages, required_pace, overall_status = show_plan(
-            books,
+        section_plans, total_pages, required_pace, overall_status = show_plan(
+            sections,
             start_date,
             end_date,
             daily_pace,
             end_label,
             end_name,
-            simultaneous_groups,
         )
 
         if overall_status == "achievable":
-            return daily_pace, deadlines, total_pages, required_pace, overall_status
+            return daily_pace, section_plans, total_pages, required_pace, overall_status
 
         if prompt_yes_no(
             "\nUse the proposed required pace to finish by the deadline?"
         ):
             daily_pace = required_pace
         else:
-            prompt_book_replacement(books)
+            prompt_plan_book_replacement(sections)
 
 
 def main() -> None:
@@ -782,16 +1031,15 @@ def main() -> None:
     loaded_from_csv = prompt_yes_no("Import a previously saved CSV plan?")
     if loaded_from_csv:
         (
-            books,
+            sections,
             start_date,
             end_date,
             daily_pace,
             end_label,
             end_name,
-            simultaneous_groups,
         ) = prompt_csv_plan()
     else:
-        daily_pace = prompt_float("Daily reading pace in pages")
+        daily_pace = prompt_float("Daily reading pace in pages per format")
         start_date = prompt_date("Quarter start date", default=next_quarter_start())
 
         use_custom_target = prompt_yes_no(
@@ -810,54 +1058,47 @@ def main() -> None:
         end_label = "Target finish date" if use_custom_target else "Quarter end"
         end_name = "target finish date" if use_custom_target else "quarter end date"
 
-        book_count = prompt_int("Number of books", default=5)
-        books = collect_books(book_count)
-        simultaneous_groups: list[tuple[int, ...]] = []
+        sections = collect_book_sections()
 
     if loaded_from_csv:
-        deadlines, total_pages, required_pace, overall_status = show_plan(
-            books,
+        section_plans, total_pages, required_pace, overall_status = show_plan(
+            sections,
             start_date,
             end_date,
             daily_pace,
             end_label,
             end_name,
-            simultaneous_groups,
         )
     else:
-        daily_pace, deadlines, total_pages, required_pace, overall_status = resolve_plan(
-            books,
+        daily_pace, section_plans, total_pages, required_pace, overall_status = resolve_plan(
+            sections,
             start_date,
             end_date,
             daily_pace,
             end_label,
             end_name,
-            simultaneous_groups,
         )
 
     plan_changed = False
     recalculate_pace = False
     if loaded_from_csv:
         if prompt_yes_no("\nReplace a book in the imported plan?"):
-            prompt_book_replacement(books)
+            prompt_plan_book_replacement(sections)
             plan_changed = True
             recalculate_pace = True
         elif prompt_yes_no("Delete a book from the imported plan?"):
-            book_deleted, simultaneous_groups = prompt_book_deletion(
-                books, simultaneous_groups
-            )
+            book_deleted = prompt_plan_book_deletion(sections)
             plan_changed = book_deleted
             recalculate_pace = book_deleted
         elif prompt_yes_no("Add a book to the imported plan?"):
-            simultaneous_groups = prompt_book_addition(books, simultaneous_groups)
+            prompt_plan_book_addition(sections)
             plan_changed = True
             recalculate_pace = True
         elif prompt_yes_no("Change the order of books in the imported plan?"):
-            prompt_book_reorder(books)
+            prompt_plan_book_reorder(sections)
             plan_changed = True
-            simultaneous_groups = []
     elif prompt_yes_no("\nChange the order of a book before saving?"):
-        prompt_book_reorder(books)
+        prompt_plan_book_reorder(sections)
         plan_changed = True
 
     if plan_changed:
@@ -865,61 +1106,53 @@ def main() -> None:
             # Replacement, deletion, and addition change the total pages.
             # Recalculate from the fixed reading window so the final book remains
             # scheduled for the chosen end date.
-            daily_pace = sum(book.pages for book in books) / inclusive_days_between(
-                start_date, end_date
+            daily_pace = required_daily_pace_for_sections(
+                sections, start_date, end_date
             )
         if loaded_from_csv:
-            deadlines, total_pages, required_pace, overall_status = show_plan(
-                books,
+            section_plans, total_pages, required_pace, overall_status = show_plan(
+                sections,
                 start_date,
                 end_date,
                 daily_pace,
                 end_label,
                 end_name,
-                simultaneous_groups,
             )
         else:
-            daily_pace, deadlines, total_pages, required_pace, overall_status = resolve_plan(
-                books,
+            daily_pace, section_plans, total_pages, required_pace, overall_status = resolve_plan(
+                sections,
                 start_date,
                 end_date,
                 daily_pace,
                 end_label,
                 end_name,
-                simultaneous_groups,
             )
 
-    updated_simultaneous_groups = prompt_simultaneous_groups(
-        books, simultaneous_groups
-    )
-    if updated_simultaneous_groups != simultaneous_groups:
-        simultaneous_groups = updated_simultaneous_groups
+    if prompt_plan_simultaneous_groups(sections):
         if loaded_from_csv:
-            deadlines, total_pages, required_pace, overall_status = show_plan(
-                books,
+            section_plans, total_pages, required_pace, overall_status = show_plan(
+                sections,
                 start_date,
                 end_date,
                 daily_pace,
                 end_label,
                 end_name,
-                simultaneous_groups,
             )
         else:
-            daily_pace, deadlines, total_pages, required_pace, overall_status = resolve_plan(
-                books,
+            daily_pace, section_plans, total_pages, required_pace, overall_status = resolve_plan(
+                sections,
                 start_date,
                 end_date,
                 daily_pace,
                 end_label,
                 end_name,
-                simultaneous_groups,
             )
 
     if prompt_yes_no("\nSave this plan to a CSV file?"):
         filename = input("CSV filename [reading_plan.csv]: ").strip() or "reading_plan.csv"
         write_csv(
             filename=filename,
-            deadlines=deadlines,
+            section_plans=section_plans,
             start_date=start_date,
             end_date=end_date,
             daily_pace=daily_pace,
@@ -927,7 +1160,6 @@ def main() -> None:
             required_pace=required_pace,
             overall_status=overall_status,
             end_label=end_label,
-            simultaneous_groups=simultaneous_groups,
         )
         print(f"Saved to {Path(filename).resolve()}")
 
