@@ -15,7 +15,7 @@ You'll be prompted for:
 
 The final plan can be exported to CSV.
 
-The output shows a physical-books table followed by a digital-books table. Each format is planned as a parallel reading stream with its own calculated daily pace.
+The output shows physical and digital page totals, then a physical-books table followed by a digital-books table. Each format is planned as a parallel reading stream with its own calculated daily pace. The CLI asks before showing each optional extra summary stat.
 
 After the tables are shown, you can choose consecutive Book IDs within each table to read simultaneously. The books start and finish together, their daily page allocation is split according to their page counts, and the table is recalculated. Simultaneous groups are saved in CSV exports and restored on import.
 

@@ -50,6 +50,15 @@ class SectionPlan:
     overall_status: str
 
 
+@dataclass
+class SummaryStatsOptions:
+    book_counts: bool
+    page_share: bool
+    average_pages: bool
+    reading_period: bool
+    pace_driver: bool
+
+
 def parse_date(value: str) -> date:
     """Parse a date in YYYY-MM-DD format."""
     return datetime.strptime(value, DATE_FORMAT).date()
@@ -139,6 +148,18 @@ def prompt_yes_no(prompt: str, default: bool = False) -> bool:
             return False
 
         print("Please enter y or n.")
+
+
+def prompt_summary_stats_options() -> SummaryStatsOptions:
+    """Ask which optional summary stats should be shown for this run."""
+    print("\nOptional summary stats")
+    return SummaryStatsOptions(
+        book_counts=prompt_yes_no("Show book counts by format?"),
+        page_share=prompt_yes_no("Show physical/digital page percentages?"),
+        average_pages=prompt_yes_no("Show average pages per book by format?"),
+        reading_period=prompt_yes_no("Show reading period length?"),
+        pace_driver=prompt_yes_no("Show which format sets the highest pace?"),
+    )
 
 
 def collect_books(count: int, label: str = "Book") -> list[Book]:
@@ -606,6 +627,89 @@ def build_section_plans(
     return section_plans, total_pages, highest_daily_pace, overall_status
 
 
+def section_plan_by_label(
+    section_plans: list[SectionPlan], label: str
+) -> SectionPlan:
+    return next(
+        section_plan
+        for section_plan in section_plans
+        if section_plan.section.label == label
+    )
+
+
+def average_pages_per_book(section_plan: SectionPlan) -> float:
+    book_count = len(section_plan.section.books)
+    if book_count == 0:
+        return 0.0
+    return section_plan.total_pages / book_count
+
+
+def optional_summary_stat_rows(
+    section_plans: list[SectionPlan],
+    start_date: date,
+    end_date: date,
+    highest_daily_pace: float,
+    stats_options: SummaryStatsOptions,
+) -> list[tuple[str, str]]:
+    physical_plan = section_plan_by_label(section_plans, PHYSICAL_BOOKS_LABEL)
+    digital_plan = section_plan_by_label(section_plans, DIGITAL_BOOKS_LABEL)
+    rows: list[tuple[str, str]] = []
+
+    if stats_options.book_counts:
+        rows.extend(
+            [
+                ("Physical book count", str(len(physical_plan.section.books))),
+                ("Digital book count", str(len(digital_plan.section.books))),
+            ]
+        )
+    if stats_options.page_share:
+        total_pages = physical_plan.total_pages + digital_plan.total_pages
+        physical_share = (
+            0.0 if total_pages == 0 else physical_plan.total_pages / total_pages * 100
+        )
+        digital_share = (
+            0.0 if total_pages == 0 else digital_plan.total_pages / total_pages * 100
+        )
+        rows.extend(
+            [
+                ("Physical page share", f"{physical_share:.1f}%"),
+                ("Digital page share", f"{digital_share:.1f}%"),
+            ]
+        )
+    if stats_options.average_pages:
+        rows.extend(
+            [
+                (
+                    "Physical average pages/book",
+                    f"{average_pages_per_book(physical_plan):.1f}",
+                ),
+                (
+                    "Digital average pages/book",
+                    f"{average_pages_per_book(digital_plan):.1f}",
+                ),
+            ]
+        )
+    if stats_options.reading_period:
+        rows.append(
+            ("Reading period", f"{inclusive_days_between(start_date, end_date)} days")
+        )
+    if stats_options.pace_driver:
+        pace_drivers = [
+            section_plan.section.label
+            for section_plan in section_plans
+            if section_plan.total_pages > 0
+            and abs(section_plan.daily_pace - highest_daily_pace) < 1e-9
+        ]
+        rows.append(
+            (
+                "Pace driver",
+                f"{', '.join(pace_drivers)} ({highest_daily_pace:.2f} pages/day)",
+            )
+        )
+
+    return rows
+
+
 def format_table(deadlines: list[BookDeadline]) -> str:
     headers = [
         "Book",
@@ -665,6 +769,7 @@ def write_csv(
     highest_daily_pace: float,
     overall_status: str,
     end_label: str,
+    stats_options: SummaryStatsOptions,
 ) -> None:
     path = Path(filename)
 
@@ -673,9 +778,17 @@ def write_csv(
         writer.writerow(["Reading plan"])
         writer.writerow(["Start date", start_date.isoformat()])
         writer.writerow([end_label, end_date.isoformat()])
+        physical_plan = section_plan_by_label(section_plans, PHYSICAL_BOOKS_LABEL)
+        digital_plan = section_plan_by_label(section_plans, DIGITAL_BOOKS_LABEL)
         writer.writerow(["Total pages", total_pages])
+        writer.writerow(["Physical pages", physical_plan.total_pages])
+        writer.writerow(["Digital pages", digital_plan.total_pages])
         writer.writerow(["Highest daily pace", f"{highest_daily_pace:.15g} pages/day"])
         writer.writerow(["Status", overall_status])
+        for label, value in optional_summary_stat_rows(
+            section_plans, start_date, end_date, highest_daily_pace, stats_options
+        ):
+            writer.writerow([label, value])
 
         for section_plan in section_plans:
             writer.writerow([])
@@ -920,13 +1033,22 @@ def print_plan(
     overall_status: str,
     end_label: str,
     end_name: str,
+    stats_options: SummaryStatsOptions,
 ) -> None:
     print("\nReading plan")
     print(f"Start date: {start_date.isoformat()}")
+    physical_plan = section_plan_by_label(section_plans, PHYSICAL_BOOKS_LABEL)
+    digital_plan = section_plan_by_label(section_plans, DIGITAL_BOOKS_LABEL)
     print(f"{end_label}: {end_date.isoformat()}")
     print(f"Total pages: {total_pages}")
+    print(f"Physical pages: {physical_plan.total_pages}")
+    print(f"Digital pages: {digital_plan.total_pages}")
     print(f"Highest daily pace: {highest_daily_pace:.2f} pages/day")
     print(f"Status: {overall_status}")
+    for label, value in optional_summary_stat_rows(
+        section_plans, start_date, end_date, highest_daily_pace, stats_options
+    ):
+        print(f"{label}: {value}")
 
     for section_plan in section_plans:
         print(f"\n{section_plan.section.label}")
@@ -951,6 +1073,7 @@ def show_plan(
     end_date: date,
     end_label: str,
     end_name: str,
+    stats_options: SummaryStatsOptions,
 ) -> tuple[list[SectionPlan], int, float, str]:
     """Build and print the current plan without prompting for edits."""
     section_plans, total_pages, highest_daily_pace, overall_status = build_section_plans(
@@ -965,6 +1088,7 @@ def show_plan(
         overall_status=overall_status,
         end_label=end_label,
         end_name=end_name,
+        stats_options=stats_options,
     )
     return section_plans, total_pages, highest_daily_pace, overall_status
 
@@ -1002,6 +1126,8 @@ def main() -> None:
 
         sections = collect_book_sections()
 
+    stats_options = prompt_summary_stats_options()
+
     if loaded_from_csv:
         section_plans, total_pages, highest_daily_pace, overall_status = show_plan(
             sections,
@@ -1009,6 +1135,7 @@ def main() -> None:
             end_date,
             end_label,
             end_name,
+            stats_options,
         )
     else:
         section_plans, total_pages, highest_daily_pace, overall_status = show_plan(
@@ -1017,6 +1144,7 @@ def main() -> None:
             end_date,
             end_label,
             end_name,
+            stats_options,
         )
 
     plan_changed = False
@@ -1044,6 +1172,7 @@ def main() -> None:
             end_date,
             end_label,
             end_name,
+            stats_options,
         )
 
     if prompt_plan_simultaneous_groups(sections):
@@ -1053,6 +1182,7 @@ def main() -> None:
             end_date,
             end_label,
             end_name,
+            stats_options,
         )
 
     if prompt_yes_no("\nSave this plan to a CSV file?"):
@@ -1066,6 +1196,7 @@ def main() -> None:
             highest_daily_pace=highest_daily_pace,
             overall_status=overall_status,
             end_label=end_label,
+            stats_options=stats_options,
         )
         print(f"Saved to {Path(filename).resolve()}")
 
