@@ -422,9 +422,11 @@ def build_plan(
     total_pages = sum(book.pages for book in books)
     period_days = inclusive_days_between(start_date, end_date)
     required_pace = total_pages / period_days
-    overall_status = "achievable" if daily_pace >= required_pace else "not achievable"
     deadlines = calculate_deadlines(
         books, start_date, end_date, daily_pace, simultaneous_groups
+    )
+    overall_status = (
+        "achievable" if deadlines[-1].deadline <= end_date else "not achievable"
     )
     return deadlines, total_pages, required_pace, overall_status
 
@@ -670,6 +672,33 @@ def print_plan(
     print(final_result_message(deadlines[-1].deadline, end_date, end_name))
 
 
+def show_plan(
+    books: list[Book],
+    start_date: date,
+    end_date: date,
+    daily_pace: float,
+    end_label: str,
+    end_name: str,
+    simultaneous_groups: list[tuple[int, ...]],
+) -> tuple[list[BookDeadline], int, float, str]:
+    """Build and print the current plan without prompting for edits."""
+    deadlines, total_pages, required_pace, overall_status = build_plan(
+        books, start_date, end_date, daily_pace, simultaneous_groups
+    )
+    print_plan(
+        deadlines=deadlines,
+        start_date=start_date,
+        end_date=end_date,
+        daily_pace=daily_pace,
+        total_pages=total_pages,
+        required_pace=required_pace,
+        overall_status=overall_status,
+        end_label=end_label,
+        end_name=end_name,
+    )
+    return deadlines, total_pages, required_pace, overall_status
+
+
 def resolve_plan(
     books: list[Book],
     start_date: date,
@@ -681,19 +710,14 @@ def resolve_plan(
 ) -> tuple[float, list[BookDeadline], int, float, str]:
     """Show the plan and resolve any pace shortfall before it can be saved."""
     while True:
-        deadlines, total_pages, required_pace, overall_status = build_plan(
-            books, start_date, end_date, daily_pace, simultaneous_groups
-        )
-        print_plan(
-            deadlines=deadlines,
-            start_date=start_date,
-            end_date=end_date,
-            daily_pace=daily_pace,
-            total_pages=total_pages,
-            required_pace=required_pace,
-            overall_status=overall_status,
-            end_label=end_label,
-            end_name=end_name,
+        deadlines, total_pages, required_pace, overall_status = show_plan(
+            books,
+            start_date,
+            end_date,
+            daily_pace,
+            end_label,
+            end_name,
+            simultaneous_groups,
         )
 
         if overall_status == "achievable":
@@ -745,15 +769,26 @@ def main() -> None:
         books = collect_books(book_count)
         simultaneous_groups: list[tuple[int, ...]] = []
 
-    daily_pace, deadlines, total_pages, required_pace, overall_status = resolve_plan(
-        books,
-        start_date,
-        end_date,
-        daily_pace,
-        end_label,
-        end_name,
-        simultaneous_groups,
-    )
+    if loaded_from_csv:
+        deadlines, total_pages, required_pace, overall_status = show_plan(
+            books,
+            start_date,
+            end_date,
+            daily_pace,
+            end_label,
+            end_name,
+            simultaneous_groups,
+        )
+    else:
+        daily_pace, deadlines, total_pages, required_pace, overall_status = resolve_plan(
+            books,
+            start_date,
+            end_date,
+            daily_pace,
+            end_label,
+            end_name,
+            simultaneous_groups,
+        )
 
     plan_changed = False
     recalculate_pace = False
@@ -788,30 +823,52 @@ def main() -> None:
             daily_pace = sum(book.pages for book in books) / inclusive_days_between(
                 start_date, end_date
             )
-        daily_pace, deadlines, total_pages, required_pace, overall_status = resolve_plan(
-            books,
-            start_date,
-            end_date,
-            daily_pace,
-            end_label,
-            end_name,
-            simultaneous_groups,
-        )
+        if loaded_from_csv:
+            deadlines, total_pages, required_pace, overall_status = show_plan(
+                books,
+                start_date,
+                end_date,
+                daily_pace,
+                end_label,
+                end_name,
+                simultaneous_groups,
+            )
+        else:
+            daily_pace, deadlines, total_pages, required_pace, overall_status = resolve_plan(
+                books,
+                start_date,
+                end_date,
+                daily_pace,
+                end_label,
+                end_name,
+                simultaneous_groups,
+            )
 
     updated_simultaneous_groups = prompt_simultaneous_groups(
         books, simultaneous_groups
     )
     if updated_simultaneous_groups != simultaneous_groups:
         simultaneous_groups = updated_simultaneous_groups
-        daily_pace, deadlines, total_pages, required_pace, overall_status = resolve_plan(
-            books,
-            start_date,
-            end_date,
-            daily_pace,
-            end_label,
-            end_name,
-            simultaneous_groups,
-        )
+        if loaded_from_csv:
+            deadlines, total_pages, required_pace, overall_status = show_plan(
+                books,
+                start_date,
+                end_date,
+                daily_pace,
+                end_label,
+                end_name,
+                simultaneous_groups,
+            )
+        else:
+            daily_pace, deadlines, total_pages, required_pace, overall_status = resolve_plan(
+                books,
+                start_date,
+                end_date,
+                daily_pace,
+                end_label,
+                end_name,
+                simultaneous_groups,
+            )
 
     if prompt_yes_no("\nSave this plan to a CSV file?"):
         filename = input("CSV filename [reading_plan.csv]: ").strip() or "reading_plan.csv"
