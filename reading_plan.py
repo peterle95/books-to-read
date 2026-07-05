@@ -184,6 +184,30 @@ def remap_simultaneous_groups_after_deletion(
     return validate_simultaneous_groups(books, remapped_groups)
 
 
+def remap_simultaneous_groups_after_addition(
+    groups: list[tuple[int, ...]], new_book_position: int, books: list[Book]
+) -> list[tuple[int, ...]]:
+    """Keep simultaneous groups aligned after one Book ID is inserted."""
+    remapped_groups = [
+        tuple(
+            book_id + 1 if book_id >= new_book_position else book_id
+            for book_id in group
+        )
+        for group in groups
+    ]
+    return validate_simultaneous_groups(books, remapped_groups)
+
+
+def insertion_splits_simultaneous_group(
+    position: int, simultaneous_groups: list[tuple[int, ...]]
+) -> tuple[int, ...] | None:
+    """Return the simultaneous group that would be split by an insertion."""
+    for group in simultaneous_groups:
+        if group[0] < position <= group[-1]:
+            return group
+    return None
+
+
 def prompt_book_deletion(
     books: list[Book], simultaneous_groups: list[tuple[int, ...]]
 ) -> tuple[bool, list[tuple[int, ...]]]:
@@ -204,6 +228,41 @@ def prompt_book_deletion(
 
     return True, remap_simultaneous_groups_after_deletion(
         simultaneous_groups, book_id, books
+    )
+
+
+def prompt_book_addition(
+    books: list[Book], simultaneous_groups: list[tuple[int, ...]]
+) -> list[tuple[int, ...]]:
+    """Add one book to the plan and preserve existing simultaneous groups."""
+    while True:
+        position = prompt_int("Position for new book", default=len(books) + 1)
+        if position > len(books) + 1:
+            print(f"Please enter a position from 1 to {len(books) + 1}.")
+            continue
+
+        split_group = insertion_splits_simultaneous_group(
+            position, simultaneous_groups
+        )
+        if split_group:
+            group_text = ", ".join(map(str, split_group))
+            print(
+                f"That position would split simultaneous books {group_text}. "
+                "Choose a position before or after that group."
+            )
+            continue
+
+        break
+
+    print(f"\nNew details for Book {position}")
+    title = input(f"Title [Book {position}]: ").strip() or f"Book {position}"
+    pages = prompt_int("Pages")
+    books.insert(position - 1, Book(number=position, title=title, pages=pages))
+    renumber_books(books)
+    print(f"Added Book {position} ({title}).")
+
+    return remap_simultaneous_groups_after_addition(
+        simultaneous_groups, position, books
     )
 
 
@@ -709,6 +768,10 @@ def main() -> None:
             )
             plan_changed = book_deleted
             recalculate_pace = book_deleted
+        elif prompt_yes_no("Add a book to the imported plan?"):
+            simultaneous_groups = prompt_book_addition(books, simultaneous_groups)
+            plan_changed = True
+            recalculate_pace = True
         elif prompt_yes_no("Change the order of books in the imported plan?"):
             prompt_book_reorder(books)
             plan_changed = True
@@ -719,8 +782,8 @@ def main() -> None:
 
     if plan_changed:
         if recalculate_pace:
-            # A replacement or deletion changes the total pages. Recalculate
-            # from the fixed reading window so the final book remains
+            # Replacement, deletion, and addition change the total pages.
+            # Recalculate from the fixed reading window so the final book remains
             # scheduled for the chosen end date.
             daily_pace = sum(book.pages for book in books) / inclusive_days_between(
                 start_date, end_date
