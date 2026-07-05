@@ -44,6 +44,7 @@ class BookDeadline:
 class SectionPlan:
     section: BookSection
     deadlines: list[BookDeadline]
+    daily_pace: float
     total_pages: int
     required_pace: float
     overall_status: str
@@ -84,27 +85,6 @@ def period_end_from_start(start: date) -> date:
 def inclusive_days_between(start: date, end: date) -> int:
     """Count readable calendar days, including both start and end."""
     return (end - start).days + 1
-
-
-def prompt_float(prompt: str, default: float | None = None) -> float:
-    while True:
-        suffix = f" [{default:g}]" if default is not None else ""
-        raw_value = input(f"{prompt}{suffix}: ").strip()
-
-        if not raw_value and default is not None:
-            return default
-
-        try:
-            value = float(raw_value)
-        except ValueError:
-            print("Please enter a number.")
-            continue
-
-        if value <= 0:
-            print("Pages per day must be positive.")
-            continue
-
-        return value
 
 
 def prompt_int(prompt: str, default: int | None = None, minimum: int = 1) -> int:
@@ -588,28 +568,32 @@ def build_plan(
 
 
 def build_section_plan(
-    section: BookSection, start_date: date, end_date: date, daily_pace: float
+    section: BookSection, start_date: date, end_date: date
 ) -> SectionPlan:
     """Calculate one physical or digital table."""
     if not section.books:
-        return SectionPlan(section, [], 0, 0.0, "achievable")
+        return SectionPlan(section, [], 0.0, 0, 0.0, "achievable")
 
+    period_days = inclusive_days_between(start_date, end_date)
+    daily_pace = sum(book.pages for book in section.books) / period_days
     deadlines, total_pages, required_pace, overall_status = build_plan(
         section.books, start_date, end_date, daily_pace, section.simultaneous_groups
     )
-    return SectionPlan(section, deadlines, total_pages, required_pace, overall_status)
+    return SectionPlan(
+        section, deadlines, daily_pace, total_pages, required_pace, overall_status
+    )
 
 
 def build_section_plans(
-    sections: list[BookSection], start_date: date, end_date: date, daily_pace: float
+    sections: list[BookSection], start_date: date, end_date: date
 ) -> tuple[list[SectionPlan], int, float, str]:
     section_plans = [
-        build_section_plan(section, start_date, end_date, daily_pace)
+        build_section_plan(section, start_date, end_date)
         for section in sections
     ]
     total_pages = sum(section_plan.total_pages for section_plan in section_plans)
-    required_pace = max(
-        (section_plan.required_pace for section_plan in section_plans), default=0.0
+    highest_daily_pace = max(
+        (section_plan.daily_pace for section_plan in section_plans), default=0.0
     )
     overall_status = (
         "achievable"
@@ -619,21 +603,7 @@ def build_section_plans(
         )
         else "not achievable"
     )
-    return section_plans, total_pages, required_pace, overall_status
-
-
-def required_daily_pace_for_sections(
-    sections: list[BookSection], start_date: date, end_date: date
-) -> float:
-    period_days = inclusive_days_between(start_date, end_date)
-    return max(
-        (
-            sum(book.pages for book in section.books) / period_days
-            for section in sections
-            if section.books
-        ),
-        default=0.0,
-    )
+    return section_plans, total_pages, highest_daily_pace, overall_status
 
 
 def format_table(deadlines: list[BookDeadline]) -> str:
@@ -691,9 +661,8 @@ def write_csv(
     section_plans: list[SectionPlan],
     start_date: date,
     end_date: date,
-    daily_pace: float,
     total_pages: int,
-    required_pace: float,
+    highest_daily_pace: float,
     overall_status: str,
     end_label: str,
 ) -> None:
@@ -704,16 +673,16 @@ def write_csv(
         writer.writerow(["Reading plan"])
         writer.writerow(["Start date", start_date.isoformat()])
         writer.writerow([end_label, end_date.isoformat()])
-        # Keep enough precision for a reopened plan to retain its exact final
-        # deadline after a replacement recalculates the pace.
-        writer.writerow(["Daily pace", f"{daily_pace:.15g} pages/day per format"])
         writer.writerow(["Total pages", total_pages])
-        writer.writerow(["Required pace", f"{required_pace:.2f} pages/day per format"])
+        writer.writerow(["Highest daily pace", f"{highest_daily_pace:.15g} pages/day"])
         writer.writerow(["Status", overall_status])
 
         for section_plan in section_plans:
             writer.writerow([])
             writer.writerow([section_plan.section.label])
+            writer.writerow(
+                ["Daily pace", f"{section_plan.daily_pace:.15g} pages/day"]
+            )
             if section_plan.section.simultaneous_groups:
                 writer.writerow(
                     [
@@ -804,7 +773,7 @@ def parse_csv_simultaneous_groups(
 
 def load_csv_plan(
     filename: str,
-) -> tuple[list[BookSection], date, date, float, str, str]:
+) -> tuple[list[BookSection], date, date, str, str]:
     """Load the books and settings written by ``write_csv``."""
     with Path(filename).open(newline="", encoding="utf-8") as csv_file:
         rows = list(csv.reader(csv_file))
@@ -826,7 +795,7 @@ def load_csv_plan(
         for row in rows[:first_plan_row_index]
         if len(row) >= 2 and row[0] and row[0] != "Book"
     }
-    required_fields = {"Start date", "Daily pace"}
+    required_fields = {"Start date"}
     missing_fields = required_fields - metadata.keys()
     if missing_fields:
         names = ", ".join(sorted(missing_fields))
@@ -844,12 +813,8 @@ def load_csv_plan(
     try:
         start_date = parse_date(metadata["Start date"])
         end_date = parse_date(metadata[end_label])
-        daily_pace = float(metadata["Daily pace"].split()[0])
-    except (ValueError, IndexError) as error:
-        raise ValueError("invalid date or daily pace") from error
-
-    if daily_pace <= 0:
-        raise ValueError("daily pace must be positive")
+    except ValueError as error:
+        raise ValueError("invalid date") from error
     if end_date < start_date:
         raise ValueError("finish date must be on or after the start date")
 
@@ -879,6 +844,19 @@ def load_csv_plan(
             ):
                 raw_groups = rows[index][1].strip()
                 index += 1
+            elif (
+                index < len(rows)
+                and len(rows[index]) >= 2
+                and rows[index][0] == "Daily pace"
+            ):
+                index += 1
+                if (
+                    index < len(rows)
+                    and len(rows[index]) >= 2
+                    and rows[index][0] == "Simultaneous groups"
+                ):
+                    raw_groups = rows[index][1].strip()
+                    index += 1
             while index < len(rows) and (
                 not rows[index] or not any(cell.strip() for cell in rows[index])
             ):
@@ -917,14 +895,13 @@ def load_csv_plan(
         sections,
         start_date,
         end_date,
-        daily_pace,
         end_label,
         end_name,
     )
 
 
 def prompt_csv_plan(
-) -> tuple[list[BookSection], date, date, float, str, str]:
+) -> tuple[list[BookSection], date, date, str, str]:
     """Keep asking for a saved CSV file until a valid plan is loaded."""
     while True:
         filename = input("CSV filename [reading_plan.csv]: ").strip() or "reading_plan.csv"
@@ -938,9 +915,8 @@ def print_plan(
     section_plans: list[SectionPlan],
     start_date: date,
     end_date: date,
-    daily_pace: float,
     total_pages: int,
-    required_pace: float,
+    highest_daily_pace: float,
     overall_status: str,
     end_label: str,
     end_name: str,
@@ -948,9 +924,8 @@ def print_plan(
     print("\nReading plan")
     print(f"Start date: {start_date.isoformat()}")
     print(f"{end_label}: {end_date.isoformat()}")
-    print(f"Daily pace: {daily_pace:g} pages/day per format")
     print(f"Total pages: {total_pages}")
-    print(f"Required pace: {required_pace:.2f} pages/day per format")
+    print(f"Highest daily pace: {highest_daily_pace:.2f} pages/day")
     print(f"Status: {overall_status}")
 
     for section_plan in section_plans:
@@ -959,6 +934,7 @@ def print_plan(
             print("No books.")
             continue
 
+        print(f"Daily pace: {section_plan.daily_pace:.2f} pages/day")
         print(format_table(section_plan.deadlines))
         print()
         print("Final result:")
@@ -973,56 +949,24 @@ def show_plan(
     sections: list[BookSection],
     start_date: date,
     end_date: date,
-    daily_pace: float,
     end_label: str,
     end_name: str,
 ) -> tuple[list[SectionPlan], int, float, str]:
     """Build and print the current plan without prompting for edits."""
-    section_plans, total_pages, required_pace, overall_status = build_section_plans(
-        sections, start_date, end_date, daily_pace
+    section_plans, total_pages, highest_daily_pace, overall_status = build_section_plans(
+        sections, start_date, end_date
     )
     print_plan(
         section_plans=section_plans,
         start_date=start_date,
         end_date=end_date,
-        daily_pace=daily_pace,
         total_pages=total_pages,
-        required_pace=required_pace,
+        highest_daily_pace=highest_daily_pace,
         overall_status=overall_status,
         end_label=end_label,
         end_name=end_name,
     )
-    return section_plans, total_pages, required_pace, overall_status
-
-
-def resolve_plan(
-    sections: list[BookSection],
-    start_date: date,
-    end_date: date,
-    daily_pace: float,
-    end_label: str,
-    end_name: str,
-) -> tuple[float, list[SectionPlan], int, float, str]:
-    """Show the plan and resolve any pace shortfall before it can be saved."""
-    while True:
-        section_plans, total_pages, required_pace, overall_status = show_plan(
-            sections,
-            start_date,
-            end_date,
-            daily_pace,
-            end_label,
-            end_name,
-        )
-
-        if overall_status == "achievable":
-            return daily_pace, section_plans, total_pages, required_pace, overall_status
-
-        if prompt_yes_no(
-            "\nUse the proposed required pace to finish by the deadline?"
-        ):
-            daily_pace = required_pace
-        else:
-            prompt_plan_book_replacement(sections)
+    return section_plans, total_pages, highest_daily_pace, overall_status
 
 
 def main() -> None:
@@ -1034,12 +978,10 @@ def main() -> None:
             sections,
             start_date,
             end_date,
-            daily_pace,
             end_label,
             end_name,
         ) = prompt_csv_plan()
     else:
-        daily_pace = prompt_float("Daily reading pace in pages per format")
         start_date = prompt_date("Quarter start date", default=next_quarter_start())
 
         use_custom_target = prompt_yes_no(
@@ -1061,39 +1003,33 @@ def main() -> None:
         sections = collect_book_sections()
 
     if loaded_from_csv:
-        section_plans, total_pages, required_pace, overall_status = show_plan(
+        section_plans, total_pages, highest_daily_pace, overall_status = show_plan(
             sections,
             start_date,
             end_date,
-            daily_pace,
             end_label,
             end_name,
         )
     else:
-        daily_pace, section_plans, total_pages, required_pace, overall_status = resolve_plan(
+        section_plans, total_pages, highest_daily_pace, overall_status = show_plan(
             sections,
             start_date,
             end_date,
-            daily_pace,
             end_label,
             end_name,
         )
 
     plan_changed = False
-    recalculate_pace = False
     if loaded_from_csv:
         if prompt_yes_no("\nReplace a book in the imported plan?"):
             prompt_plan_book_replacement(sections)
             plan_changed = True
-            recalculate_pace = True
         elif prompt_yes_no("Delete a book from the imported plan?"):
             book_deleted = prompt_plan_book_deletion(sections)
             plan_changed = book_deleted
-            recalculate_pace = book_deleted
         elif prompt_yes_no("Add a book to the imported plan?"):
             prompt_plan_book_addition(sections)
             plan_changed = True
-            recalculate_pace = True
         elif prompt_yes_no("Change the order of books in the imported plan?"):
             prompt_plan_book_reorder(sections)
             plan_changed = True
@@ -1102,51 +1038,22 @@ def main() -> None:
         plan_changed = True
 
     if plan_changed:
-        if recalculate_pace:
-            # Replacement, deletion, and addition change the total pages.
-            # Recalculate from the fixed reading window so the final book remains
-            # scheduled for the chosen end date.
-            daily_pace = required_daily_pace_for_sections(
-                sections, start_date, end_date
-            )
-        if loaded_from_csv:
-            section_plans, total_pages, required_pace, overall_status = show_plan(
-                sections,
-                start_date,
-                end_date,
-                daily_pace,
-                end_label,
-                end_name,
-            )
-        else:
-            daily_pace, section_plans, total_pages, required_pace, overall_status = resolve_plan(
-                sections,
-                start_date,
-                end_date,
-                daily_pace,
-                end_label,
-                end_name,
-            )
+        section_plans, total_pages, highest_daily_pace, overall_status = show_plan(
+            sections,
+            start_date,
+            end_date,
+            end_label,
+            end_name,
+        )
 
     if prompt_plan_simultaneous_groups(sections):
-        if loaded_from_csv:
-            section_plans, total_pages, required_pace, overall_status = show_plan(
-                sections,
-                start_date,
-                end_date,
-                daily_pace,
-                end_label,
-                end_name,
-            )
-        else:
-            daily_pace, section_plans, total_pages, required_pace, overall_status = resolve_plan(
-                sections,
-                start_date,
-                end_date,
-                daily_pace,
-                end_label,
-                end_name,
-            )
+        section_plans, total_pages, highest_daily_pace, overall_status = show_plan(
+            sections,
+            start_date,
+            end_date,
+            end_label,
+            end_name,
+        )
 
     if prompt_yes_no("\nSave this plan to a CSV file?"):
         filename = input("CSV filename [reading_plan.csv]: ").strip() or "reading_plan.csv"
@@ -1155,9 +1062,8 @@ def main() -> None:
             section_plans=section_plans,
             start_date=start_date,
             end_date=end_date,
-            daily_pace=daily_pace,
             total_pages=total_pages,
-            required_pace=required_pace,
+            highest_daily_pace=highest_daily_pace,
             overall_status=overall_status,
             end_label=end_label,
         )
