@@ -317,6 +317,47 @@ def validate_simultaneous_groups(
     return valid_groups
 
 
+def consecutive_book_runs(book_ids: tuple[int, ...]) -> list[tuple[int, ...]]:
+    """Split Book IDs into consecutive runs, keeping only usable groups."""
+    runs: list[tuple[int, ...]] = []
+    current_run: list[int] = []
+
+    for book_id in book_ids:
+        if not current_run or book_id == current_run[-1] + 1:
+            current_run.append(book_id)
+            continue
+
+        if len(current_run) >= 2:
+            runs.append(tuple(current_run))
+        current_run = [book_id]
+
+    if len(current_run) >= 2:
+        runs.append(tuple(current_run))
+
+    return runs
+
+
+def add_or_update_simultaneous_group(
+    books: list[Book], groups: list[tuple[int, ...]], group: tuple[int, ...]
+) -> tuple[list[tuple[int, ...]], bool]:
+    """Add a group, moving selected books out of older groups when needed."""
+    new_group = validate_simultaneous_groups(books, [group])[0]
+    new_group_ids = set(new_group)
+    updated_groups: list[tuple[int, ...]] = []
+    changed_existing_group = False
+
+    for existing_group in groups:
+        remaining_ids = tuple(
+            book_id for book_id in existing_group if book_id not in new_group_ids
+        )
+        if len(remaining_ids) != len(existing_group):
+            changed_existing_group = True
+        updated_groups.extend(consecutive_book_runs(remaining_ids))
+
+    updated_groups.append(new_group)
+    return validate_simultaneous_groups(books, updated_groups), changed_existing_group
+
+
 def prompt_simultaneous_groups(
     books: list[Book], groups: list[tuple[int, ...]]
 ) -> list[tuple[int, ...]]:
@@ -327,11 +368,15 @@ def prompt_simultaneous_groups(
         raw_ids = input("Consecutive Book IDs to read together (for example 2,3): ").strip()
         try:
             group = tuple(int(value.strip()) for value in raw_ids.split(","))
-            groups = validate_simultaneous_groups(books, [*groups, group])
+            groups, changed_existing_group = add_or_update_simultaneous_group(
+                books, groups, group
+            )
         except ValueError as error:
             print(f"Could not add simultaneous books: {error}")
             continue
 
+        if changed_existing_group:
+            print("Updated existing simultaneous groups.")
         print(f"Books {', '.join(map(str, group))} will be read together.")
 
     return groups
