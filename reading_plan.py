@@ -166,6 +166,47 @@ def prompt_book_replacement(books: list[Book]) -> None:
     books[book_id - 1] = Book(number=book_id, title=title, pages=pages)
 
 
+def remap_simultaneous_groups_after_deletion(
+    groups: list[tuple[int, ...]], deleted_book_id: int, books: list[Book]
+) -> list[tuple[int, ...]]:
+    """Keep simultaneous groups aligned after one Book ID is removed."""
+    remapped_groups: list[tuple[int, ...]] = []
+
+    for group in groups:
+        remapped_group = tuple(
+            book_id - 1 if book_id > deleted_book_id else book_id
+            for book_id in group
+            if book_id != deleted_book_id
+        )
+        if len(remapped_group) >= 2:
+            remapped_groups.append(remapped_group)
+
+    return validate_simultaneous_groups(books, remapped_groups)
+
+
+def prompt_book_deletion(
+    books: list[Book], simultaneous_groups: list[tuple[int, ...]]
+) -> tuple[bool, list[tuple[int, ...]]]:
+    """Delete one book and preserve simultaneous groups among remaining books."""
+    if len(books) == 1:
+        print("Cannot delete the only book in the plan.")
+        return False, simultaneous_groups
+
+    while True:
+        book_id = prompt_int("Book ID to delete")
+        if book_id <= len(books):
+            break
+        print(f"Please enter a Book ID from 1 to {len(books)}.")
+
+    deleted_book = books.pop(book_id - 1)
+    renumber_books(books)
+    print(f"Deleted Book {book_id} ({deleted_book.title}).")
+
+    return True, remap_simultaneous_groups_after_deletion(
+        simultaneous_groups, book_id, books
+    )
+
+
 def renumber_books(books: list[Book]) -> None:
     """Keep displayed Book IDs aligned with the current reading order."""
     for number, book in enumerate(books, start=1):
@@ -656,12 +697,18 @@ def main() -> None:
     )
 
     plan_changed = False
-    replacement_made = False
+    recalculate_pace = False
     if loaded_from_csv:
         if prompt_yes_no("\nReplace a book in the imported plan?"):
             prompt_book_replacement(books)
             plan_changed = True
-            replacement_made = True
+            recalculate_pace = True
+        elif prompt_yes_no("Delete a book from the imported plan?"):
+            book_deleted, simultaneous_groups = prompt_book_deletion(
+                books, simultaneous_groups
+            )
+            plan_changed = book_deleted
+            recalculate_pace = book_deleted
         elif prompt_yes_no("Change the order of books in the imported plan?"):
             prompt_book_reorder(books)
             plan_changed = True
@@ -671,9 +718,9 @@ def main() -> None:
         plan_changed = True
 
     if plan_changed:
-        if replacement_made:
-            # A replacement changes the total pages. Recalculate the daily
-            # pace from the fixed reading window so the final book remains
+        if recalculate_pace:
+            # A replacement or deletion changes the total pages. Recalculate
+            # from the fixed reading window so the final book remains
             # scheduled for the chosen end date.
             daily_pace = sum(book.pages for book in books) / inclusive_days_between(
                 start_date, end_date
