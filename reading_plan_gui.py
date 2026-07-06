@@ -40,13 +40,13 @@ DEFAULT_JSON_FILE = Path("reading_plan.json")
 PLAN_COLUMNS = (
     "Book",
     "Title",
+    "Daily pages",
     "Start page",
     "End page",
     "Current page",
     "Pages",
     "Read",
     "Remaining",
-    "Daily pages",
     "Cumulative remaining",
     "Start date",
     "Deadline",
@@ -64,6 +64,24 @@ BOOK_COLUMNS = (
     "Remaining",
 )
 SESSION_COLUMNS = ("Date", "Format", "Book", "Current page", "Pages read")
+PLAN_COLUMN_WIDTHS = {
+    "Book": 6,
+    "Title": 28,
+    "Daily pages": 12,
+    "Start page": 10,
+    "End page": 10,
+    "Current page": 12,
+    "Pages": 8,
+    "Read": 8,
+    "Remaining": 10,
+    "Cumulative remaining": 20,
+    "Start date": 12,
+    "Deadline": 12,
+    "Days allocated": 14,
+    "Status": 12,
+}
+DAILY_PAGES_PURPLE = "#6d28d9"
+DAILY_PAGES_PURPLE_DARK = "#4c1d95"
 
 
 def blank_sections() -> list[BookSection]:
@@ -127,7 +145,7 @@ class ReadingPlanApp(tk.Tk):
         self.session_remaining_var = tk.StringVar(value="")
 
         self.book_trees: dict[str, ttk.Treeview] = {}
-        self.plan_trees: dict[str, ttk.Treeview] = {}
+        self.plan_tables: dict[str, tk.Frame] = {}
         self.title_vars: dict[str, tk.StringVar] = {}
         self.start_page_vars: dict[str, tk.StringVar] = {}
         self.end_page_vars: dict[str, tk.StringVar] = {}
@@ -431,18 +449,31 @@ class ReadingPlanApp(tk.Tk):
             frame.columnconfigure(0, weight=1)
             frame.rowconfigure(0, weight=1)
             notebook.add(frame, text=label)
-            tree = ttk.Treeview(frame, columns=PLAN_COLUMNS, show="headings", height=14)
-            for column in PLAN_COLUMNS:
-                tree.heading(column, text=column)
-                width = 220 if column == "Title" else 125
-                tree.column(column, width=width, anchor="w")
-            tree.grid(row=0, column=0, sticky="nsew")
-            y_scrollbar = ttk.Scrollbar(frame, orient="vertical", command=tree.yview)
+            canvas = tk.Canvas(frame, highlightthickness=0)
+            canvas.grid(row=0, column=0, sticky="nsew")
+            y_scrollbar = ttk.Scrollbar(frame, orient="vertical", command=canvas.yview)
             y_scrollbar.grid(row=0, column=1, sticky="ns")
-            x_scrollbar = ttk.Scrollbar(frame, orient="horizontal", command=tree.xview)
+            x_scrollbar = ttk.Scrollbar(frame, orient="horizontal", command=canvas.xview)
             x_scrollbar.grid(row=1, column=0, sticky="ew")
-            tree.configure(yscrollcommand=y_scrollbar.set, xscrollcommand=x_scrollbar.set)
-            self.plan_trees[label] = tree
+            canvas.configure(
+                yscrollcommand=y_scrollbar.set,
+                xscrollcommand=x_scrollbar.set,
+            )
+            table = ttk.Frame(canvas)
+            canvas_window = canvas.create_window((0, 0), window=table, anchor="nw")
+            table.bind(
+                "<Configure>",
+                lambda _event, table_canvas=canvas: table_canvas.configure(
+                    scrollregion=table_canvas.bbox("all")
+                ),
+            )
+            canvas.bind(
+                "<Configure>",
+                lambda event, table_canvas=canvas, window_id=canvas_window: (
+                    table_canvas.itemconfigure(window_id, height=max(event.height, 1))
+                ),
+            )
+            self.plan_tables[label] = table
 
     def load_initial_plan(self) -> None:
         if self.file_path.exists():
@@ -796,34 +827,82 @@ class ReadingPlanApp(tk.Tk):
 
     def render_plan_tables(self, section_plans) -> None:
         for section_plan in section_plans:
-            tree = self.plan_trees[section_plan.section.label]
-            tree.delete(*tree.get_children())
-            for deadline in section_plan.deadlines:
-                book = deadline.book
-                tree.insert(
-                    "",
-                    "end",
-                    values=(
-                        book.number,
-                        book.title,
-                        book.start_page,
-                        book.end_page,
-                        "" if book.current_page is None else book.current_page,
-                        book.pages,
-                        book.pages_read,
-                        pages_remaining(book),
-                        f"{deadline.daily_pages:.2f}",
-                        deadline.cumulative_pages,
-                        deadline.start_date.isoformat(),
-                        deadline.deadline.isoformat(),
-                        deadline.days_allocated,
-                        deadline.status,
-                    ),
+            table = self.plan_tables[section_plan.section.label]
+            for child in table.winfo_children():
+                child.destroy()
+            for column_index, column in enumerate(PLAN_COLUMNS):
+                self.add_plan_table_cell(
+                    table,
+                    text=column,
+                    row=0,
+                    column=column_index,
+                    column_name=column,
+                    is_header=True,
                 )
+            for row_index, deadline in enumerate(section_plan.deadlines, start=1):
+                book = deadline.book
+                values = {
+                    "Book": book.number,
+                    "Title": book.title,
+                    "Daily pages": f"{deadline.daily_pages:.2f}",
+                    "Start page": book.start_page,
+                    "End page": book.end_page,
+                    "Current page": (
+                        "" if book.current_page is None else book.current_page
+                    ),
+                    "Pages": book.pages,
+                    "Read": book.pages_read,
+                    "Remaining": pages_remaining(book),
+                    "Cumulative remaining": deadline.cumulative_pages,
+                    "Start date": deadline.start_date.isoformat(),
+                    "Deadline": deadline.deadline.isoformat(),
+                    "Days allocated": deadline.days_allocated,
+                    "Status": deadline.status,
+                }
+                for column_index, column in enumerate(PLAN_COLUMNS):
+                    self.add_plan_table_cell(
+                        table,
+                        text=str(values[column]),
+                        row=row_index,
+                        column=column_index,
+                        column_name=column,
+                        is_header=False,
+                    )
+
+    def add_plan_table_cell(
+        self,
+        parent: tk.Frame,
+        text: str,
+        row: int,
+        column: int,
+        column_name: str,
+        is_header: bool,
+    ) -> None:
+        is_daily_pages = column_name == "Daily pages"
+        background = "#f3f4f6" if is_header else "#ffffff"
+        foreground = "#111827"
+        if is_daily_pages:
+            background = DAILY_PAGES_PURPLE_DARK if is_header else DAILY_PAGES_PURPLE
+            foreground = "#ffffff"
+        cell = tk.Label(
+            parent,
+            text=text,
+            anchor="w",
+            padx=8,
+            pady=5,
+            width=PLAN_COLUMN_WIDTHS[column_name],
+            bg=background,
+            fg=foreground,
+            bd=1,
+            relief="solid",
+            font=("TkDefaultFont", 9, "bold" if is_header else "normal"),
+        )
+        cell.grid(row=row, column=column, sticky="nsew")
 
     def clear_plan_output(self) -> None:
-        for tree in self.plan_trees.values():
-            tree.delete(*tree.get_children())
+        for table in self.plan_tables.values():
+            for child in table.winfo_children():
+                child.destroy()
         self.set_text(self.summary_text, "")
         self.set_text(self.plan_text, "")
 
@@ -1086,14 +1165,54 @@ class ReadingPlanApp(tk.Tk):
         if index is None:
             self.show_error("Select a book first")
             return
-        target = index + offset
-        if target < 0 or target >= len(section.books):
-            return
-        book = section.books.pop(index)
-        section.books.insert(target, book)
+        selected_book = section.books[index]
+        old_group_book_ids = [
+            [id(section.books[book_id - 1]) for book_id in group]
+            for group in section.simultaneous_groups
+        ]
+        start, end = self.move_block_range(section, index)
+        if offset < 0:
+            if start == 0:
+                return
+            adjacent_start, adjacent_end = self.move_block_range(section, start - 1)
+            moving_block = section.books[start : end + 1]
+            adjacent_block = section.books[adjacent_start : adjacent_end + 1]
+            section.books[adjacent_start : end + 1] = moving_block + adjacent_block
+        else:
+            if end == len(section.books) - 1:
+                return
+            adjacent_start, adjacent_end = self.move_block_range(section, end + 1)
+            moving_block = section.books[start : end + 1]
+            adjacent_block = section.books[adjacent_start : adjacent_end + 1]
+            section.books[start : adjacent_end + 1] = adjacent_block + moving_block
+
         renumber_books(section.books)
-        section.simultaneous_groups = []
-        self.after_book_edit(label, select_index=target)
+        section.simultaneous_groups = self.remap_groups_by_book_identity(
+            section.books, old_group_book_ids
+        )
+        selected_index = next(
+            index
+            for index, book in enumerate(section.books)
+            if book is selected_book
+        )
+        self.after_book_edit(label, select_index=selected_index)
+
+    def move_block_range(self, section: BookSection, index: int) -> tuple[int, int]:
+        book_id = index + 1
+        for group in section.simultaneous_groups:
+            if book_id in group:
+                return group[0] - 1, group[-1] - 1
+        return index, index
+
+    def remap_groups_by_book_identity(
+        self, books: list[Book], old_group_book_ids: list[list[int]]
+    ) -> list[tuple[int, ...]]:
+        new_book_ids = {id(book): book.number for book in books}
+        remapped_groups = [
+            tuple(sorted(new_book_ids[book_identity] for book_identity in group))
+            for group in old_group_book_ids
+        ]
+        return validate_simultaneous_groups(books, remapped_groups)
 
     def apply_groups(self, label: str) -> None:
         section = self.section_by_label(label)
