@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+from datetime import date
 from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
@@ -12,17 +13,20 @@ from reading_plan import (
     Book,
     BookSection,
     SummaryStatsOptions,
-    build_section_plans,
+    add_reading_session,
+    build_remaining_section_plans,
     final_result_message,
     insertion_splits_simultaneous_group,
     load_csv_plan,
     load_json_plan,
     next_quarter_start,
     optional_summary_stat_rows,
+    pages_remaining,
     parse_date,
     period_end_from_start,
     remap_simultaneous_groups_after_addition,
     remap_simultaneous_groups_after_deletion,
+    remove_reading_session,
     renumber_books,
     section_plan_by_label,
     validate_simultaneous_groups,
@@ -30,23 +34,36 @@ from reading_plan import (
     write_json_plan,
 )
 
-DEFAULT_JSON_FILE = "reading_plan.json"
 
+DEFAULT_JSON_FILE = Path("reading_plan.json")
 
 PLAN_COLUMNS = (
     "Book",
     "Title",
+    "Start page",
+    "End page",
+    "Current page",
     "Pages",
+    "Read",
+    "Remaining",
     "Daily pages",
-    "Cumulative pages",
+    "Cumulative remaining",
     "Start date",
     "Deadline",
     "Days allocated",
     "Status",
 )
-
-
-BOOK_COLUMNS = ("Book", "Title", "Pages")
+BOOK_COLUMNS = (
+    "Book",
+    "Title",
+    "Start page",
+    "End page",
+    "Current page",
+    "Pages",
+    "Read",
+    "Remaining",
+)
+SESSION_COLUMNS = ("Date", "Format", "Book", "Current page", "Pages read")
 
 
 def blank_sections() -> list[BookSection]:
@@ -67,42 +84,53 @@ def parse_group_text(raw_text: str) -> list[tuple[int, ...]]:
         if not raw_group:
             continue
         try:
-            group = tuple(
-                int(raw_id.strip()) for raw_id in raw_group.split(",") if raw_id.strip()
+            groups.append(
+                tuple(
+                    int(raw_id.strip())
+                    for raw_id in raw_group.split(",")
+                    if raw_id.strip()
+                )
             )
         except ValueError as error:
             raise ValueError("group IDs must be whole numbers") from error
-        groups.append(group)
     return groups
 
 
 def end_name_for_label(end_label: str) -> str:
-    return (
-        "target finish date"
-        if end_label == "Target finish date"
-        else "quarter end date"
-    )
+    if end_label == "Target finish date":
+        return "target finish date"
+    return "quarter end date"
 
 
 class ReadingPlanApp(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
         self.title("Reading Plan")
-        self.geometry("1180x760")
-        self.minsize(980, 620)
+        self.geometry("1220x780")
+        self.minsize(1020, 640)
 
         self.sections = blank_sections()
-        self.file_path: Path | None = Path(DEFAULT_JSON_FILE)
+        self.file_path = DEFAULT_JSON_FILE
         self.cached_plan: tuple[object, ...] | None = None
+        self.suspend_autosave = False
 
         self.start_var = tk.StringVar()
         self.end_var = tk.StringVar()
         self.custom_target_var = tk.BooleanVar(value=False)
         self.status_var = tk.StringVar(value="Ready")
+        self.file_var = tk.StringVar(value=str(self.file_path))
+
+        self.session_section_var = tk.StringVar(value=PHYSICAL_BOOKS_LABEL)
+        self.session_book_var = tk.StringVar()
+        self.session_date_var = tk.StringVar(value=date.today().isoformat())
+        self.session_current_page_var = tk.StringVar()
+        self.session_remaining_var = tk.StringVar(value="")
+
         self.book_trees: dict[str, ttk.Treeview] = {}
         self.plan_trees: dict[str, ttk.Treeview] = {}
         self.title_vars: dict[str, tk.StringVar] = {}
-        self.pages_vars: dict[str, tk.StringVar] = {}
+        self.start_page_vars: dict[str, tk.StringVar] = {}
+        self.end_page_vars: dict[str, tk.StringVar] = {}
         self.group_vars: dict[str, tk.StringVar] = {}
         self.stat_vars = {
             "book_counts": tk.BooleanVar(value=True),
@@ -113,7 +141,7 @@ class ReadingPlanApp(tk.Tk):
         }
 
         self._build_layout()
-        self.new_plan()
+        self.load_initial_plan()
 
     def _build_layout(self) -> None:
         self.columnconfigure(0, weight=1)
@@ -122,51 +150,131 @@ class ReadingPlanApp(tk.Tk):
         notebook = ttk.Notebook(self)
         notebook.grid(row=0, column=0, sticky="nsew")
 
+        session_tab = ttk.Frame(notebook, padding=12)
         plan_tab = ttk.Frame(notebook, padding=12)
         books_tab = ttk.Frame(notebook, padding=12)
         summary_tab = ttk.Frame(notebook, padding=12)
+        notebook.add(session_tab, text="Session")
         notebook.add(plan_tab, text="Plan")
         notebook.add(books_tab, text="Books")
         notebook.add(summary_tab, text="Summary")
 
+        self._build_session_tab(session_tab)
         self._build_plan_tab(plan_tab)
         self._build_books_tab(books_tab)
         self._build_summary_tab(summary_tab)
 
-        status = ttk.Label(self, textvariable=self.status_var, anchor="w", padding=(8, 5))
-        status.grid(row=1, column=0, sticky="ew")
-        self.status_label = status
+        self.status_label = ttk.Label(
+            self, textvariable=self.status_var, anchor="w", padding=(8, 5)
+        )
+        self.status_label.grid(row=1, column=0, sticky="ew")
+
+    def _build_session_tab(self, parent: ttk.Frame) -> None:
+        parent.columnconfigure(0, weight=1)
+        parent.rowconfigure(2, weight=1)
+
+        form = ttk.LabelFrame(parent, text="Reading session", padding=12)
+        form.grid(row=0, column=0, sticky="ew")
+        form.columnconfigure(3, weight=1)
+
+        ttk.Label(form, text="Format").grid(row=0, column=0, sticky="w")
+        section_combo = ttk.Combobox(
+            form,
+            textvariable=self.session_section_var,
+            values=BOOK_SECTION_LABELS,
+            state="readonly",
+            width=18,
+        )
+        section_combo.grid(row=0, column=1, sticky="w", padx=(8, 18))
+        section_combo.bind("<<ComboboxSelected>>", lambda _event: self.refresh_session_books())
+
+        ttk.Label(form, text="Book").grid(row=0, column=2, sticky="w")
+        self.session_book_combo = ttk.Combobox(
+            form,
+            textvariable=self.session_book_var,
+            state="readonly",
+        )
+        self.session_book_combo.grid(row=0, column=3, sticky="ew", padx=(8, 18))
+        self.session_book_combo.bind(
+            "<<ComboboxSelected>>", lambda _event: self.refresh_session_remaining()
+        )
+
+        ttk.Label(form, text="Date").grid(row=1, column=0, sticky="w", pady=(10, 0))
+        ttk.Entry(form, textvariable=self.session_date_var, width=14).grid(
+            row=1, column=1, sticky="w", padx=(8, 18), pady=(10, 0)
+        )
+        ttk.Label(form, text="Current page").grid(row=1, column=2, sticky="w", pady=(10, 0))
+        ttk.Entry(form, textvariable=self.session_current_page_var, width=12).grid(
+            row=1, column=3, sticky="w", padx=(8, 18), pady=(10, 0)
+        )
+        ttk.Button(form, text="Add Session", command=self.add_session).grid(
+            row=1, column=4, sticky="w", pady=(10, 0)
+        )
+
+        remaining = ttk.Label(form, textvariable=self.session_remaining_var)
+        remaining.grid(row=2, column=0, columnspan=5, sticky="w", pady=(10, 0))
+
+        actions = ttk.Frame(parent)
+        actions.grid(row=1, column=0, sticky="ew", pady=(12, 8))
+        ttk.Button(actions, text="Delete Selected Session", command=self.delete_session).grid(
+            row=0, column=0, sticky="w"
+        )
+
+        self.session_tree = ttk.Treeview(
+            parent, columns=SESSION_COLUMNS, show="headings", selectmode="browse"
+        )
+        widths = {
+            "Date": 120,
+            "Format": 160,
+            "Book": 460,
+            "Current page": 120,
+            "Pages read": 100,
+        }
+        for column in SESSION_COLUMNS:
+            self.session_tree.heading(column, text=column)
+            self.session_tree.column(column, width=widths[column], anchor="w")
+        self.session_tree.grid(row=2, column=0, sticky="nsew")
+        scrollbar = ttk.Scrollbar(parent, orient="vertical", command=self.session_tree.yview)
+        scrollbar.grid(row=2, column=1, sticky="ns")
+        self.session_tree.configure(yscrollcommand=scrollbar.set)
 
     def _build_plan_tab(self, parent: ttk.Frame) -> None:
         parent.columnconfigure(0, weight=1)
-        parent.rowconfigure(3, weight=1)
+        parent.rowconfigure(4, weight=1)
 
         toolbar = ttk.Frame(parent)
         toolbar.grid(row=0, column=0, sticky="ew", pady=(0, 12))
-        for index, (label, command) in enumerate(
-            [
-                ("New", self.new_plan),
-                ("Open JSON", self.open_json),
-                ("Save JSON", self.save_json),
-                ("Save JSON As", self.save_json_as),
-                ("Import CSV", self.import_csv),
-                ("Export CSV", self.export_csv),
-                ("Recalculate", self.refresh_plan),
-            ]
-        ):
+        actions = [
+            ("New", self.new_plan),
+            ("Open JSON", self.open_json),
+            ("Import CSV", self.import_csv),
+            ("Export CSV", self.export_csv),
+            ("Recalculate", self.refresh_and_autosave),
+        ]
+        for index, (label, command) in enumerate(actions):
             ttk.Button(toolbar, text=label, command=command).grid(
                 row=0, column=index, padx=(0, 8)
             )
 
+        file_row = ttk.Frame(parent)
+        file_row.grid(row=1, column=0, sticky="ew", pady=(0, 12))
+        file_row.columnconfigure(1, weight=1)
+        ttk.Label(file_row, text="JSON file").grid(row=0, column=0, sticky="w")
+        ttk.Label(file_row, textvariable=self.file_var).grid(
+            row=0, column=1, sticky="ew", padx=(8, 0)
+        )
+
         dates = ttk.LabelFrame(parent, text="Dates", padding=12)
-        dates.grid(row=1, column=0, sticky="ew")
+        dates.grid(row=2, column=0, sticky="ew")
         dates.columnconfigure(1, weight=1)
         dates.columnconfigure(4, weight=1)
 
         ttk.Label(dates, text="Start date").grid(row=0, column=0, sticky="w")
-        ttk.Entry(dates, textvariable=self.start_var, width=16).grid(
-            row=0, column=1, sticky="w", padx=(8, 24)
-        )
+        start_entry = ttk.Entry(dates, textvariable=self.start_var, width=16)
+        start_entry.grid(row=0, column=1, sticky="w", padx=(8, 24))
+        start_entry.bind("<Return>", lambda _event: self.refresh_and_autosave())
+        start_entry.bind("<FocusOut>", lambda _event: self.refresh_and_autosave())
+
         ttk.Checkbutton(
             dates,
             text="Custom finish date",
@@ -176,9 +284,11 @@ class ReadingPlanApp(tk.Tk):
         ttk.Label(dates, text="Finish date").grid(row=0, column=3, sticky="w")
         self.end_entry = ttk.Entry(dates, textvariable=self.end_var, width=16)
         self.end_entry.grid(row=0, column=4, sticky="w", padx=(8, 0))
+        self.end_entry.bind("<Return>", lambda _event: self.refresh_and_autosave())
+        self.end_entry.bind("<FocusOut>", lambda _event: self.refresh_and_autosave())
 
         stats = ttk.LabelFrame(parent, text="Optional summary stats", padding=12)
-        stats.grid(row=2, column=0, sticky="ew", pady=(12, 12))
+        stats.grid(row=3, column=0, sticky="ew", pady=(12, 12))
         labels = [
             ("book_counts", "Book counts"),
             ("page_share", "Page share"),
@@ -191,16 +301,15 @@ class ReadingPlanApp(tk.Tk):
                 stats,
                 text=label,
                 variable=self.stat_vars[key],
-                command=self.refresh_plan,
+                command=self.refresh_and_autosave,
             ).grid(row=0, column=index, sticky="w", padx=(0, 16))
 
         self.plan_text = tk.Text(parent, height=18, wrap="word", state="disabled")
-        self.plan_text.grid(row=3, column=0, sticky="nsew")
+        self.plan_text.grid(row=4, column=0, sticky="nsew")
 
     def _build_books_tab(self, parent: ttk.Frame) -> None:
         parent.columnconfigure(0, weight=1)
         parent.rowconfigure(0, weight=1)
-
         notebook = ttk.Notebook(parent)
         notebook.grid(row=0, column=0, sticky="nsew")
         for label in BOOK_SECTION_LABELS:
@@ -223,7 +332,7 @@ class ReadingPlanApp(tk.Tk):
             selectmode="browse",
             height=12,
         )
-        widths = {"Book": 70, "Title": 420, "Pages": 100}
+        widths = {"Book": 70, "Title": 420, "Pages": 100, "Read": 100, "Remaining": 120}
         for column in BOOK_COLUMNS:
             tree.heading(column, text=column)
             tree.column(column, width=widths[column], anchor="w")
@@ -231,13 +340,15 @@ class ReadingPlanApp(tk.Tk):
         scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=tree.yview)
         scrollbar.grid(row=0, column=1, sticky="ns")
         tree.configure(yscrollcommand=scrollbar.set)
-        tree.bind("<<TreeviewSelect>>", lambda _event, label=label: self.load_selected_book(label))
+        tree.bind(
+            "<<TreeviewSelect>>",
+            lambda _event, section_label=label: self.load_selected_book(section_label),
+        )
         self.book_trees[label] = tree
 
         editor = ttk.LabelFrame(parent, text="Book", padding=10)
         editor.grid(row=1, column=0, sticky="ew", pady=(12, 0))
         editor.columnconfigure(1, weight=1)
-
         self.title_vars[label] = tk.StringVar()
         self.pages_vars[label] = tk.StringVar()
         ttk.Label(editor, text="Title").grid(row=0, column=0, sticky="w")
@@ -252,12 +363,21 @@ class ReadingPlanApp(tk.Tk):
         buttons = ttk.Frame(editor)
         buttons.grid(row=1, column=0, columnspan=4, sticky="ew", pady=(10, 0))
         actions = [
-            ("Add", lambda label=label: self.add_book(label)),
-            ("Insert Before", lambda label=label: self.insert_book_before_selection(label)),
-            ("Replace Selected", lambda label=label: self.replace_selected_book(label)),
-            ("Delete Selected", lambda label=label: self.delete_selected_book(label)),
-            ("Move Up", lambda label=label: self.move_selected_book(label, -1)),
-            ("Move Down", lambda label=label: self.move_selected_book(label, 1)),
+            ("Add", lambda section_label=label: self.add_book(section_label)),
+            (
+                "Insert Before",
+                lambda section_label=label: self.insert_book_before_selection(section_label),
+            ),
+            (
+                "Replace Selected",
+                lambda section_label=label: self.replace_selected_book(section_label),
+            ),
+            (
+                "Delete Selected",
+                lambda section_label=label: self.delete_selected_book(section_label),
+            ),
+            ("Move Up", lambda section_label=label: self.move_selected_book(section_label, -1)),
+            ("Move Down", lambda section_label=label: self.move_selected_book(section_label, 1)),
         ]
         for index, (button_label, command) in enumerate(actions):
             ttk.Button(buttons, text=button_label, command=command).grid(
@@ -275,12 +395,12 @@ class ReadingPlanApp(tk.Tk):
         ttk.Button(
             groups,
             text="Apply",
-            command=lambda label=label: self.apply_groups(label),
+            command=lambda section_label=label: self.apply_groups(section_label),
         ).grid(row=0, column=2, padx=(0, 8))
         ttk.Button(
             groups,
             text="Clear",
-            command=lambda label=label: self.clear_groups(label),
+            command=lambda section_label=label: self.clear_groups(section_label),
         ).grid(row=0, column=3)
 
     def _build_summary_tab(self, parent: ttk.Frame) -> None:
@@ -300,394 +420,64 @@ class ReadingPlanApp(tk.Tk):
             tree = ttk.Treeview(frame, columns=PLAN_COLUMNS, show="headings", height=14)
             for column in PLAN_COLUMNS:
                 tree.heading(column, text=column)
-                width = 210 if column == "Title" else 120
+                width = 220 if column == "Title" else 125
                 tree.column(column, width=width, anchor="w")
             tree.grid(row=0, column=0, sticky="nsew")
             y_scrollbar = ttk.Scrollbar(frame, orient="vertical", command=tree.yview)
             y_scrollbar.grid(row=0, column=1, sticky="ns")
             x_scrollbar = ttk.Scrollbar(frame, orient="horizontal", command=tree.xview)
             x_scrollbar.grid(row=1, column=0, sticky="ew")
-            tree.configure(
-                yscrollcommand=y_scrollbar.set,
-                xscrollcommand=x_scrollbar.set,
-            )
+            tree.configure(yscrollcommand=y_scrollbar.set, xscrollcommand=x_scrollbar.set)
             self.plan_trees[label] = tree
 
-    def new_plan(self) -> None:
+    def load_initial_plan(self) -> None:
+        if self.file_path.exists():
+            try:
+                self.load_plan_from_json(self.file_path)
+                self.set_status(f"Loaded {self.file_path}")
+                return
+            except (OSError, ValueError) as error:
+                self.set_status(f"Could not load {self.file_path}: {error}", error=True)
+        self.reset_to_blank_plan(autosave=True)
+
+    def reset_to_blank_plan(self, autosave: bool) -> None:
         start_date = next_quarter_start()
         self.sections = blank_sections()
-        self.file_path = Path(DEFAULT_JSON_FILE)
         self.start_var.set(start_date.isoformat())
         self.end_var.set(period_end_from_start(start_date).isoformat())
         self.custom_target_var.set(False)
-        self.set_stats_options(
-            SummaryStatsOptions(True, True, True, True, True)
-        )
+        self.set_stats_options(SummaryStatsOptions(True, True, True, True, True))
         self.toggle_custom_target(refresh=False)
-        self.refresh_all()
-        self.set_status("New plan")
+        self.refresh_all(autosave=autosave)
 
-    def toggle_custom_target(self, refresh: bool = True) -> None:
-        if self.custom_target_var.get():
-            self.end_entry.configure(state="normal")
-        else:
-            self.end_entry.configure(state="disabled")
-            try:
-                start_date = parse_date(self.start_var.get().strip())
-                self.end_var.set(period_end_from_start(start_date).isoformat())
-            except ValueError:
-                pass
-        if refresh:
-            self.refresh_plan()
+    def new_plan(self) -> None:
+        if not messagebox.askyesno("Reading Plan", "Replace the current plan?"):
+            return
+        self.reset_to_blank_plan(autosave=True)
+        self.set_status(f"New plan saved to {self.file_path}")
 
-    def current_dates(self) -> tuple[object, object, str, str]:
-        start_date = parse_date(self.start_var.get().strip())
-        if self.custom_target_var.get():
-            end_date = parse_date(self.end_var.get().strip())
-            end_label = "Target finish date"
-        else:
-            end_date = period_end_from_start(start_date)
+    def load_plan_from_json(self, path: Path) -> None:
+        (
+            sections,
+            start_date,
+            end_date,
+            end_label,
+            _end_name,
+            stats_options,
+        ) = load_json_plan(str(path))
+        self.suspend_autosave = True
+        try:
+            self.sections = sections
+            self.file_path = path
+            self.file_var.set(str(path))
+            self.start_var.set(start_date.isoformat())
             self.end_var.set(end_date.isoformat())
-            end_label = "Quarter end"
-        if end_date < start_date:
-            raise ValueError("finish date must be on or after the start date")
-        return start_date, end_date, end_label, end_name_for_label(end_label)
-
-    def current_stats_options(self) -> SummaryStatsOptions:
-        return SummaryStatsOptions(
-            book_counts=self.stat_vars["book_counts"].get(),
-            page_share=self.stat_vars["page_share"].get(),
-            average_pages=self.stat_vars["average_pages"].get(),
-            reading_period=self.stat_vars["reading_period"].get(),
-            pace_driver=self.stat_vars["pace_driver"].get(),
-        )
-
-    def set_stats_options(self, options: SummaryStatsOptions) -> None:
-        self.stat_vars["book_counts"].set(options.book_counts)
-        self.stat_vars["page_share"].set(options.page_share)
-        self.stat_vars["average_pages"].set(options.average_pages)
-        self.stat_vars["reading_period"].set(options.reading_period)
-        self.stat_vars["pace_driver"].set(options.pace_driver)
-
-    def refresh_all(self) -> None:
-        self.refresh_book_tables()
-        self.refresh_group_entries()
-        self.refresh_plan()
-
-    def refresh_book_tables(self) -> None:
-        for section in self.sections:
-            tree = self.book_trees[section.label]
-            tree.delete(*tree.get_children())
-            for book in section.books:
-                tree.insert("", "end", iid=str(book.number), values=(book.number, book.title, book.pages))
-
-    def refresh_group_entries(self) -> None:
-        for section in self.sections:
-            self.group_vars[section.label].set(groups_to_text(section.simultaneous_groups))
-
-    def refresh_plan(self) -> None:
-        try:
-            start_date, end_date, end_label, end_name = self.current_dates()
-        except ValueError as error:
-            self.cached_plan = None
-            self.clear_plan_output()
-            self.set_status(str(error), error=True)
-            return
-
-        if not any(section.books for section in self.sections):
-            self.cached_plan = None
-            self.clear_plan_output()
-            self.set_text(self.plan_text, "Reading plan\n")
-            self.set_text(self.summary_text, "")
-            self.set_status("Add at least one book", error=True)
-            return
-
-        try:
-            section_plans, total_pages, highest_daily_pace, overall_status = (
-                build_section_plans(self.sections, start_date, end_date)
-            )
-        except ValueError as error:
-            self.cached_plan = None
-            self.clear_plan_output()
-            self.set_status(str(error), error=True)
-            return
-
-        stats_options = self.current_stats_options()
-        self.cached_plan = (
-            section_plans,
-            total_pages,
-            highest_daily_pace,
-            overall_status,
-            start_date,
-            end_date,
-            end_label,
-            end_name,
-            stats_options,
-        )
-        self.render_summary(
-            section_plans,
-            total_pages,
-            highest_daily_pace,
-            overall_status,
-            start_date,
-            end_date,
-            end_label,
-            end_name,
-            stats_options,
-        )
-        self.render_plan_tables(section_plans)
-        self.set_status("Plan recalculated")
-
-    def render_summary(
-        self,
-        section_plans,
-        total_pages: int,
-        highest_daily_pace: float,
-        overall_status: str,
-        start_date,
-        end_date,
-        end_label: str,
-        end_name: str,
-        stats_options: SummaryStatsOptions,
-    ) -> None:
-        physical_plan = section_plan_by_label(section_plans, PHYSICAL_BOOKS_LABEL)
-        digital_plan = section_plan_by_label(section_plans, DIGITAL_BOOKS_LABEL)
-        lines = [
-            "Reading plan",
-            f"Start date: {start_date.isoformat()}",
-            f"{end_label}: {end_date.isoformat()}",
-            f"Total pages: {total_pages}",
-            f"Physical pages: {physical_plan.total_pages}",
-            f"Digital pages: {digital_plan.total_pages}",
-            f"Highest daily pace: {highest_daily_pace:.2f} pages/day",
-            f"Status: {overall_status}",
-        ]
-        for label, value in optional_summary_stat_rows(
-            section_plans, start_date, end_date, highest_daily_pace, stats_options
-        ):
-            lines.append(f"{label}: {value}")
-
-        detail_lines = list(lines)
-        for section_plan in section_plans:
-            detail_lines.append("")
-            detail_lines.append(section_plan.section.label)
-            if not section_plan.deadlines:
-                detail_lines.append("No books.")
-                continue
-            detail_lines.append(f"Daily pace: {section_plan.daily_pace:.2f} pages/day")
-            detail_lines.append(
-                final_result_message(
-                    section_plan.deadlines[-1].deadline, end_date, end_name
-                )
-            )
-
-        self.set_text(self.summary_text, "\n".join(lines) + "\n")
-        self.set_text(self.plan_text, "\n".join(detail_lines) + "\n")
-
-    def render_plan_tables(self, section_plans) -> None:
-        for section_plan in section_plans:
-            tree = self.plan_trees[section_plan.section.label]
-            tree.delete(*tree.get_children())
-            for deadline in section_plan.deadlines:
-                tree.insert(
-                    "",
-                    "end",
-                    values=(
-                        deadline.book.number,
-                        deadline.book.title,
-                        deadline.book.pages,
-                        f"{deadline.daily_pages:.2f}",
-                        deadline.cumulative_pages,
-                        deadline.start_date.isoformat(),
-                        deadline.deadline.isoformat(),
-                        deadline.days_allocated,
-                        deadline.status,
-                    ),
-                )
-
-    def clear_plan_output(self) -> None:
-        for tree in self.plan_trees.values():
-            tree.delete(*tree.get_children())
-        self.set_text(self.summary_text, "")
-        self.set_text(self.plan_text, "")
-
-    def set_text(self, widget: tk.Text, value: str) -> None:
-        widget.configure(state="normal")
-        widget.delete("1.0", "end")
-        widget.insert("1.0", value)
-        widget.configure(state="disabled")
-
-    def set_status(self, message: str, error: bool = False) -> None:
-        self.status_var.set(message)
-        self.status_label.configure(foreground="#a11" if error else "#164")
-
-    def section_by_label(self, label: str) -> BookSection:
-        for section in self.sections:
-            if section.label == label:
-                return section
-        raise ValueError(f"unknown section: {label}")
-
-    def selected_book_index(self, label: str) -> int | None:
-        tree = self.book_trees[label]
-        selection = tree.selection()
-        if not selection:
-            return None
-        try:
-            return int(selection[0]) - 1
-        except ValueError:
-            return None
-
-    def load_selected_book(self, label: str) -> None:
-        index = self.selected_book_index(label)
-        if index is None:
-            return
-        section = self.section_by_label(label)
-        if index >= len(section.books):
-            return
-        book = section.books[index]
-        self.title_vars[label].set(book.title)
-        self.pages_vars[label].set(str(book.pages))
-
-    def read_book_fields(
-        self,
-        label: str,
-        default_title: str | None = None,
-        default_pages: int | None = None,
-    ) -> tuple[str, int] | None:
-        title = self.title_vars[label].get().strip() or (default_title or "")
-        if not title:
-            self.show_error("Book title is required")
-            return None
-
-        raw_pages = self.pages_vars[label].get().strip()
-        if not raw_pages and default_pages is not None:
-            return title, default_pages
-        try:
-            pages = int(raw_pages)
-        except ValueError:
-            self.show_error("Pages must be a whole number")
-            return None
-        if pages <= 0:
-            self.show_error("Pages must be positive")
-            return None
-        return title, pages
-
-    def add_book(self, label: str) -> None:
-        section = self.section_by_label(label)
-        position = len(section.books) + 1
-        values = self.read_book_fields(label, default_title=f"Book {position}")
-        if values is None:
-            return
-        title, pages = values
-        section.books.append(Book(number=position, title=title, pages=pages))
-        renumber_books(section.books)
-        self.after_book_edit(label, select_index=position - 1)
-
-    def insert_book_before_selection(self, label: str) -> None:
-        section = self.section_by_label(label)
-        index = self.selected_book_index(label)
-        if index is None:
-            self.show_error("Select a book first")
-            return
-        position = index + 1
-        split_group = insertion_splits_simultaneous_group(
-            position, section.simultaneous_groups
-        )
-        if split_group:
-            self.show_error(
-                "Insert before or after the simultaneous group instead"
-            )
-            return
-        values = self.read_book_fields(label, default_title=f"Book {position}")
-        if values is None:
-            return
-        title, pages = values
-        section.books.insert(index, Book(number=position, title=title, pages=pages))
-        renumber_books(section.books)
-        section.simultaneous_groups = remap_simultaneous_groups_after_addition(
-            section.simultaneous_groups, position, section.books
-        )
-        self.after_book_edit(label, select_index=index)
-
-    def replace_selected_book(self, label: str) -> None:
-        section = self.section_by_label(label)
-        index = self.selected_book_index(label)
-        if index is None:
-            self.show_error("Select a book first")
-            return
-        old_book = section.books[index]
-        values = self.read_book_fields(
-            label, default_title=old_book.title, default_pages=old_book.pages
-        )
-        if values is None:
-            return
-        title, pages = values
-        section.books[index] = Book(number=old_book.number, title=title, pages=pages)
-        self.after_book_edit(label, select_index=index)
-
-    def delete_selected_book(self, label: str) -> None:
-        if sum(len(section.books) for section in self.sections) == 1:
-            self.show_error("Cannot delete the only book in the plan")
-            return
-        section = self.section_by_label(label)
-        index = self.selected_book_index(label)
-        if index is None:
-            self.show_error("Select a book first")
-            return
-        deleted_book_id = index + 1
-        section.books.pop(index)
-        renumber_books(section.books)
-        section.simultaneous_groups = remap_simultaneous_groups_after_deletion(
-            section.simultaneous_groups, deleted_book_id, section.books
-        )
-        next_index = min(index, len(section.books) - 1)
-        self.after_book_edit(label, select_index=next_index if next_index >= 0 else None)
-
-    def move_selected_book(self, label: str, offset: int) -> None:
-        section = self.section_by_label(label)
-        index = self.selected_book_index(label)
-        if index is None:
-            self.show_error("Select a book first")
-            return
-        target = index + offset
-        if target < 0 or target >= len(section.books):
-            return
-        book = section.books.pop(index)
-        section.books.insert(target, book)
-        renumber_books(section.books)
-        section.simultaneous_groups = []
-        self.after_book_edit(label, select_index=target)
-
-    def apply_groups(self, label: str) -> None:
-        section = self.section_by_label(label)
-        try:
-            groups = validate_simultaneous_groups(
-                section.books, parse_group_text(self.group_vars[label].get())
-            )
-        except ValueError as error:
-            self.show_error(str(error))
-            return
-        section.simultaneous_groups = groups
-        self.after_book_edit(label)
-
-    def clear_groups(self, label: str) -> None:
-        section = self.section_by_label(label)
-        section.simultaneous_groups = []
-        self.after_book_edit(label)
-
-    def after_book_edit(self, label: str, select_index: int | None = None) -> None:
-        self.refresh_book_tables()
-        self.refresh_group_entries()
-        if select_index is not None:
-            section = self.section_by_label(label)
-            if 0 <= select_index < len(section.books):
-                tree = self.book_trees[label]
-                iid = str(select_index + 1)
-                tree.selection_set(iid)
-                tree.focus(iid)
-                tree.see(iid)
-                self.load_selected_book(label)
-        self.refresh_plan()
+            self.custom_target_var.set(end_label == "Target finish date")
+            self.set_stats_options(stats_options)
+            self.toggle_custom_target(refresh=False)
+            self.refresh_all(autosave=False)
+        finally:
+            self.suspend_autosave = False
 
     def open_json(self) -> None:
         filename = filedialog.askopenfilename(
@@ -696,58 +486,13 @@ class ReadingPlanApp(tk.Tk):
         )
         if not filename:
             return
+        path = Path(filename)
         try:
-            sections, start_date, end_date, end_label, _end_name, stats_options = (
-                load_json_plan(filename)
-            )
+            self.load_plan_from_json(path)
         except (OSError, ValueError) as error:
             self.show_error(f"Could not open JSON: {error}")
             return
-        self.sections = sections
-        self.file_path = Path(filename)
-        self.start_var.set(start_date.isoformat())
-        self.end_var.set(end_date.isoformat())
-        self.custom_target_var.set(end_label == "Target finish date")
-        self.set_stats_options(stats_options)
-        self.toggle_custom_target(refresh=False)
-        self.refresh_all()
-        self.set_status(f"Opened {self.file_path.name}")
-
-    def save_json(self) -> None:
-        if self.file_path is None:
-            self.save_json_as()
-            return
-        self.write_current_json(self.file_path)
-
-    def save_json_as(self) -> None:
-        initial_file = self.file_path.name if self.file_path else DEFAULT_JSON_FILE
-        filename = filedialog.asksaveasfilename(
-            title="Save JSON plan",
-            defaultextension=".json",
-            initialfile=initial_file,
-            filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
-        )
-        if not filename:
-            return
-        self.file_path = Path(filename)
-        self.write_current_json(self.file_path)
-
-    def write_current_json(self, path: Path) -> None:
-        try:
-            start_date, end_date, end_label, _end_name = self.current_dates()
-            self.require_books()
-            write_json_plan(
-                str(path),
-                self.sections,
-                start_date,
-                end_date,
-                end_label,
-                self.current_stats_options(),
-            )
-        except (OSError, ValueError) as error:
-            self.show_error(f"Could not save JSON: {error}")
-            return
-        self.set_status(f"Saved {path.name}")
+        self.set_status(f"Loaded {path}")
 
     def import_csv(self) -> None:
         filename = filedialog.askopenfilename(
@@ -761,15 +506,22 @@ class ReadingPlanApp(tk.Tk):
         except (OSError, csv.Error, ValueError) as error:
             self.show_error(f"Could not import CSV: {error}")
             return
-        self.sections = sections
-        self.file_path = Path(filename).with_suffix(".json")
-        self.start_var.set(start_date.isoformat())
-        self.end_var.set(end_date.isoformat())
-        self.custom_target_var.set(end_label == "Target finish date")
-        self.set_stats_options(SummaryStatsOptions(True, True, True, True, True))
-        self.toggle_custom_target(refresh=False)
-        self.refresh_all()
-        self.set_status(f"Imported {Path(filename).name}")
+
+        self.suspend_autosave = True
+        try:
+            self.sections = sections
+            self.file_path = Path(filename).with_suffix(".json")
+            self.file_var.set(str(self.file_path))
+            self.start_var.set(start_date.isoformat())
+            self.end_var.set(end_date.isoformat())
+            self.custom_target_var.set(end_label == "Target finish date")
+            self.set_stats_options(SummaryStatsOptions(True, True, True, True, True))
+            self.toggle_custom_target(refresh=False)
+            self.refresh_all(autosave=False)
+        finally:
+            self.suspend_autosave = False
+        self.autosave_json()
+        self.set_status(f"Imported {Path(filename).name} and saved {self.file_path.name}")
 
     def export_csv(self) -> None:
         try:
@@ -813,16 +565,493 @@ class ReadingPlanApp(tk.Tk):
             return
         self.set_status(f"Exported {Path(filename).name}")
 
+    def toggle_custom_target(self, refresh: bool = True) -> None:
+        if self.custom_target_var.get():
+            self.end_entry.configure(state="normal")
+        else:
+            self.end_entry.configure(state="disabled")
+            try:
+                start_date = parse_date(self.start_var.get().strip())
+                self.end_var.set(period_end_from_start(start_date).isoformat())
+            except ValueError:
+                pass
+        if refresh:
+            self.refresh_and_autosave()
+
+    def current_dates(self) -> tuple[date, date, str, str]:
+        start_date = parse_date(self.start_var.get().strip())
+        if self.custom_target_var.get():
+            end_date = parse_date(self.end_var.get().strip())
+            end_label = "Target finish date"
+        else:
+            end_date = period_end_from_start(start_date)
+            self.end_var.set(end_date.isoformat())
+            end_label = "Quarter end"
+        if end_date < start_date:
+            raise ValueError("finish date must be on or after the start date")
+        return start_date, end_date, end_label, end_name_for_label(end_label)
+
+    def current_stats_options(self) -> SummaryStatsOptions:
+        return SummaryStatsOptions(
+            book_counts=self.stat_vars["book_counts"].get(),
+            page_share=self.stat_vars["page_share"].get(),
+            average_pages=self.stat_vars["average_pages"].get(),
+            reading_period=self.stat_vars["reading_period"].get(),
+            pace_driver=self.stat_vars["pace_driver"].get(),
+        )
+
+    def set_stats_options(self, options: SummaryStatsOptions) -> None:
+        self.stat_vars["book_counts"].set(options.book_counts)
+        self.stat_vars["page_share"].set(options.page_share)
+        self.stat_vars["average_pages"].set(options.average_pages)
+        self.stat_vars["reading_period"].set(options.reading_period)
+        self.stat_vars["pace_driver"].set(options.pace_driver)
+
+    def refresh_and_autosave(self) -> None:
+        self.refresh_all(autosave=True)
+
+    def refresh_all(self, autosave: bool) -> None:
+        self.refresh_book_tables()
+        self.refresh_group_entries()
+        self.refresh_session_books()
+        self.refresh_session_table()
+        self.refresh_plan(autosave=autosave)
+
+    def refresh_book_tables(self) -> None:
+        for section in self.sections:
+            tree = self.book_trees[section.label]
+            tree.delete(*tree.get_children())
+            for book in section.books:
+                tree.insert(
+                    "",
+                    "end",
+                    iid=str(book.number),
+                    values=(
+                        book.number,
+                        book.title,
+                        book.pages,
+                        book.pages_read,
+                        pages_remaining(book),
+                    ),
+                )
+
+    def refresh_group_entries(self) -> None:
+        for section in self.sections:
+            self.group_vars[section.label].set(groups_to_text(section.simultaneous_groups))
+
+    def refresh_session_books(self) -> None:
+        section = self.section_by_label(self.session_section_var.get())
+        values = [self.book_choice(book) for book in section.books]
+        self.session_book_combo.configure(values=values)
+        if values and self.session_book_var.get() not in values:
+            self.session_book_var.set(values[0])
+        elif not values:
+            self.session_book_var.set("")
+        self.refresh_session_remaining()
+
+    def refresh_session_remaining(self) -> None:
+        selected = self.selected_session_book()
+        if selected is None:
+            self.session_remaining_var.set("No book selected.")
+            return
+        _section, book = selected
+        self.session_remaining_var.set(
+            f"{book.title}: {book.pages_read} read, {pages_remaining(book)} remaining."
+        )
+
+    def refresh_session_table(self) -> None:
+        self.session_tree.delete(*self.session_tree.get_children())
+        for section_index, section in enumerate(self.sections):
+            for book_index, book in enumerate(section.books):
+                for session_index, session in enumerate(book.reading_sessions):
+                    iid = f"{section_index}:{book_index}:{session_index}"
+                    self.session_tree.insert(
+                        "",
+                        "end",
+                        iid=iid,
+                        values=(
+                            session.date.isoformat(),
+                            section.label,
+                            f"{book.number}. {book.title}",
+                            session.pages,
+                        ),
+                    )
+
+    def refresh_plan(self, autosave: bool) -> None:
+        try:
+            start_date, end_date, end_label, end_name = self.current_dates()
+        except ValueError as error:
+            self.cached_plan = None
+            self.clear_plan_output()
+            self.set_status(str(error), error=True)
+            return
+
+        try:
+            section_plans, total_pages, highest_daily_pace, overall_status = (
+                build_remaining_section_plans(self.sections, start_date, end_date)
+            )
+        except ValueError as error:
+            self.cached_plan = None
+            self.clear_plan_output()
+            self.set_status(str(error), error=True)
+            return
+
+        stats_options = self.current_stats_options()
+        self.cached_plan = (
+            section_plans,
+            total_pages,
+            highest_daily_pace,
+            overall_status,
+            start_date,
+            end_date,
+            end_label,
+            end_name,
+            stats_options,
+        )
+        self.render_summary(
+            section_plans,
+            total_pages,
+            highest_daily_pace,
+            overall_status,
+            start_date,
+            end_date,
+            end_label,
+            end_name,
+            stats_options,
+        )
+        self.render_plan_tables(section_plans)
+        if autosave:
+            self.autosave_json()
+        elif not any(section.books for section in self.sections):
+            self.set_status("Add at least one book")
+
+    def render_summary(
+        self,
+        section_plans,
+        total_pages: int,
+        highest_daily_pace: float,
+        overall_status: str,
+        start_date: date,
+        end_date: date,
+        end_label: str,
+        end_name: str,
+        stats_options: SummaryStatsOptions,
+    ) -> None:
+        physical_plan = section_plan_by_label(section_plans, PHYSICAL_BOOKS_LABEL)
+        digital_plan = section_plan_by_label(section_plans, DIGITAL_BOOKS_LABEL)
+        lines = [
+            "Reading plan",
+            f"Start date: {start_date.isoformat()}",
+            f"{end_label}: {end_date.isoformat()}",
+            f"Remaining pages: {total_pages}",
+            f"Physical remaining pages: {physical_plan.total_pages}",
+            f"Digital remaining pages: {digital_plan.total_pages}",
+            f"Highest remaining daily pace: {highest_daily_pace:.2f} pages/day",
+            f"Status: {overall_status}",
+        ]
+        for label, value in optional_summary_stat_rows(
+            section_plans, start_date, end_date, highest_daily_pace, stats_options
+        ):
+            lines.append(f"{label}: {value}")
+
+        detail_lines = list(lines)
+        for section_plan in section_plans:
+            detail_lines.append("")
+            detail_lines.append(section_plan.section.label)
+            if not section_plan.deadlines:
+                detail_lines.append("No books.")
+                continue
+            detail_lines.append(
+                f"Remaining daily pace: {section_plan.daily_pace:.2f} pages/day"
+            )
+            detail_lines.append(
+                final_result_message(
+                    section_plan.deadlines[-1].deadline, end_date, end_name
+                )
+            )
+        self.set_text(self.summary_text, "\n".join(lines) + "\n")
+        self.set_text(self.plan_text, "\n".join(detail_lines) + "\n")
+
+    def render_plan_tables(self, section_plans) -> None:
+        for section_plan in section_plans:
+            tree = self.plan_trees[section_plan.section.label]
+            tree.delete(*tree.get_children())
+            for deadline in section_plan.deadlines:
+                book = deadline.book
+                tree.insert(
+                    "",
+                    "end",
+                    values=(
+                        book.number,
+                        book.title,
+                        book.pages,
+                        book.pages_read,
+                        pages_remaining(book),
+                        f"{deadline.daily_pages:.2f}",
+                        deadline.cumulative_pages,
+                        deadline.start_date.isoformat(),
+                        deadline.deadline.isoformat(),
+                        deadline.days_allocated,
+                        deadline.status,
+                    ),
+                )
+
+    def clear_plan_output(self) -> None:
+        for tree in self.plan_trees.values():
+            tree.delete(*tree.get_children())
+        self.set_text(self.summary_text, "")
+        self.set_text(self.plan_text, "")
+
+    def autosave_json(self) -> None:
+        if self.suspend_autosave:
+            return
+        try:
+            start_date, end_date, end_label, _end_name = self.current_dates()
+            write_json_plan(
+                str(self.file_path),
+                self.sections,
+                start_date,
+                end_date,
+                end_label,
+                self.current_stats_options(),
+            )
+        except (OSError, ValueError) as error:
+            self.set_status(f"Autosave failed: {error}", error=True)
+            return
+        self.file_var.set(str(self.file_path))
+        self.set_status(f"Saved {self.file_path}")
+
     def current_plan_for_save(self):
-        self.require_books()
-        self.refresh_plan()
+        self.refresh_plan(autosave=False)
         if self.cached_plan is None:
             raise ValueError("plan cannot be calculated")
         return self.cached_plan
 
-    def require_books(self) -> None:
-        if not any(section.books for section in self.sections):
-            raise ValueError("add at least one book before saving")
+    def set_text(self, widget: tk.Text, value: str) -> None:
+        widget.configure(state="normal")
+        widget.delete("1.0", "end")
+        widget.insert("1.0", value)
+        widget.configure(state="disabled")
+
+    def set_status(self, message: str, error: bool = False) -> None:
+        self.status_var.set(message)
+        self.status_label.configure(foreground="#a11" if error else "#164")
+
+    def section_by_label(self, label: str) -> BookSection:
+        for section in self.sections:
+            if section.label == label:
+                return section
+        raise ValueError(f"unknown section: {label}")
+
+    def book_choice(self, book: Book) -> str:
+        return f"{book.number}. {book.title}"
+
+    def selected_session_book(self) -> tuple[BookSection, Book] | None:
+        try:
+            section = self.section_by_label(self.session_section_var.get())
+        except ValueError:
+            return None
+        raw_choice = self.session_book_var.get()
+        if not raw_choice:
+            return None
+        try:
+            book_number = int(raw_choice.split(".", 1)[0])
+        except ValueError:
+            return None
+        for book in section.books:
+            if book.number == book_number:
+                return section, book
+        return None
+
+    def add_session(self) -> None:
+        selected = self.selected_session_book()
+        if selected is None:
+            self.show_error("Select a book first")
+            return
+        _section, book = selected
+        try:
+            session_date = parse_date(self.session_date_var.get().strip())
+            pages = int(self.session_pages_var.get().strip())
+            add_reading_session(book, session_date, pages)
+        except ValueError as error:
+            self.show_error(str(error))
+            return
+        self.session_pages_var.set("")
+        self.after_state_change()
+
+    def delete_session(self) -> None:
+        selection = self.session_tree.selection()
+        if not selection:
+            self.show_error("Select a session first")
+            return
+        try:
+            section_index, book_index, session_index = (
+                int(part) for part in selection[0].split(":")
+            )
+            book = self.sections[section_index].books[book_index]
+            remove_reading_session(book, session_index)
+        except (IndexError, ValueError) as error:
+            self.show_error(str(error))
+            return
+        self.after_state_change()
+
+    def selected_book_index(self, label: str) -> int | None:
+        tree = self.book_trees[label]
+        selection = tree.selection()
+        if not selection:
+            return None
+        try:
+            return int(selection[0]) - 1
+        except ValueError:
+            return None
+
+    def load_selected_book(self, label: str) -> None:
+        index = self.selected_book_index(label)
+        if index is None:
+            return
+        section = self.section_by_label(label)
+        if index >= len(section.books):
+            return
+        book = section.books[index]
+        self.title_vars[label].set(book.title)
+        self.pages_vars[label].set(str(book.pages))
+
+    def read_book_fields(
+        self,
+        label: str,
+        default_title: str | None = None,
+        default_pages: int | None = None,
+    ) -> tuple[str, int] | None:
+        title = self.title_vars[label].get().strip() or (default_title or "")
+        if not title:
+            self.show_error("Book title is required")
+            return None
+        raw_pages = self.pages_vars[label].get().strip()
+        if not raw_pages and default_pages is not None:
+            return title, default_pages
+        try:
+            pages = int(raw_pages)
+        except ValueError:
+            self.show_error("Pages must be a whole number")
+            return None
+        if pages <= 0:
+            self.show_error("Pages must be positive")
+            return None
+        return title, pages
+
+    def add_book(self, label: str) -> None:
+        section = self.section_by_label(label)
+        position = len(section.books) + 1
+        values = self.read_book_fields(label, default_title=f"Book {position}")
+        if values is None:
+            return
+        title, pages = values
+        section.books.append(Book(number=position, title=title, pages=pages))
+        renumber_books(section.books)
+        self.after_book_edit(label, select_index=position - 1)
+
+    def insert_book_before_selection(self, label: str) -> None:
+        section = self.section_by_label(label)
+        index = self.selected_book_index(label)
+        if index is None:
+            self.show_error("Select a book first")
+            return
+        position = index + 1
+        if insertion_splits_simultaneous_group(position, section.simultaneous_groups):
+            self.show_error("Insert before or after the simultaneous group instead")
+            return
+        values = self.read_book_fields(label, default_title=f"Book {position}")
+        if values is None:
+            return
+        title, pages = values
+        section.books.insert(index, Book(number=position, title=title, pages=pages))
+        renumber_books(section.books)
+        section.simultaneous_groups = remap_simultaneous_groups_after_addition(
+            section.simultaneous_groups, position, section.books
+        )
+        self.after_book_edit(label, select_index=index)
+
+    def replace_selected_book(self, label: str) -> None:
+        section = self.section_by_label(label)
+        index = self.selected_book_index(label)
+        if index is None:
+            self.show_error("Select a book first")
+            return
+        old_book = section.books[index]
+        values = self.read_book_fields(
+            label, default_title=old_book.title, default_pages=old_book.pages
+        )
+        if values is None:
+            return
+        title, pages = values
+        section.books[index] = Book(number=old_book.number, title=title, pages=pages)
+        self.after_book_edit(label, select_index=index)
+
+    def delete_selected_book(self, label: str) -> None:
+        section = self.section_by_label(label)
+        index = self.selected_book_index(label)
+        if index is None:
+            self.show_error("Select a book first")
+            return
+        deleted_book_id = index + 1
+        section.books.pop(index)
+        renumber_books(section.books)
+        section.simultaneous_groups = remap_simultaneous_groups_after_deletion(
+            section.simultaneous_groups, deleted_book_id, section.books
+        )
+        next_index = min(index, len(section.books) - 1)
+        self.after_book_edit(label, select_index=next_index if next_index >= 0 else None)
+
+    def move_selected_book(self, label: str, offset: int) -> None:
+        section = self.section_by_label(label)
+        index = self.selected_book_index(label)
+        if index is None:
+            self.show_error("Select a book first")
+            return
+        target = index + offset
+        if target < 0 or target >= len(section.books):
+            return
+        book = section.books.pop(index)
+        section.books.insert(target, book)
+        renumber_books(section.books)
+        section.simultaneous_groups = []
+        self.after_book_edit(label, select_index=target)
+
+    def apply_groups(self, label: str) -> None:
+        section = self.section_by_label(label)
+        try:
+            groups = validate_simultaneous_groups(
+                section.books, parse_group_text(self.group_vars[label].get())
+            )
+        except ValueError as error:
+            self.show_error(str(error))
+            return
+        section.simultaneous_groups = groups
+        self.after_state_change()
+
+    def clear_groups(self, label: str) -> None:
+        section = self.section_by_label(label)
+        section.simultaneous_groups = []
+        self.after_state_change()
+
+    def after_book_edit(self, label: str, select_index: int | None = None) -> None:
+        self.refresh_book_tables()
+        self.refresh_group_entries()
+        if select_index is not None:
+            section = self.section_by_label(label)
+            if 0 <= select_index < len(section.books):
+                tree = self.book_trees[label]
+                iid = str(select_index + 1)
+                tree.selection_set(iid)
+                tree.focus(iid)
+                tree.see(iid)
+                self.load_selected_book(label)
+        self.refresh_session_books()
+        self.refresh_session_table()
+        self.refresh_plan(autosave=True)
+
+    def after_state_change(self) -> None:
+        self.refresh_all(autosave=True)
 
     def show_error(self, message: str) -> None:
         self.set_status(message, error=True)

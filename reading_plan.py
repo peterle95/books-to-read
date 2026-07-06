@@ -4,7 +4,8 @@ import calendar
 import csv
 import json
 import math
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -17,10 +18,30 @@ BOOK_SECTION_LABELS = (PHYSICAL_BOOKS_LABEL, DIGITAL_BOOKS_LABEL)
 
 
 @dataclass
+class ReadingSession:
+    date: date
+    current_page: int
+    pages_read: int
+
+
+@dataclass
 class Book:
     number: int
     title: str
-    pages: int
+    start_page: int
+    end_page: int
+    current_page: int | None = None
+    reading_sessions: list[ReadingSession] = field(default_factory=list)
+
+    @property
+    def pages(self) -> int:
+        return self.end_page - self.start_page + 1
+
+    @property
+    def pages_read(self) -> int:
+        if self.current_page is None:
+            return 0
+        return min(max(self.current_page - self.start_page + 1, 0), self.pages)
 
 
 @dataclass
@@ -61,12 +82,10 @@ class SummaryStatsOptions:
 
 
 def parse_date(value: str) -> date:
-    """Parse a date in YYYY-MM-DD format."""
     return datetime.strptime(value, DATE_FORMAT).date()
 
 
 def add_months(start: date, months: int) -> date:
-    """Add calendar months while keeping the day when possible."""
     month_index = start.month - 1 + months
     year = start.year + month_index // 12
     month = month_index % 12 + 1
@@ -76,321 +95,79 @@ def add_months(start: date, months: int) -> date:
 
 
 def next_quarter_start(today: date | None = None) -> date:
-    """Return the next quarterly start date after today."""
     today = today or date.today()
-
     for month in QUARTER_START_MONTHS:
         candidate = date(today.year, month, 1)
         if candidate > today:
             return candidate
-
     return date(today.year + 1, 1, 1)
 
 
 def period_end_from_start(start: date) -> date:
-    """The default reading period ends one day before the same day 3 months later."""
     return add_months(start, 3) - timedelta(days=1)
 
 
 def inclusive_days_between(start: date, end: date) -> int:
-    """Count readable calendar days, including both start and end."""
     return (end - start).days + 1
 
 
-def prompt_int(prompt: str, default: int | None = None, minimum: int = 1) -> int:
-    while True:
-        suffix = f" [{default}]" if default is not None else ""
-        raw_value = input(f"{prompt}{suffix}: ").strip()
-
-        if not raw_value and default is not None:
-            return default
-
-        try:
-            value = int(raw_value)
-        except ValueError:
-            print("Please enter a whole number.")
-            continue
-
-        if value < minimum:
-            if minimum == 0:
-                print("Please enter zero or a positive integer.")
-            else:
-                print("Please enter a positive integer.")
-            continue
-
-        return value
+def pages_remaining(book: Book) -> int:
+    return max(book.pages - book.pages_read, 0)
 
 
-def prompt_date(prompt: str, default: date | None = None) -> date:
-    while True:
-        suffix = f" [{default.isoformat()}]" if default is not None else ""
-        raw_value = input(f"{prompt}{suffix}: ").strip()
-
-        if not raw_value and default is not None:
-            return default
-
-        try:
-            return parse_date(raw_value)
-        except ValueError:
-            print("Please enter a date in YYYY-MM-DD format.")
+def validate_page_range(start_page: int, end_page: int) -> None:
+    if start_page < 0:
+        raise ValueError("start page cannot be negative")
+    if end_page < start_page:
+        raise ValueError("end page must be on or after the start page")
 
 
-def prompt_yes_no(prompt: str, default: bool = False) -> bool:
-    default_text = "Y/n" if default else "y/N"
-
-    while True:
-        raw_value = input(f"{prompt} [{default_text}]: ").strip().lower()
-
-        if not raw_value:
-            return default
-        if raw_value in {"y", "yes"}:
-            return True
-        if raw_value in {"n", "no"}:
-            return False
-
-        print("Please enter y or n.")
+def effective_remaining_start_date(
+    start_date: date, end_date: date, today: date | None = None
+) -> date:
+    today = today or date.today()
+    return min(max(start_date, today), end_date)
 
 
-def prompt_summary_stats_options() -> SummaryStatsOptions:
-    """Ask which optional summary stats should be shown for this run."""
-    print("\nOptional summary stats")
-    return SummaryStatsOptions(
-        book_counts=prompt_yes_no("Show book counts by format?"),
-        page_share=prompt_yes_no("Show physical/digital page percentages?"),
-        average_pages=prompt_yes_no("Show average pages per book by format?"),
-        reading_period=prompt_yes_no("Show reading period length?"),
-        pace_driver=prompt_yes_no("Show which format sets the highest pace?"),
-    )
+def set_book_progress(book: Book, current_page: int | None) -> None:
+    if current_page is None:
+        book.current_page = None
+        return
+    if current_page < book.start_page:
+        raise ValueError("current page cannot be before the book's start page")
+    if current_page > book.end_page:
+        raise ValueError("current page cannot be after the book's end page")
+    book.current_page = current_page
 
 
-def collect_books(count: int, label: str = "Book") -> list[Book]:
-    books: list[Book] = []
-
-    for number in range(1, count + 1):
-        default_title = f"{label} {number}"
-        print(f"\n{default_title}")
-        title = input(f"Title [{default_title}]: ").strip() or default_title
-        pages = prompt_int("Pages")
-        books.append(Book(number=number, title=title, pages=pages))
-
-    return books
+def add_reading_session(book: Book, session_date: date, current_page: int) -> None:
+    previous_pages_read = book.pages_read
+    set_book_progress(book, current_page)
+    pages_read = book.pages_read - previous_pages_read
+    if pages_read <= 0:
+        raise ValueError("current page must be after the previously recorded page")
+    book.reading_sessions.append(ReadingSession(session_date, current_page, pages_read))
 
 
-def collect_book_sections() -> list[BookSection]:
-    """Collect physical books first, then digital books."""
-    while True:
-        physical_count = prompt_int(
-            "Number of physical books", default=5, minimum=0
-        )
-        physical_books = collect_books(physical_count, "Physical book")
-        digital_count = prompt_int("Number of digital books", default=0, minimum=0)
-        digital_books = collect_books(digital_count, "Digital book")
-
-        if physical_books or digital_books:
-            return [
-                BookSection(PHYSICAL_BOOKS_LABEL, physical_books, []),
-                BookSection(DIGITAL_BOOKS_LABEL, digital_books, []),
-            ]
-
-        print("Please enter at least one physical or digital book.")
-
-
-def prompt_book_replacement(books: list[Book]) -> None:
-    """Replace one book while keeping its original position in the plan."""
-    while True:
-        book_id = prompt_int("Book ID to replace")
-        if book_id <= len(books):
-            break
-        print(f"Please enter a Book ID from 1 to {len(books)}.")
-
-    old_book = books[book_id - 1]
-    print(f"\nNew details for Book {book_id} ({old_book.title})")
-    title = input(f"Title [{old_book.title}]: ").strip() or old_book.title
-    pages = prompt_int("Pages", default=old_book.pages)
-    books[book_id - 1] = Book(number=book_id, title=title, pages=pages)
-
-
-def remap_simultaneous_groups_after_deletion(
-    groups: list[tuple[int, ...]], deleted_book_id: int, books: list[Book]
-) -> list[tuple[int, ...]]:
-    """Keep simultaneous groups aligned after one Book ID is removed."""
-    remapped_groups: list[tuple[int, ...]] = []
-
-    for group in groups:
-        remapped_group = tuple(
-            book_id - 1 if book_id > deleted_book_id else book_id
-            for book_id in group
-            if book_id != deleted_book_id
-        )
-        if len(remapped_group) >= 2:
-            remapped_groups.append(remapped_group)
-
-    return validate_simultaneous_groups(books, remapped_groups)
-
-
-def remap_simultaneous_groups_after_addition(
-    groups: list[tuple[int, ...]], new_book_position: int, books: list[Book]
-) -> list[tuple[int, ...]]:
-    """Keep simultaneous groups aligned after one Book ID is inserted."""
-    remapped_groups = [
-        tuple(
-            book_id + 1 if book_id >= new_book_position else book_id
-            for book_id in group
-        )
-        for group in groups
-    ]
-    return validate_simultaneous_groups(books, remapped_groups)
-
-
-def insertion_splits_simultaneous_group(
-    position: int, simultaneous_groups: list[tuple[int, ...]]
-) -> tuple[int, ...] | None:
-    """Return the simultaneous group that would be split by an insertion."""
-    for group in simultaneous_groups:
-        if group[0] < position <= group[-1]:
-            return group
-    return None
-
-
-def prompt_book_deletion(
-    books: list[Book], simultaneous_groups: list[tuple[int, ...]]
-) -> tuple[bool, list[tuple[int, ...]]]:
-    """Delete one book and preserve simultaneous groups among remaining books."""
-    if not books:
-        print("No books to delete.")
-        return False, simultaneous_groups
-
-    while True:
-        book_id = prompt_int("Book ID to delete")
-        if book_id <= len(books):
-            break
-        print(f"Please enter a Book ID from 1 to {len(books)}.")
-
-    deleted_book = books.pop(book_id - 1)
-    renumber_books(books)
-    print(f"Deleted Book {book_id} ({deleted_book.title}).")
-
-    return True, remap_simultaneous_groups_after_deletion(
-        simultaneous_groups, book_id, books
-    )
-
-
-def prompt_book_addition(
-    books: list[Book], simultaneous_groups: list[tuple[int, ...]]
-) -> list[tuple[int, ...]]:
-    """Add one book to the plan and preserve existing simultaneous groups."""
-    while True:
-        position = prompt_int("Position for new book", default=len(books) + 1)
-        if position > len(books) + 1:
-            print(f"Please enter a position from 1 to {len(books) + 1}.")
-            continue
-
-        split_group = insertion_splits_simultaneous_group(
-            position, simultaneous_groups
-        )
-        if split_group:
-            group_text = ", ".join(map(str, split_group))
-            print(
-                f"That position would split simultaneous books {group_text}. "
-                "Choose a position before or after that group."
-            )
-            continue
-
-        break
-
-    print(f"\nNew details for Book {position}")
-    title = input(f"Title [Book {position}]: ").strip() or f"Book {position}"
-    pages = prompt_int("Pages")
-    books.insert(position - 1, Book(number=position, title=title, pages=pages))
-    renumber_books(books)
-    print(f"Added Book {position} ({title}).")
-
-    return remap_simultaneous_groups_after_addition(
-        simultaneous_groups, position, books
-    )
-
-
-def prompt_section_choice(
-    sections: list[BookSection], question: str, require_books: bool = True
-) -> BookSection:
-    available_sections = [
-        section for section in sections if section.books or not require_books
-    ]
-    if len(available_sections) == 1:
-        return available_sections[0]
-
-    print(f"\n{question}")
-    for index, section in enumerate(available_sections, start=1):
-        print(f"{index}. {section.label}")
-
-    while True:
-        section_id = prompt_int("Table", default=1)
-        if section_id <= len(available_sections):
-            return available_sections[section_id - 1]
-        print(f"Please enter a table from 1 to {len(available_sections)}.")
-
-
-def prompt_plan_book_replacement(sections: list[BookSection]) -> None:
-    section = prompt_section_choice(sections, "Which table contains the book to replace?")
-    prompt_book_replacement(section.books)
-
-
-def prompt_plan_book_deletion(sections: list[BookSection]) -> bool:
-    if sum(len(section.books) for section in sections) == 1:
-        print("Cannot delete the only book in the plan.")
-        return False
-
-    section = prompt_section_choice(sections, "Which table contains the book to delete?")
-    book_deleted, section.simultaneous_groups = prompt_book_deletion(
-        section.books, section.simultaneous_groups
-    )
-    return book_deleted
-
-
-def prompt_plan_book_addition(sections: list[BookSection]) -> None:
-    section = prompt_section_choice(
-        sections, "Which table should the new book be added to?", require_books=False
-    )
-    section.simultaneous_groups = prompt_book_addition(
-        section.books, section.simultaneous_groups
-    )
-
-
-def prompt_plan_book_reorder(sections: list[BookSection]) -> None:
-    section = prompt_section_choice(sections, "Which table contains the book to reorder?")
-    prompt_book_reorder(section.books)
-    section.simultaneous_groups = []
+def remove_reading_session(book: Book, session_index: int) -> None:
+    try:
+        book.reading_sessions.pop(session_index)
+    except IndexError as error:
+        raise ValueError("reading session not found") from error
+    if not book.reading_sessions:
+        book.current_page = None
+        return
+    book.current_page = max(session.current_page for session in book.reading_sessions)
 
 
 def renumber_books(books: list[Book]) -> None:
-    """Keep displayed Book IDs aligned with the current reading order."""
     for number, book in enumerate(books, start=1):
         book.number = number
-
-
-def prompt_book_reorder(books: list[Book]) -> None:
-    """Move one book to a new position in the reading order."""
-    while True:
-        book_id = prompt_int("Book ID to move")
-        if book_id <= len(books):
-            break
-        print(f"Please enter a Book ID from 1 to {len(books)}.")
-
-    while True:
-        new_position = prompt_int("New position")
-        if new_position <= len(books):
-            break
-        print(f"Please enter a position from 1 to {len(books)}.")
-
-    book = books.pop(book_id - 1)
-    books.insert(new_position - 1, book)
-    renumber_books(books)
 
 
 def validate_simultaneous_groups(
     books: list[Book], groups: list[tuple[int, ...]]
 ) -> list[tuple[int, ...]]:
-    """Validate groups of consecutive Book IDs that are read in parallel."""
     used_ids: set[int] = set()
     valid_groups: list[tuple[int, ...]] = []
 
@@ -406,93 +183,47 @@ def validate_simultaneous_groups(
             raise ValueError("Book IDs read together must be consecutive")
         if used_ids.intersection(ids):
             raise ValueError("a book can belong to only one simultaneous group")
-
         used_ids.update(ids)
         valid_groups.append(ids)
 
     return valid_groups
 
 
-def consecutive_book_runs(book_ids: tuple[int, ...]) -> list[tuple[int, ...]]:
-    """Split Book IDs into consecutive runs, keeping only usable groups."""
-    runs: list[tuple[int, ...]] = []
-    current_run: list[int] = []
-
-    for book_id in book_ids:
-        if not current_run or book_id == current_run[-1] + 1:
-            current_run.append(book_id)
-            continue
-
-        if len(current_run) >= 2:
-            runs.append(tuple(current_run))
-        current_run = [book_id]
-
-    if len(current_run) >= 2:
-        runs.append(tuple(current_run))
-
-    return runs
-
-
-def add_or_update_simultaneous_group(
-    books: list[Book], groups: list[tuple[int, ...]], group: tuple[int, ...]
-) -> tuple[list[tuple[int, ...]], bool]:
-    """Add a group, moving selected books out of older groups when needed."""
-    new_group = validate_simultaneous_groups(books, [group])[0]
-    new_group_ids = set(new_group)
-    updated_groups: list[tuple[int, ...]] = []
-    changed_existing_group = False
-
-    for existing_group in groups:
-        remaining_ids = tuple(
-            book_id for book_id in existing_group if book_id not in new_group_ids
-        )
-        if len(remaining_ids) != len(existing_group):
-            changed_existing_group = True
-        updated_groups.extend(consecutive_book_runs(remaining_ids))
-
-    updated_groups.append(new_group)
-    return validate_simultaneous_groups(books, updated_groups), changed_existing_group
-
-
-def prompt_simultaneous_groups(
-    books: list[Book], groups: list[tuple[int, ...]], label: str = "books"
+def remap_simultaneous_groups_after_deletion(
+    groups: list[tuple[int, ...]], deleted_book_id: int, books: list[Book]
 ) -> list[tuple[int, ...]]:
-    """Let the reader add consecutive books that should be read together."""
-    groups = list(groups)
-    label_text = label.lower()
-
-    while prompt_yes_no(f"\nRead {label_text} simultaneously?"):
-        raw_ids = input("Consecutive Book IDs to read together (for example 2,3): ").strip()
-        try:
-            group = tuple(int(value.strip()) for value in raw_ids.split(","))
-            groups, changed_existing_group = add_or_update_simultaneous_group(
-                books, groups, group
-            )
-        except ValueError as error:
-            print(f"Could not add simultaneous books: {error}")
-            continue
-
-        if changed_existing_group:
-            print("Updated existing simultaneous groups.")
-        print(f"Books {', '.join(map(str, group))} will be read together.")
-
-    return groups
-
-
-def prompt_plan_simultaneous_groups(sections: list[BookSection]) -> bool:
-    changed = False
-
-    for section in sections:
-        if not section.books:
-            continue
-        updated_groups = prompt_simultaneous_groups(
-            section.books, section.simultaneous_groups, section.label
+    remapped_groups: list[tuple[int, ...]] = []
+    for group in groups:
+        remapped_group = tuple(
+            book_id - 1 if book_id > deleted_book_id else book_id
+            for book_id in group
+            if book_id != deleted_book_id
         )
-        if updated_groups != section.simultaneous_groups:
-            section.simultaneous_groups = updated_groups
-            changed = True
+        if len(remapped_group) >= 2:
+            remapped_groups.append(remapped_group)
+    return validate_simultaneous_groups(books, remapped_groups)
 
-    return changed
+
+def remap_simultaneous_groups_after_addition(
+    groups: list[tuple[int, ...]], new_book_position: int, books: list[Book]
+) -> list[tuple[int, ...]]:
+    remapped_groups = [
+        tuple(
+            book_id + 1 if book_id >= new_book_position else book_id
+            for book_id in group
+        )
+        for group in groups
+    ]
+    return validate_simultaneous_groups(books, remapped_groups)
+
+
+def insertion_splits_simultaneous_group(
+    position: int, simultaneous_groups: list[tuple[int, ...]]
+) -> tuple[int, ...] | None:
+    for group in simultaneous_groups:
+        if group[0] < position <= group[-1]:
+            return group
+    return None
 
 
 def calculate_deadlines(
@@ -501,10 +232,12 @@ def calculate_deadlines(
     end_date: date,
     daily_pace: float,
     simultaneous_groups: list[tuple[int, ...]] | None = None,
+    page_count: Callable[[Book], int] | None = None,
 ) -> list[BookDeadline]:
     simultaneous_groups = validate_simultaneous_groups(
         books, simultaneous_groups or []
     )
+    page_count = page_count or (lambda book: book.pages)
     group_by_first_book = {group[0]: group for group in simultaneous_groups}
     grouped_book_ids = {book_id for group in simultaneous_groups for book_id in group}
     deadlines: list[BookDeadline] = []
@@ -520,16 +253,16 @@ def calculate_deadlines(
 
         group_ids = group_by_first_book.get(book.number, (book.number,))
         group_books = books[book_index : book_index + len(group_ids)]
-        group_pages = sum(group_book.pages for group_book in group_books)
+        group_pages = sum(page_count(group_book) for group_book in group_books)
         cumulative_pages += group_pages
-        # Use cumulative pages so rounding does not compound from book to book.
-        # The tiny tolerance avoids floating-point noise turning an exact
-        # whole-day pace into one extra day (for example, 103.00000000000001).
-        cumulative_days = max(1, math.ceil(cumulative_pages / daily_pace - 1e-9))
+        if daily_pace <= 0 or cumulative_pages == 0:
+            cumulative_days = previous_cumulative_days
+        else:
+            cumulative_days = max(
+                1, math.ceil(cumulative_pages / daily_pace - 1e-9)
+            )
         days_allocated = cumulative_days - previous_cumulative_days
-        # The start date is the end of the first reading day, so a one-day
-        # book has a deadline of the start date rather than the next day.
-        deadline = start_date + timedelta(days=cumulative_days - 1)
+        deadline = start_date + timedelta(days=max(cumulative_days - 1, 0))
         group_start_date = (
             deadline
             if days_allocated == 0
@@ -545,12 +278,16 @@ def calculate_deadlines(
 
         individual_cumulative_pages = cumulative_pages - group_pages
         for group_book in group_books:
-            individual_cumulative_pages += group_book.pages
-            daily_pages = (
-                daily_pace
-                if len(group_books) == 1
-                else daily_pace * group_book.pages / group_pages
-            )
+            book_pages = page_count(group_book)
+            individual_cumulative_pages += book_pages
+            if book_pages == 0:
+                daily_pages = 0.0
+            elif len(group_books) == 1:
+                daily_pages = daily_pace
+            elif group_pages == 0:
+                daily_pages = 0.0
+            else:
+                daily_pages = daily_pace * book_pages / group_pages
             deadlines.append(
                 BookDeadline(
                     book=group_book,
@@ -575,16 +312,24 @@ def build_plan(
     end_date: date,
     daily_pace: float,
     simultaneous_groups: list[tuple[int, ...]] | None = None,
+    page_count: Callable[[Book], int] | None = None,
 ) -> tuple[list[BookDeadline], int, float, str]:
-    """Calculate all values needed to display or export the current plan."""
-    total_pages = sum(book.pages for book in books)
+    page_count = page_count or (lambda book: book.pages)
+    total_pages = sum(page_count(book) for book in books)
     period_days = inclusive_days_between(start_date, end_date)
     required_pace = total_pages / period_days
     deadlines = calculate_deadlines(
-        books, start_date, end_date, daily_pace, simultaneous_groups
+        books,
+        start_date,
+        end_date,
+        daily_pace,
+        simultaneous_groups,
+        page_count,
     )
     overall_status = (
-        "achievable" if deadlines[-1].deadline <= end_date else "not achievable"
+        "achievable"
+        if not deadlines or deadlines[-1].deadline <= end_date
+        else "not achievable"
     )
     return deadlines, total_pages, required_pace, overall_status
 
@@ -592,7 +337,6 @@ def build_plan(
 def build_section_plan(
     section: BookSection, start_date: date, end_date: date
 ) -> SectionPlan:
-    """Calculate one physical or digital table."""
     if not section.books:
         return SectionPlan(section, [], 0.0, 0, 0.0, "achievable")
 
@@ -613,6 +357,51 @@ def build_section_plans(
         build_section_plan(section, start_date, end_date)
         for section in sections
     ]
+    return summarize_section_plans(section_plans)
+
+
+def build_remaining_section_plan(
+    section: BookSection,
+    start_date: date,
+    end_date: date,
+    today: date | None = None,
+) -> SectionPlan:
+    if not section.books:
+        return SectionPlan(section, [], 0.0, 0, 0.0, "achievable")
+
+    remaining_start = effective_remaining_start_date(start_date, end_date, today)
+    period_days = inclusive_days_between(remaining_start, end_date)
+    remaining_pages = sum(pages_remaining(book) for book in section.books)
+    daily_pace = 0.0 if remaining_pages == 0 else remaining_pages / period_days
+    deadlines, total_pages, required_pace, overall_status = build_plan(
+        section.books,
+        remaining_start,
+        end_date,
+        daily_pace,
+        section.simultaneous_groups,
+        pages_remaining,
+    )
+    return SectionPlan(
+        section, deadlines, daily_pace, total_pages, required_pace, overall_status
+    )
+
+
+def build_remaining_section_plans(
+    sections: list[BookSection],
+    start_date: date,
+    end_date: date,
+    today: date | None = None,
+) -> tuple[list[SectionPlan], int, float, str]:
+    section_plans = [
+        build_remaining_section_plan(section, start_date, end_date, today)
+        for section in sections
+    ]
+    return summarize_section_plans(section_plans)
+
+
+def summarize_section_plans(
+    section_plans: list[SectionPlan],
+) -> tuple[list[SectionPlan], int, float, str]:
     total_pages = sum(section_plan.total_pages for section_plan in section_plans)
     highest_daily_pace = max(
         (section_plan.daily_pace for section_plan in section_plans), default=0.0
@@ -640,9 +429,7 @@ def section_plan_by_label(
 
 def average_pages_per_book(section_plan: SectionPlan) -> float:
     book_count = len(section_plan.section.books)
-    if book_count == 0:
-        return 0.0
-    return section_plan.total_pages / book_count
+    return 0.0 if book_count == 0 else section_plan.total_pages / book_count
 
 
 def optional_summary_stat_rows(
@@ -711,52 +498,12 @@ def optional_summary_stat_rows(
     return rows
 
 
-def format_table(deadlines: list[BookDeadline]) -> str:
-    headers = [
-        "Book",
-        "Title",
-        "Pages",
-        "Daily pages",
-        "Cumulative pages",
-        "Start date",
-        "Deadline",
-        "Days allocated",
-        "Status",
-    ]
-    rows = [
-        [
-            str(deadline.book.number),
-            deadline.book.title,
-            str(deadline.book.pages),
-            f"{deadline.daily_pages:.2f}",
-            str(deadline.cumulative_pages),
-            deadline.start_date.isoformat(),
-            deadline.deadline.isoformat(),
-            str(deadline.days_allocated),
-            deadline.status,
-        ]
-        for deadline in deadlines
-    ]
-
-    columns = list(zip(headers, *rows))
-    widths = [max(len(value) for value in column) for column in columns]
-
-    def format_row(values: list[str]) -> str:
-        padded = [value.ljust(widths[index]) for index, value in enumerate(values)]
-        return "| " + " | ".join(padded) + " |"
-
-    separator = "|-" + "-|-".join("-" * width for width in widths) + "-|"
-    return "\n".join([format_row(headers), separator, *[format_row(row) for row in rows]])
-
-
 def final_result_message(final_deadline: date, end_date: date, end_name: str) -> str:
     difference = (end_date - final_deadline).days
-
     if difference > 0:
         return f"You finish {difference} day{'s' if difference != 1 else ''} before the {end_name}."
     if difference == 0:
         return f"You finish exactly on the {end_name}."
-
     late_days = abs(difference)
     return f"You finish {late_days} day{'s' if late_days != 1 else ''} after the {end_name}."
 
@@ -773,7 +520,6 @@ def write_csv(
     stats_options: SummaryStatsOptions,
 ) -> None:
     path = Path(filename)
-
     with path.open("w", newline="", encoding="utf-8") as csv_file:
         writer = csv.writer(csv_file)
         writer.writerow(["Reading plan"])
@@ -781,9 +527,9 @@ def write_csv(
         writer.writerow([end_label, end_date.isoformat()])
         physical_plan = section_plan_by_label(section_plans, PHYSICAL_BOOKS_LABEL)
         digital_plan = section_plan_by_label(section_plans, DIGITAL_BOOKS_LABEL)
-        writer.writerow(["Total pages", total_pages])
-        writer.writerow(["Physical pages", physical_plan.total_pages])
-        writer.writerow(["Digital pages", digital_plan.total_pages])
+        writer.writerow(["Total remaining pages", total_pages])
+        writer.writerow(["Physical remaining pages", physical_plan.total_pages])
+        writer.writerow(["Digital remaining pages", digital_plan.total_pages])
         writer.writerow(["Highest daily pace", f"{highest_daily_pace:.15g} pages/day"])
         writer.writerow(["Status", overall_status])
         for label, value in optional_summary_stat_rows(
@@ -811,22 +557,31 @@ def write_csv(
                 [
                     "Book",
                     "Title",
+                    "Start page",
+                    "End page",
+                    "Current page",
                     "Pages",
+                    "Read pages",
+                    "Remaining pages",
                     "Daily pages",
-                    "Cumulative pages",
+                    "Cumulative remaining pages",
                     "Start date",
                     "Deadline",
                     "Days allocated",
                     "Status",
                 ]
             )
-
             for deadline in section_plan.deadlines:
                 writer.writerow(
                     [
                         deadline.book.number,
                         deadline.book.title,
+                        deadline.book.start_page,
+                        deadline.book.end_page,
+                        "" if deadline.book.current_page is None else deadline.book.current_page,
                         deadline.book.pages,
+                        deadline.book.pages_read,
+                        pages_remaining(deadline.book),
                         f"{deadline.daily_pages:.15g}",
                         deadline.cumulative_pages,
                         deadline.start_date.isoformat(),
@@ -842,6 +597,13 @@ def parse_csv_book_table(
 ) -> tuple[list[Book], int]:
     books: list[Book] = []
     index = header_index + 1
+    headers = rows[header_index]
+    header_indexes = {header: idx for idx, header in enumerate(headers)}
+    start_page_index = header_indexes.get("Start page")
+    end_page_index = header_indexes.get("End page")
+    current_page_index = header_indexes.get("Current page")
+    pages_index = header_indexes.get("Pages", 2)
+    pages_read_index = header_indexes.get("Read pages", header_indexes.get("Pages read"))
 
     while index < len(rows):
         row = rows[index]
@@ -855,14 +617,44 @@ def parse_csv_book_table(
         if len(row) < 3:
             raise ValueError("a book row is incomplete")
         try:
-            number = int(row[0])
-            pages = int(row[2])
+            if start_page_index is not None and end_page_index is not None:
+                start_page = int(row[start_page_index])
+                end_page = int(row[end_page_index])
+            else:
+                pages = int(row[pages_index])
+                start_page = 1
+                end_page = pages
+            pages_read = (
+                int(row[pages_read_index])
+                if pages_read_index is not None and len(row) > pages_read_index
+                else 0
+            )
+            current_page = (
+                int(row[current_page_index])
+                if current_page_index is not None
+                and len(row) > current_page_index
+                and row[current_page_index].strip()
+                else None
+            )
         except ValueError as error:
-            raise ValueError("book IDs and pages must be whole numbers") from error
+            raise ValueError("book page fields must be whole numbers") from error
         title = row[1].strip()
-        if number <= 0 or pages <= 0 or not title:
-            raise ValueError("each book needs a positive ID, title, and page count")
-        books.append(Book(number=number, title=title, pages=pages))
+        validate_page_range(start_page, end_page)
+        if pages_read < 0 or not title:
+            raise ValueError("each book needs a title and valid page range")
+        if current_page is None and pages_read > 0:
+            current_page = start_page + pages_read - 1
+        if current_page is not None:
+            current_page = min(max(current_page, start_page), end_page)
+        books.append(
+            Book(
+                number=len(books) + 1,
+                title=title,
+                start_page=start_page,
+                end_page=end_page,
+                current_page=current_page,
+            )
+        )
         index += 1
 
     renumber_books(books)
@@ -888,7 +680,6 @@ def parse_csv_simultaneous_groups(
 def load_csv_plan(
     filename: str,
 ) -> tuple[list[BookSection], date, date, str, str]:
-    """Load the books and settings written by ``write_csv``."""
     with Path(filename).open(newline="", encoding="utf-8") as csv_file:
         rows = list(csv.reader(csv_file))
 
@@ -900,6 +691,7 @@ def load_csv_plan(
             and (
                 row[0] in BOOK_SECTION_LABELS
                 or row[:3] == ["Book", "Title", "Pages"]
+                or row[:3] == ["Book", "Title", "Start page"]
             )
         ),
         len(rows),
@@ -909,11 +701,8 @@ def load_csv_plan(
         for row in rows[:first_plan_row_index]
         if len(row) >= 2 and row[0] and row[0] != "Book"
     }
-    required_fields = {"Start date"}
-    missing_fields = required_fields - metadata.keys()
-    if missing_fields:
-        names = ", ".join(sorted(missing_fields))
-        raise ValueError(f"missing required field(s): {names}")
+    if "Start date" not in metadata:
+        raise ValueError("missing required field: Start date")
 
     if "Target finish date" in metadata:
         end_label = "Target finish date"
@@ -954,34 +743,25 @@ def load_csv_plan(
             if (
                 index < len(rows)
                 and len(rows[index]) >= 2
+                and rows[index][0] == "Daily pace"
+            ):
+                index += 1
+            if (
+                index < len(rows)
+                and len(rows[index]) >= 2
                 and rows[index][0] == "Simultaneous groups"
             ):
                 raw_groups = rows[index][1].strip()
                 index += 1
-            elif (
-                index < len(rows)
-                and len(rows[index]) >= 2
-                and rows[index][0] == "Daily pace"
-            ):
-                index += 1
-                if (
-                    index < len(rows)
-                    and len(rows[index]) >= 2
-                    and rows[index][0] == "Simultaneous groups"
-                ):
-                    raw_groups = rows[index][1].strip()
-                    index += 1
             while index < len(rows) and (
                 not rows[index] or not any(cell.strip() for cell in rows[index])
             ):
                 index += 1
-            if index >= len(rows) or rows[index][:3] != ["Book", "Title", "Pages"]:
+            if index >= len(rows) or rows[index][:2] != ["Book", "Title"]:
                 raise ValueError(f"missing {label} book table header")
-
             books, index = parse_csv_book_table(rows, index, stop_at_blank=True)
             groups = parse_csv_simultaneous_groups(books, raw_groups, label)
             sections_by_label[label] = BookSection(label, books, groups)
-
         sections = [sections_by_label[label] for label in BOOK_SECTION_LABELS]
     else:
         try:
@@ -989,10 +769,10 @@ def load_csv_plan(
                 index
                 for index, row in enumerate(rows)
                 if row[:3] == ["Book", "Title", "Pages"]
+                or row[:3] == ["Book", "Title", "Start page"]
             )
         except StopIteration as error:
             raise ValueError("missing book table header") from error
-
         books, _ = parse_csv_book_table(rows, header_index, stop_at_blank=False)
         groups = parse_csv_simultaneous_groups(
             books, metadata.get("Simultaneous groups", "").strip(), PHYSICAL_BOOKS_LABEL
@@ -1004,14 +784,7 @@ def load_csv_plan(
 
     if not any(section.books for section in sections):
         raise ValueError("no books found")
-
-    return (
-        sections,
-        start_date,
-        end_date,
-        end_label,
-        end_name,
-    )
+    return sections, start_date, end_date, end_label, end_name
 
 
 def summary_stats_options_to_json(options: SummaryStatsOptions) -> dict[str, bool]:
@@ -1026,14 +799,7 @@ def summary_stats_options_to_json(options: SummaryStatsOptions) -> dict[str, boo
 
 def summary_stats_options_from_json(value: object | None) -> SummaryStatsOptions:
     if not isinstance(value, dict):
-        return SummaryStatsOptions(
-            book_counts=True,
-            page_share=True,
-            average_pages=True,
-            reading_period=True,
-            pace_driver=True,
-        )
-
+        return SummaryStatsOptions(True, True, True, True, True)
     return SummaryStatsOptions(
         book_counts=bool(value.get("book_counts", True)),
         page_share=bool(value.get("page_share", True)),
@@ -1043,31 +809,124 @@ def summary_stats_options_from_json(value: object | None) -> SummaryStatsOptions
     )
 
 
+def reading_session_to_json(session: ReadingSession) -> dict[str, object]:
+    return {
+        "date": session.date.isoformat(),
+        "current_page": session.current_page,
+        "pages_read": session.pages_read,
+    }
+
+
+def parse_session_date(value: object) -> date:
+    if not isinstance(value, dict):
+        raise ValueError("each reading session must be a JSON object")
+    try:
+        return parse_date(str(value["date"]))
+    except KeyError as error:
+        raise ValueError(f"missing reading session field: {error.args[0]}") from error
+    except ValueError as error:
+        raise ValueError("invalid reading session") from error
+
+
 def book_to_json(book: Book) -> dict[str, object]:
     return {
         "number": book.number,
         "title": book.title,
+        "start_page": book.start_page,
+        "end_page": book.end_page,
+        "current_page": book.current_page,
         "pages": book.pages,
+        "pages_read": book.pages_read,
+        "reading_sessions": [
+            reading_session_to_json(session) for session in book.reading_sessions
+        ],
     }
 
 
 def book_from_json(value: object, fallback_number: int) -> Book:
     if not isinstance(value, dict):
         raise ValueError("each book must be a JSON object")
-
     title = str(value.get("title", "")).strip()
     if not title:
         raise ValueError("each book needs a title")
-
     try:
-        pages = int(value.get("pages", 0))
+        if "start_page" in value and "end_page" in value:
+            start_page = int(value["start_page"])
+            end_page = int(value["end_page"])
+        else:
+            pages = int(value.get("pages", 0))
+            start_page = 1
+            end_page = pages
+        pages_read = int(value.get("pages_read", 0))
+        raw_current_page = value.get("current_page")
+        current_page = (
+            None
+            if raw_current_page is None or raw_current_page == ""
+            else int(raw_current_page)
+        )
     except (TypeError, ValueError) as error:
-        raise ValueError("book pages must be whole numbers") from error
+        raise ValueError("book page fields must be whole numbers") from error
+    validate_page_range(start_page, end_page)
+    if pages_read < 0:
+        raise ValueError("pages read cannot be negative")
 
-    if pages <= 0:
-        raise ValueError("book pages must be positive")
+    raw_sessions = value.get("reading_sessions", [])
+    if not isinstance(raw_sessions, list):
+        raise ValueError("reading_sessions must be a list")
+    reading_sessions: list[ReadingSession] = []
+    previous_current_page: int | None = None
+    for raw_session in raw_sessions:
+        if not isinstance(raw_session, dict):
+            raise ValueError("each reading session must be a JSON object")
+        session_date = parse_session_date(raw_session)
+        try:
+            if "current_page" in raw_session:
+                session_current_page = int(raw_session["current_page"])
+                previous_total = (
+                    0
+                    if previous_current_page is None
+                    else previous_current_page - start_page + 1
+                )
+                session_pages_read = int(
+                    raw_session.get(
+                        "pages_read",
+                        session_current_page - start_page + 1 - previous_total,
+                    )
+                )
+            else:
+                session_pages_read = int(raw_session["pages"])
+                session_current_page = (
+                    start_page + session_pages_read - 1
+                    if previous_current_page is None
+                    else previous_current_page + session_pages_read
+                )
+        except (KeyError, TypeError, ValueError) as error:
+            raise ValueError("invalid reading session") from error
+        if session_pages_read <= 0:
+            raise ValueError("reading session pages must be positive")
+        session_current_page = min(max(session_current_page, start_page), end_page)
+        reading_sessions.append(
+            ReadingSession(session_date, session_current_page, session_pages_read)
+        )
+        previous_current_page = max(
+            previous_current_page or session_current_page, session_current_page
+        )
 
-    return Book(number=fallback_number, title=title, pages=pages)
+    if current_page is None and reading_sessions:
+        current_page = max(session.current_page for session in reading_sessions)
+    elif current_page is None and pages_read > 0:
+        current_page = start_page + pages_read - 1
+    if current_page is not None:
+        current_page = min(max(current_page, start_page), end_page)
+
+    return Book(
+        number=fallback_number,
+        title=title,
+        start_page=start_page,
+        end_page=end_page,
+        current_page=current_page,
+        reading_sessions=reading_sessions,
+    )
 
 
 def book_section_to_json(section: BookSection) -> dict[str, object]:
@@ -1083,12 +942,10 @@ def book_section_to_json(section: BookSection) -> dict[str, object]:
 def book_section_from_json(value: object, default_label: str) -> BookSection:
     if not isinstance(value, dict):
         raise ValueError("each section must be a JSON object")
-
     label = str(value.get("label", default_label)).strip() or default_label
     raw_books = value.get("books", [])
     if not isinstance(raw_books, list):
         raise ValueError(f"{label} books must be a list")
-
     books = [
         book_from_json(book_value, fallback_number=index)
         for index, book_value in enumerate(raw_books, start=1)
@@ -1098,7 +955,6 @@ def book_section_from_json(value: object, default_label: str) -> BookSection:
     raw_groups = value.get("simultaneous_groups", [])
     if not isinstance(raw_groups, list):
         raise ValueError(f"{label} simultaneous groups must be a list")
-
     groups: list[tuple[int, ...]] = []
     for raw_group in raw_groups:
         if not isinstance(raw_group, list):
@@ -1109,7 +965,6 @@ def book_section_from_json(value: object, default_label: str) -> BookSection:
             raise ValueError(
                 f"{label} simultaneous group IDs must be whole numbers"
             ) from error
-
     return BookSection(label, books, validate_simultaneous_groups(books, groups))
 
 
@@ -1122,7 +977,7 @@ def write_json_plan(
     stats_options: SummaryStatsOptions,
 ) -> None:
     payload = {
-        "schema_version": 1,
+        "schema_version": 3,
         "start_date": start_date.isoformat(),
         "end_date": end_date.isoformat(),
         "end_label": end_label,
@@ -1142,7 +997,6 @@ def load_json_plan(
         payload = json.loads(Path(filename).read_text(encoding="utf-8"))
     except json.JSONDecodeError as error:
         raise ValueError("invalid JSON") from error
-
     if not isinstance(payload, dict):
         raise ValueError("the JSON plan must be an object")
 
@@ -1153,7 +1007,6 @@ def load_json_plan(
         raise ValueError(f"missing required field: {error.args[0]}") from error
     except ValueError as error:
         raise ValueError("invalid date") from error
-
     if end_date < start_date:
         raise ValueError("finish date must be on or after the start date")
 
@@ -1173,7 +1026,6 @@ def load_json_plan(
     raw_sections = payload.get("sections", [])
     if not isinstance(raw_sections, list):
         raise ValueError("sections must be a list")
-
     sections_by_label = {
         label: BookSection(label, [], []) for label in BOOK_SECTION_LABELS
     }
@@ -1188,9 +1040,6 @@ def load_json_plan(
             sections_by_label[section.label] = section
 
     sections = [sections_by_label[label] for label in BOOK_SECTION_LABELS]
-    if not any(section.books for section in sections):
-        raise ValueError("no books found")
-
     return (
         sections,
         start_date,
@@ -1199,196 +1048,3 @@ def load_json_plan(
         end_name,
         summary_stats_options_from_json(payload.get("stats_options")),
     )
-
-
-def prompt_csv_plan(
-) -> tuple[list[BookSection], date, date, str, str]:
-    """Keep asking for a saved CSV file until a valid plan is loaded."""
-    while True:
-        filename = input("CSV filename [reading_plan.csv]: ").strip() or "reading_plan.csv"
-        try:
-            return load_csv_plan(filename)
-        except (OSError, csv.Error, ValueError) as error:
-            print(f"Could not import the CSV file: {error}")
-
-
-def print_plan(
-    section_plans: list[SectionPlan],
-    start_date: date,
-    end_date: date,
-    total_pages: int,
-    highest_daily_pace: float,
-    overall_status: str,
-    end_label: str,
-    end_name: str,
-    stats_options: SummaryStatsOptions,
-) -> None:
-    print("\nReading plan")
-    print(f"Start date: {start_date.isoformat()}")
-    physical_plan = section_plan_by_label(section_plans, PHYSICAL_BOOKS_LABEL)
-    digital_plan = section_plan_by_label(section_plans, DIGITAL_BOOKS_LABEL)
-    print(f"{end_label}: {end_date.isoformat()}")
-    print(f"Total pages: {total_pages}")
-    print(f"Physical pages: {physical_plan.total_pages}")
-    print(f"Digital pages: {digital_plan.total_pages}")
-    print(f"Highest daily pace: {highest_daily_pace:.2f} pages/day")
-    print(f"Status: {overall_status}")
-    for label, value in optional_summary_stat_rows(
-        section_plans, start_date, end_date, highest_daily_pace, stats_options
-    ):
-        print(f"{label}: {value}")
-
-    for section_plan in section_plans:
-        print(f"\n{section_plan.section.label}")
-        if not section_plan.deadlines:
-            print("No books.")
-            continue
-
-        print(f"Daily pace: {section_plan.daily_pace:.2f} pages/day")
-        print(format_table(section_plan.deadlines))
-        print()
-        print("Final result:")
-        print(
-            final_result_message(
-                section_plan.deadlines[-1].deadline, end_date, end_name
-            )
-        )
-
-
-def show_plan(
-    sections: list[BookSection],
-    start_date: date,
-    end_date: date,
-    end_label: str,
-    end_name: str,
-    stats_options: SummaryStatsOptions,
-) -> tuple[list[SectionPlan], int, float, str]:
-    """Build and print the current plan without prompting for edits."""
-    section_plans, total_pages, highest_daily_pace, overall_status = build_section_plans(
-        sections, start_date, end_date
-    )
-    print_plan(
-        section_plans=section_plans,
-        start_date=start_date,
-        end_date=end_date,
-        total_pages=total_pages,
-        highest_daily_pace=highest_daily_pace,
-        overall_status=overall_status,
-        end_label=end_label,
-        end_name=end_name,
-        stats_options=stats_options,
-    )
-    return section_plans, total_pages, highest_daily_pace, overall_status
-
-
-def main() -> None:
-    print("Quarterly reading deadline planner\n")
-
-    loaded_from_csv = prompt_yes_no("Import a previously saved CSV plan?")
-    if loaded_from_csv:
-        (
-            sections,
-            start_date,
-            end_date,
-            end_label,
-            end_name,
-        ) = prompt_csv_plan()
-    else:
-        start_date = prompt_date("Quarter start date", default=next_quarter_start())
-
-        use_custom_target = prompt_yes_no(
-            "Use a custom target finish date instead of a 3-month quarter?"
-        )
-        if use_custom_target:
-            while True:
-                end_date = prompt_date("Target finish date")
-                if end_date < start_date:
-                    print("Target finish date must be on or after the start date.")
-                    continue
-                break
-        else:
-            end_date = period_end_from_start(start_date)
-
-        end_label = "Target finish date" if use_custom_target else "Quarter end"
-        end_name = "target finish date" if use_custom_target else "quarter end date"
-
-        sections = collect_book_sections()
-
-    if loaded_from_csv:
-        # Skip the optional-stats questionnaire for an imported plan: go
-        # straight from loading the file to showing every stat and table.
-        stats_options = SummaryStatsOptions(
-            book_counts=True,
-            page_share=True,
-            average_pages=True,
-            reading_period=True,
-            pace_driver=True,
-        )
-    else:
-        stats_options = prompt_summary_stats_options()
-
-    section_plans, total_pages, highest_daily_pace, overall_status = show_plan(
-        sections,
-        start_date,
-        end_date,
-        end_label,
-        end_name,
-        stats_options,
-    )
-
-    plan_changed = False
-    if loaded_from_csv:
-        if prompt_yes_no("\nReplace a book in the imported plan?"):
-            prompt_plan_book_replacement(sections)
-            plan_changed = True
-        elif prompt_yes_no("Delete a book from the imported plan?"):
-            book_deleted = prompt_plan_book_deletion(sections)
-            plan_changed = book_deleted
-        elif prompt_yes_no("Add a book to the imported plan?"):
-            prompt_plan_book_addition(sections)
-            plan_changed = True
-        elif prompt_yes_no("Change the order of books in the imported plan?"):
-            prompt_plan_book_reorder(sections)
-            plan_changed = True
-    elif prompt_yes_no("\nChange the order of a book before saving?"):
-        prompt_plan_book_reorder(sections)
-        plan_changed = True
-
-    if plan_changed:
-        section_plans, total_pages, highest_daily_pace, overall_status = show_plan(
-            sections,
-            start_date,
-            end_date,
-            end_label,
-            end_name,
-            stats_options,
-        )
-
-    if prompt_plan_simultaneous_groups(sections):
-        section_plans, total_pages, highest_daily_pace, overall_status = show_plan(
-            sections,
-            start_date,
-            end_date,
-            end_label,
-            end_name,
-            stats_options,
-        )
-
-    if prompt_yes_no("\nSave this plan to a CSV file?"):
-        filename = input("CSV filename [reading_plan.csv]: ").strip() or "reading_plan.csv"
-        write_csv(
-            filename=filename,
-            section_plans=section_plans,
-            start_date=start_date,
-            end_date=end_date,
-            total_pages=total_pages,
-            highest_daily_pace=highest_daily_pace,
-            overall_status=overall_status,
-            end_label=end_label,
-            stats_options=stats_options,
-        )
-        print(f"Saved to {Path(filename).resolve()}")
-
-
-if __name__ == "__main__":
-    main()
