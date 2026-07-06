@@ -17,6 +17,7 @@ import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.Spinner;
@@ -70,7 +71,6 @@ public class MainActivity extends Activity {
     private LinearLayout tabBar;
     private FrameLayout content;
     private TextView statusView;
-    private TextView fileView;
 
     private final List<BookSection> sections = blankSections();
     private StatsOptions statsOptions = new StatsOptions(true, true, true, true, true);
@@ -79,6 +79,7 @@ public class MainActivity extends Activity {
     private String endLabel = "Quarter end";
     private Uri jsonUri;
     private String currentTab = "Session";
+    private String previousTabBeforeSettings = "Session";
     private String selectedBookSection = PHYSICAL_BOOKS_LABEL;
     private int selectedBookIndex = -1;
     private boolean restoring = false;
@@ -99,7 +100,8 @@ public class MainActivity extends Activity {
         root.setBackgroundColor(0xffffffff);
 
         LinearLayout header = new LinearLayout(this);
-        header.setOrientation(LinearLayout.VERTICAL);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
         header.setPadding(dp(12), dp(10), dp(12), dp(8));
         root.addView(header, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -111,33 +113,18 @@ public class MainActivity extends Activity {
         title.setTextColor(TEXT);
         title.setTextSize(22);
         title.setTypeface(null, 1);
-        header.addView(title);
-
-        fileView = new TextView(this);
-        fileView.setTextColor(0xff374151);
-        fileView.setPadding(0, dp(4), 0, dp(8));
-        header.addView(fileView);
-
-        HorizontalScrollView actionScroll = new HorizontalScrollView(this);
-        actionScroll.setHorizontalScrollBarEnabled(false);
-        LinearLayout actions = new LinearLayout(this);
-        actions.setOrientation(LinearLayout.HORIZONTAL);
-        actionScroll.addView(actions);
-        header.addView(actionScroll);
-
-        actions.addView(actionButton("Connect synced reading_plan.json", v -> openJsonPicker()));
-        actions.addView(actionButton("Reload from synced file", v -> reloadFromJson()));
-        actions.addView(actionButton("Import CSV", v -> openCsvPicker()));
-        actions.addView(actionButton("Export CSV", v -> createCsv()));
-        actions.addView(actionButton("New", v -> confirmNewPlan()));
-
-        tabBar = new LinearLayout(this);
-        tabBar.setOrientation(LinearLayout.HORIZONTAL);
-        tabBar.setPadding(dp(8), 0, dp(8), dp(6));
-        root.addView(tabBar, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
+        header.addView(title, new LinearLayout.LayoutParams(
+                0,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                1
         ));
+
+        ImageButton settings = new ImageButton(this);
+        settings.setImageResource(android.R.drawable.ic_menu_manage);
+        settings.setBackgroundColor(LIGHT_GRAY);
+        settings.setContentDescription("Settings");
+        settings.setOnClickListener(v -> openSettings());
+        header.addView(settings, new LinearLayout.LayoutParams(dp(48), dp(48)));
 
         content = new FrameLayout(this);
         root.addView(content, new LinearLayout.LayoutParams(
@@ -150,6 +137,14 @@ public class MainActivity extends Activity {
         statusView.setTextColor(0xff166534);
         statusView.setPadding(dp(10), dp(6), dp(10), dp(6));
         root.addView(statusView, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+
+        tabBar = new LinearLayout(this);
+        tabBar.setOrientation(LinearLayout.HORIZONTAL);
+        tabBar.setPadding(dp(8), dp(4), dp(8), dp(8));
+        root.addView(tabBar, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
         ));
@@ -204,9 +199,24 @@ public class MainActivity extends Activity {
             content.addView(buildPlanView());
         } else if ("Books".equals(currentTab)) {
             content.addView(buildBooksView());
+        } else if ("Settings".equals(currentTab)) {
+            content.addView(buildSettingsView());
         } else {
             content.addView(buildSummaryView());
         }
+    }
+
+    private void openSettings() {
+        if (!"Settings".equals(currentTab)) {
+            previousTabBeforeSettings = currentTab;
+        }
+        currentTab = "Settings";
+        showCurrentTab();
+    }
+
+    private void closeSettings() {
+        currentTab = previousTabBeforeSettings;
+        showCurrentTab();
     }
 
     private View buildSessionView() {
@@ -214,8 +224,17 @@ public class MainActivity extends Activity {
         LinearLayout box = verticalBox();
         scroll.addView(box);
 
+        LinearLayout sessionHeader = row();
+        sessionHeader.setPadding(0, 0, 0, dp(8));
         TextView heading = heading("Reading session");
-        box.addView(heading);
+        heading.setPadding(0, dp(4), 0, 0);
+        sessionHeader.addView(heading, new LinearLayout.LayoutParams(
+                0,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                1
+        ));
+        sessionHeader.addView(actionButton("New plan", v -> confirmNewPlan()));
+        box.addView(sessionHeader);
 
         Spinner sectionSpinner = spinner(BOOK_SECTION_LABELS, selectedBookSection);
         box.addView(label("Format"));
@@ -305,6 +324,35 @@ public class MainActivity extends Activity {
         if (!hasSessions) {
             box.addView(label("No sessions yet."));
         }
+        return scroll;
+    }
+
+    private View buildSettingsView() {
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout box = verticalBox();
+        scroll.addView(box);
+
+        LinearLayout settingsHeader = row();
+        settingsHeader.setPadding(0, 0, 0, dp(8));
+        TextView heading = heading("Settings");
+        heading.setPadding(0, dp(4), 0, 0);
+        settingsHeader.addView(heading, new LinearLayout.LayoutParams(
+                0,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                1
+        ));
+        settingsHeader.addView(actionButton("Done", v -> closeSettings()));
+        box.addView(settingsHeader);
+
+        box.addView(sectionTitle("Synced file"));
+        box.addView(label("Loaded from"));
+        box.addView(monoText(fileLocationText()));
+        box.addView(actionButton("Connect synced reading_plan.json", v -> openJsonPicker()));
+        box.addView(actionButton("Reload from synced file", v -> reloadFromJson()));
+
+        box.addView(sectionTitle("CSV files"));
+        box.addView(actionButton("Import CSV", v -> openCsvPicker()));
+        box.addView(actionButton("Export CSV", v -> createCsv()));
         return scroll;
     }
 
@@ -686,10 +734,11 @@ public class MainActivity extends Activity {
         return spinner;
     }
 
+    private String fileLocationText() {
+        return jsonUri == null ? "Not connected" : jsonUri.toString();
+    }
+
     private void refreshHeader() {
-        fileView.setText(jsonUri == null
-                ? "JSON file: not connected"
-                : "JSON file: " + jsonUri);
         if (statusView.getText().length() == 0) {
             setStatus(jsonUri == null ? "Connect the Syncthing reading_plan.json file." : "Ready", false);
         }
@@ -708,6 +757,15 @@ public class MainActivity extends Activity {
     private void showError(String message) {
         setStatus(message, true);
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+    }
+
+    @Override
+    public void onBackPressed() {
+        if ("Settings".equals(currentTab)) {
+            closeSettings();
+            return;
+        }
+        super.onBackPressed();
     }
 
     private void confirmNewPlan() {
