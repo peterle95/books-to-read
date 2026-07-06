@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "start_date": "2026-07-05",
+  "end_date": "2026-09-30",
+  "end_label": "Target finish date",
+  "stats_options": {
+    "book_counts": true,
+    "page_share": true,
+    "average_pages": true,
+    "reading_period": true,
+    "pace_driver": true
+  },
+  "sections": [
+    {
+      "label": "Physical books",
+      "books": [
+        {
+          "number": 1,
+          "title": "capital",
+          "pages": 46
+        },
+        {
+          "number": 2,
+          "title": "wild swans",
+          "pages": 469
+        },
+        {
+          "number": 3,
+          "title": "changing order",
+          "pages": 465
+        },
+        {
+          "number": 4,
+          "title": "camus",
+          "pages": 92
+        },
+        {
+          "number": 5,
+          "title": "byun chul",
+          "pages": 111
+        }
+      ],
+      "simultaneous_groups": [
+        [
+          1,
+          2,
+          3
+        ]
+      ]
+    },
+    {
+      "label": "Digital books",
+      "books": [
+        {
+          "number": 1,
+          "title": "pragmatic",
+          "pages": 59
+        },
+        {
+          "number": 2,
+          "title": "react",
+          "pages": 279
+        }
+      ],
+      "simultaneous_groups": []
+    }
+  ]
+}

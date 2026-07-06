@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import calendar
 import csv
+import json
 import math
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
@@ -1010,6 +1011,193 @@ def load_csv_plan(
         end_date,
         end_label,
         end_name,
+    )
+
+
+def summary_stats_options_to_json(options: SummaryStatsOptions) -> dict[str, bool]:
+    return {
+        "book_counts": options.book_counts,
+        "page_share": options.page_share,
+        "average_pages": options.average_pages,
+        "reading_period": options.reading_period,
+        "pace_driver": options.pace_driver,
+    }
+
+
+def summary_stats_options_from_json(value: object | None) -> SummaryStatsOptions:
+    if not isinstance(value, dict):
+        return SummaryStatsOptions(
+            book_counts=True,
+            page_share=True,
+            average_pages=True,
+            reading_period=True,
+            pace_driver=True,
+        )
+
+    return SummaryStatsOptions(
+        book_counts=bool(value.get("book_counts", True)),
+        page_share=bool(value.get("page_share", True)),
+        average_pages=bool(value.get("average_pages", True)),
+        reading_period=bool(value.get("reading_period", True)),
+        pace_driver=bool(value.get("pace_driver", True)),
+    )
+
+
+def book_to_json(book: Book) -> dict[str, object]:
+    return {
+        "number": book.number,
+        "title": book.title,
+        "pages": book.pages,
+    }
+
+
+def book_from_json(value: object, fallback_number: int) -> Book:
+    if not isinstance(value, dict):
+        raise ValueError("each book must be a JSON object")
+
+    title = str(value.get("title", "")).strip()
+    if not title:
+        raise ValueError("each book needs a title")
+
+    try:
+        pages = int(value.get("pages", 0))
+    except (TypeError, ValueError) as error:
+        raise ValueError("book pages must be whole numbers") from error
+
+    if pages <= 0:
+        raise ValueError("book pages must be positive")
+
+    return Book(number=fallback_number, title=title, pages=pages)
+
+
+def book_section_to_json(section: BookSection) -> dict[str, object]:
+    return {
+        "label": section.label,
+        "books": [book_to_json(book) for book in section.books],
+        "simultaneous_groups": [
+            list(group) for group in section.simultaneous_groups
+        ],
+    }
+
+
+def book_section_from_json(value: object, default_label: str) -> BookSection:
+    if not isinstance(value, dict):
+        raise ValueError("each section must be a JSON object")
+
+    label = str(value.get("label", default_label)).strip() or default_label
+    raw_books = value.get("books", [])
+    if not isinstance(raw_books, list):
+        raise ValueError(f"{label} books must be a list")
+
+    books = [
+        book_from_json(book_value, fallback_number=index)
+        for index, book_value in enumerate(raw_books, start=1)
+    ]
+    renumber_books(books)
+
+    raw_groups = value.get("simultaneous_groups", [])
+    if not isinstance(raw_groups, list):
+        raise ValueError(f"{label} simultaneous groups must be a list")
+
+    groups: list[tuple[int, ...]] = []
+    for raw_group in raw_groups:
+        if not isinstance(raw_group, list):
+            raise ValueError(f"{label} simultaneous groups must be lists")
+        try:
+            groups.append(tuple(int(book_id) for book_id in raw_group))
+        except (TypeError, ValueError) as error:
+            raise ValueError(
+                f"{label} simultaneous group IDs must be whole numbers"
+            ) from error
+
+    return BookSection(label, books, validate_simultaneous_groups(books, groups))
+
+
+def write_json_plan(
+    filename: str,
+    sections: list[BookSection],
+    start_date: date,
+    end_date: date,
+    end_label: str,
+    stats_options: SummaryStatsOptions,
+) -> None:
+    payload = {
+        "schema_version": 1,
+        "start_date": start_date.isoformat(),
+        "end_date": end_date.isoformat(),
+        "end_label": end_label,
+        "stats_options": summary_stats_options_to_json(stats_options),
+        "sections": [book_section_to_json(section) for section in sections],
+    }
+    Path(filename).write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+
+
+def load_json_plan(
+    filename: str,
+) -> tuple[list[BookSection], date, date, str, str, SummaryStatsOptions]:
+    try:
+        payload = json.loads(Path(filename).read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        raise ValueError("invalid JSON") from error
+
+    if not isinstance(payload, dict):
+        raise ValueError("the JSON plan must be an object")
+
+    try:
+        start_date = parse_date(str(payload["start_date"]))
+        end_date = parse_date(str(payload["end_date"]))
+    except KeyError as error:
+        raise ValueError(f"missing required field: {error.args[0]}") from error
+    except ValueError as error:
+        raise ValueError("invalid date") from error
+
+    if end_date < start_date:
+        raise ValueError("finish date must be on or after the start date")
+
+    end_label = str(payload.get("end_label", "")).strip()
+    if end_label not in {"Target finish date", "Quarter end"}:
+        end_label = (
+            "Quarter end"
+            if end_date == period_end_from_start(start_date)
+            else "Target finish date"
+        )
+    end_name = (
+        "target finish date"
+        if end_label == "Target finish date"
+        else "quarter end date"
+    )
+
+    raw_sections = payload.get("sections", [])
+    if not isinstance(raw_sections, list):
+        raise ValueError("sections must be a list")
+
+    sections_by_label = {
+        label: BookSection(label, [], []) for label in BOOK_SECTION_LABELS
+    }
+    for index, raw_section in enumerate(raw_sections):
+        default_label = (
+            BOOK_SECTION_LABELS[index]
+            if index < len(BOOK_SECTION_LABELS)
+            else f"Section {index + 1}"
+        )
+        section = book_section_from_json(raw_section, default_label)
+        if section.label in BOOK_SECTION_LABELS:
+            sections_by_label[section.label] = section
+
+    sections = [sections_by_label[label] for label in BOOK_SECTION_LABELS]
+    if not any(section.books for section in sections):
+        raise ValueError("no books found")
+
+    return (
+        sections,
+        start_date,
+        end_date,
+        end_label,
+        end_name,
+        summary_stats_options_from_json(payload.get("stats_options")),
     )
 
 

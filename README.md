@@ -1,14 +1,24 @@
 # Books to Read
 
-A CLI tool that creates a quarterly reading deadline plan. Given physical and digital book lists, it calculates the daily pace each format needs to finish on the desired end date.
+A Python tool that creates a quarterly reading deadline plan. Given physical and digital book lists, it calculates the daily pace each format needs to finish on the desired end date.
 
 ## Usage
 
+### CLI
+
 ```bash
-python reading_plan.py
+python3 reading_plan.py
 ```
 
-You'll be prompted for:
+### GUI
+
+```bash
+python3 reading_plan_gui.py
+```
+
+The GUI opens and saves editable plans as JSON files. It can also import the CSV files written by the CLI and export the current plan back to CSV.
+
+The CLI prompts for:
 - Quarter start date (defaults to next quarter start)
 - Optional custom target finish date
 - Physical books first, then digital books, including their titles/pages
