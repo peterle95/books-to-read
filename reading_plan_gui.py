@@ -332,7 +332,16 @@ class ReadingPlanApp(tk.Tk):
             selectmode="browse",
             height=12,
         )
-        widths = {"Book": 70, "Title": 420, "Pages": 100, "Read": 100, "Remaining": 120}
+        widths = {
+            "Book": 70,
+            "Title": 320,
+            "Start page": 100,
+            "End page": 100,
+            "Current page": 110,
+            "Pages": 90,
+            "Read": 90,
+            "Remaining": 110,
+        }
         for column in BOOK_COLUMNS:
             tree.heading(column, text=column)
             tree.column(column, width=widths[column], anchor="w")
@@ -350,18 +359,23 @@ class ReadingPlanApp(tk.Tk):
         editor.grid(row=1, column=0, sticky="ew", pady=(12, 0))
         editor.columnconfigure(1, weight=1)
         self.title_vars[label] = tk.StringVar()
-        self.pages_vars[label] = tk.StringVar()
+        self.start_page_vars[label] = tk.StringVar()
+        self.end_page_vars[label] = tk.StringVar()
         ttk.Label(editor, text="Title").grid(row=0, column=0, sticky="w")
         ttk.Entry(editor, textvariable=self.title_vars[label]).grid(
-            row=0, column=1, sticky="ew", padx=(8, 12)
+            row=0, column=1, sticky="ew", padx=(8, 12), columnspan=3
         )
-        ttk.Label(editor, text="Pages").grid(row=0, column=2, sticky="w")
-        ttk.Entry(editor, textvariable=self.pages_vars[label], width=10).grid(
-            row=0, column=3, sticky="w", padx=(8, 0)
+        ttk.Label(editor, text="Start page").grid(row=1, column=0, sticky="w", pady=(10, 0))
+        ttk.Entry(editor, textvariable=self.start_page_vars[label], width=10).grid(
+            row=1, column=1, sticky="w", padx=(8, 12), pady=(10, 0)
+        )
+        ttk.Label(editor, text="End page").grid(row=1, column=2, sticky="w", pady=(10, 0))
+        ttk.Entry(editor, textvariable=self.end_page_vars[label], width=10).grid(
+            row=1, column=3, sticky="w", padx=(8, 0), pady=(10, 0)
         )
 
         buttons = ttk.Frame(editor)
-        buttons.grid(row=1, column=0, columnspan=4, sticky="ew", pady=(10, 0))
+        buttons.grid(row=2, column=0, columnspan=4, sticky="ew", pady=(10, 0))
         actions = [
             ("Add", lambda section_label=label: self.add_book(section_label)),
             (
@@ -629,6 +643,9 @@ class ReadingPlanApp(tk.Tk):
                     values=(
                         book.number,
                         book.title,
+                        book.start_page,
+                        book.end_page,
+                        "" if book.current_page is None else book.current_page,
                         book.pages,
                         book.pages_read,
                         pages_remaining(book),
@@ -655,8 +672,12 @@ class ReadingPlanApp(tk.Tk):
             self.session_remaining_var.set("No book selected.")
             return
         _section, book = selected
+        current_page = (
+            "not started" if book.current_page is None else str(book.current_page)
+        )
         self.session_remaining_var.set(
-            f"{book.title}: {book.pages_read} read, {pages_remaining(book)} remaining."
+            f"{book.title}: current page {current_page}; "
+            f"{book.pages_read} read, {pages_remaining(book)} remaining."
         )
 
     def refresh_session_table(self) -> None:
@@ -673,7 +694,8 @@ class ReadingPlanApp(tk.Tk):
                             session.date.isoformat(),
                             section.label,
                             f"{book.number}. {book.title}",
-                            session.pages,
+                            session.current_page,
+                            session.pages_read,
                         ),
                     )
 
@@ -784,6 +806,9 @@ class ReadingPlanApp(tk.Tk):
                     values=(
                         book.number,
                         book.title,
+                        book.start_page,
+                        book.end_page,
+                        "" if book.current_page is None else book.current_page,
                         book.pages,
                         book.pages_read,
                         pages_remaining(book),
@@ -871,12 +896,12 @@ class ReadingPlanApp(tk.Tk):
         _section, book = selected
         try:
             session_date = parse_date(self.session_date_var.get().strip())
-            pages = int(self.session_pages_var.get().strip())
-            add_reading_session(book, session_date, pages)
+            current_page = int(self.session_current_page_var.get().strip())
+            add_reading_session(book, session_date, current_page)
         except ValueError as error:
             self.show_error(str(error))
             return
-        self.session_pages_var.set("")
+        self.session_current_page_var.set("")
         self.after_state_change()
 
     def delete_session(self) -> None:
@@ -914,39 +939,61 @@ class ReadingPlanApp(tk.Tk):
             return
         book = section.books[index]
         self.title_vars[label].set(book.title)
-        self.pages_vars[label].set(str(book.pages))
+        self.start_page_vars[label].set(str(book.start_page))
+        self.end_page_vars[label].set(str(book.end_page))
 
     def read_book_fields(
         self,
         label: str,
         default_title: str | None = None,
-        default_pages: int | None = None,
-    ) -> tuple[str, int] | None:
+        default_start_page: int | None = None,
+        default_end_page: int | None = None,
+    ) -> tuple[str, int, int] | None:
         title = self.title_vars[label].get().strip() or (default_title or "")
         if not title:
             self.show_error("Book title is required")
             return None
-        raw_pages = self.pages_vars[label].get().strip()
-        if not raw_pages and default_pages is not None:
-            return title, default_pages
+        raw_start_page = self.start_page_vars[label].get().strip()
+        raw_end_page = self.end_page_vars[label].get().strip()
         try:
-            pages = int(raw_pages)
+            start_page = (
+                default_start_page
+                if not raw_start_page and default_start_page is not None
+                else int(raw_start_page)
+            )
+            end_page = (
+                default_end_page
+                if not raw_end_page and default_end_page is not None
+                else int(raw_end_page)
+            )
         except ValueError:
-            self.show_error("Pages must be a whole number")
+            self.show_error("Start page and end page must be whole numbers")
             return None
-        if pages <= 0:
-            self.show_error("Pages must be positive")
+        if start_page < 0:
+            self.show_error("Start page cannot be negative")
             return None
-        return title, pages
+        if end_page < start_page:
+            self.show_error("End page must be on or after the start page")
+            return None
+        return title, start_page, end_page
 
     def add_book(self, label: str) -> None:
         section = self.section_by_label(label)
         position = len(section.books) + 1
-        values = self.read_book_fields(label, default_title=f"Book {position}")
+        values = self.read_book_fields(
+            label, default_title=f"Book {position}", default_start_page=1
+        )
         if values is None:
             return
-        title, pages = values
-        section.books.append(Book(number=position, title=title, pages=pages))
+        title, start_page, end_page = values
+        section.books.append(
+            Book(
+                number=position,
+                title=title,
+                start_page=start_page,
+                end_page=end_page,
+            )
+        )
         renumber_books(section.books)
         self.after_book_edit(label, select_index=position - 1)
 
@@ -960,11 +1007,21 @@ class ReadingPlanApp(tk.Tk):
         if insertion_splits_simultaneous_group(position, section.simultaneous_groups):
             self.show_error("Insert before or after the simultaneous group instead")
             return
-        values = self.read_book_fields(label, default_title=f"Book {position}")
+        values = self.read_book_fields(
+            label, default_title=f"Book {position}", default_start_page=1
+        )
         if values is None:
             return
-        title, pages = values
-        section.books.insert(index, Book(number=position, title=title, pages=pages))
+        title, start_page, end_page = values
+        section.books.insert(
+            index,
+            Book(
+                number=position,
+                title=title,
+                start_page=start_page,
+                end_page=end_page,
+            ),
+        )
         renumber_books(section.books)
         section.simultaneous_groups = remap_simultaneous_groups_after_addition(
             section.simultaneous_groups, position, section.books
@@ -979,12 +1036,33 @@ class ReadingPlanApp(tk.Tk):
             return
         old_book = section.books[index]
         values = self.read_book_fields(
-            label, default_title=old_book.title, default_pages=old_book.pages
+            label,
+            default_title=old_book.title,
+            default_start_page=old_book.start_page,
+            default_end_page=old_book.end_page,
         )
         if values is None:
             return
-        title, pages = values
-        section.books[index] = Book(number=old_book.number, title=title, pages=pages)
+        title, start_page, end_page = values
+        current_page = (
+            old_book.current_page
+            if old_book.current_page is not None
+            and start_page <= old_book.current_page <= end_page
+            else None
+        )
+        reading_sessions = (
+            old_book.reading_sessions
+            if start_page == old_book.start_page and end_page == old_book.end_page
+            else []
+        )
+        section.books[index] = Book(
+            number=old_book.number,
+            title=title,
+            start_page=start_page,
+            end_page=end_page,
+            current_page=current_page,
+            reading_sessions=reading_sessions,
+        )
         self.after_book_edit(label, select_index=index)
 
     def delete_selected_book(self, label: str) -> None:

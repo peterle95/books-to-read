@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 3,
   "start_date": "2026-07-05",
   "end_date": "2026-09-30",
   "end_label": "Target finish date",
@@ -17,36 +17,73 @@
         {
           "number": 1,
           "title": "capital",
-          "pages": 46
+          "start_page": 1,
+          "end_page": 1041,
+          "current_page": 995,
+          "pages": 1041,
+          "pages_read": 995,
+          "reading_sessions": [
+            {
+              "date": "2026-07-06",
+              "current_page": 995,
+              "pages_read": 995
+            }
+          ]
         },
         {
           "number": 2,
           "title": "wild swans",
-          "pages": 469
+          "start_page": 1,
+          "end_page": 669,
+          "current_page": 210,
+          "pages": 669,
+          "pages_read": 210,
+          "reading_sessions": [
+            {
+              "date": "2026-07-06",
+              "current_page": 210,
+              "pages_read": 210
+            }
+          ]
         },
         {
           "number": 3,
           "title": "changing order",
-          "pages": 465
+          "start_page": 1,
+          "end_page": 559,
+          "current_page": 94,
+          "pages": 559,
+          "pages_read": 94,
+          "reading_sessions": [
+            {
+              "date": "2026-07-06",
+              "current_page": 94,
+              "pages_read": 94
+            }
+          ]
         },
         {
           "number": 4,
-          "title": "camus",
-          "pages": 92
+          "title": "byun chul",
+          "start_page": 1,
+          "end_page": 111,
+          "current_page": null,
+          "pages": 111,
+          "pages_read": 0,
+          "reading_sessions": []
         },
         {
           "number": 5,
-          "title": "byun chul",
-          "pages": 111
+          "title": "camus",
+          "start_page": 1,
+          "end_page": 92,
+          "current_page": null,
+          "pages": 92,
+          "pages_read": 0,
+          "reading_sessions": []
         }
       ],
-      "simultaneous_groups": [
-        [
-          1,
-          2,
-          3
-        ]
-      ]
+      "simultaneous_groups": []
     },
     {
       "label": "Digital books",
@@ -54,12 +91,22 @@
         {
           "number": 1,
           "title": "pragmatic",
-          "pages": 59
+          "start_page": 1,
+          "end_page": 59,
+          "current_page": null,
+          "pages": 59,
+          "pages_read": 0,
+          "reading_sessions": []
         },
         {
           "number": 2,
           "title": "react",
-          "pages": 279
+          "start_page": 1,
+          "end_page": 279,
+          "current_page": null,
+          "pages": 279,
+          "pages_read": 0,
+          "reading_sessions": []
         }
       ],
       "simultaneous_groups": []

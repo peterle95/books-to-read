@@ -1,6 +1,6 @@
 # Books to Read
 
-A GUI app that creates a quarterly reading deadline plan. Given physical and digital book lists, it recalculates the remaining daily pace each format needs to finish on the desired end date.
+A GUI app that creates a quarterly reading deadline plan. Given physical and digital book page ranges, it recalculates the remaining daily pace each format needs to finish on the desired end date.
 
 ## Usage
 
@@ -11,10 +11,10 @@ python3 reading_plan_gui.py
 The app opens `reading_plan.json` automatically when it starts. Changes are written back to the active JSON file automatically.
 
 Use the tabs to:
-- Log reading sessions by book and pages read
+- Log reading sessions by book and current page reached
 - Quarter start date (defaults to next quarter start)
 - Set an optional custom target finish date
-- Add, replace, delete, reorder, and group physical or digital books
+- Add, replace, delete, reorder, and group physical or digital books using start and end page
 - Import a CSV plan or export the current plan to CSV
 
 The output shows physical and digital remaining page totals, then a physical-books table followed by a digital-books table. Each format is planned as a parallel reading stream with its own recalculated daily pace.
