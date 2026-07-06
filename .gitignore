@@ -1,4 +1,7 @@
 *.pyc
 __pycache__/
 *.csv
-
+reading-plan-android/.gradle/
+reading-plan-android/build/
+reading-plan-android/app/build/
+reading-plan-android/local.properties
