@@ -64,6 +64,7 @@ public class MainActivity extends Activity {
     );
     private static final int PURPLE = 0xff6d28d9;
     private static final int PURPLE_DARK = 0xff4c1d95;
+    private static final int DARK_GREEN = 0xff166534;
     private static final int LIGHT_GRAY = 0xfff3f4f6;
     private static final int TEXT = 0xff111827;
 
@@ -121,7 +122,8 @@ public class MainActivity extends Activity {
 
         ImageButton settings = new ImageButton(this);
         settings.setImageResource(android.R.drawable.ic_menu_manage);
-        settings.setBackgroundColor(LIGHT_GRAY);
+        settings.setColorFilter(0xffffffff);
+        settings.setBackgroundColor(PURPLE);
         settings.setContentDescription("Settings");
         settings.setOnClickListener(v -> openSettings());
         header.addView(settings, new LinearLayout.LayoutParams(dp(48), dp(48)));
@@ -150,12 +152,20 @@ public class MainActivity extends Activity {
         ));
 
         setContentView(root);
+        root.setOnApplyWindowInsetsListener((view, insets) -> {
+            header.setPadding(dp(12), insets.getSystemWindowInsetTop() + dp(12), dp(12), dp(8));
+            tabBar.setPadding(dp(8), dp(4), dp(8), insets.getSystemWindowInsetBottom() + dp(8));
+            return insets;
+        });
+        root.requestApplyInsets();
     }
 
     private Button actionButton(String label, View.OnClickListener listener) {
         Button button = new Button(this);
         button.setText(label);
         button.setAllCaps(false);
+        button.setTextColor(0xffffffff);
+        button.setBackgroundColor(PURPLE);
         button.setOnClickListener(listener);
         button.setMinHeight(dp(40));
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
@@ -173,8 +183,8 @@ public class MainActivity extends Activity {
             Button button = new Button(this);
             button.setText(tab);
             button.setAllCaps(false);
-            button.setTextColor(tab.equals(currentTab) ? 0xffffffff : TEXT);
-            button.setBackgroundColor(tab.equals(currentTab) ? PURPLE : LIGHT_GRAY);
+            button.setTextColor(0xffffffff);
+            button.setBackgroundColor(tab.equals(currentTab) ? PURPLE_DARK : PURPLE);
             button.setOnClickListener(v -> {
                 currentTab = tab;
                 showCurrentTab();
@@ -236,12 +246,12 @@ public class MainActivity extends Activity {
         sessionHeader.addView(actionButton("New plan", v -> confirmNewPlan()));
         box.addView(sessionHeader);
 
-        Spinner sectionSpinner = spinner(BOOK_SECTION_LABELS, selectedBookSection);
+        Spinner sectionSpinner = spinner(BOOK_SECTION_LABELS, selectedBookSection, DARK_GREEN, 0xffffffff);
         box.addView(label("Format"));
         box.addView(sectionSpinner);
 
         List<String> bookChoices = bookChoices(sectionByLabel(selectedBookSection));
-        Spinner bookSpinner = spinner(bookChoices, "");
+        Spinner bookSpinner = spinner(bookChoices, "", DARK_GREEN, 0xffffffff);
         box.addView(label("Book"));
         box.addView(bookSpinner);
 
@@ -719,19 +729,52 @@ public class MainActivity extends Activity {
     }
 
     private Spinner spinner(List<String> values, String selected) {
+        return spinner(values, selected, -1, TEXT);
+    }
+
+    private Spinner spinner(List<String> values, String selected, int backgroundColor, int selectedTextColor) {
         Spinner spinner = new Spinner(this);
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(
                 this,
                 android.R.layout.simple_spinner_item,
                 values
-        );
+        ) {
+            @Override
+            public View getView(int position, View convertView, ViewGroup parent) {
+                View view = super.getView(position, convertView, parent);
+                styleSpinnerText(view, selectedTextColor);
+                return view;
+            }
+
+            @Override
+            public View getDropDownView(int position, View convertView, ViewGroup parent) {
+                View view = super.getDropDownView(position, convertView, parent);
+                styleSpinnerText(view, TEXT);
+                view.setBackgroundColor(0xffffffff);
+                return view;
+            }
+        };
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinner.setAdapter(adapter);
+        spinner.setMinimumHeight(dp(44));
+        if (backgroundColor != -1) {
+            spinner.setBackgroundColor(backgroundColor);
+            spinner.setPadding(dp(8), 0, dp(8), 0);
+        }
         int index = values.indexOf(selected);
         if (index >= 0) {
             spinner.setSelection(index);
         }
         return spinner;
+    }
+
+    private void styleSpinnerText(View view, int color) {
+        if (view instanceof TextView) {
+            TextView text = (TextView) view;
+            text.setTextColor(color);
+            text.setTextSize(15);
+            text.setPadding(dp(12), dp(8), dp(12), dp(8));
+        }
     }
 
     private String fileLocationText() {
