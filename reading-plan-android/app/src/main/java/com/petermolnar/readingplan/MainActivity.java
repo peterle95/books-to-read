@@ -5,6 +5,7 @@ import android.app.AlertDialog;
 import android.content.ContentResolver;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.InputType;
@@ -65,6 +66,8 @@ public class MainActivity extends Activity {
     private static final int PURPLE = 0xff6d28d9;
     private static final int PURPLE_DARK = 0xff4c1d95;
     private static final int DARK_GREEN = 0xff166534;
+    private static final int DARK_GREEN_BORDER = 0xff14532d;
+    private static final int BORDER = 0xffd1d5db;
     private static final int LIGHT_GRAY = 0xfff3f4f6;
     private static final int TEXT = 0xff111827;
 
@@ -123,7 +126,7 @@ public class MainActivity extends Activity {
         ImageButton settings = new ImageButton(this);
         settings.setImageResource(android.R.drawable.ic_menu_manage);
         settings.setColorFilter(0xffffffff);
-        settings.setBackgroundColor(PURPLE);
+        settings.setBackground(roundedBackground(PURPLE, PURPLE_DARK));
         settings.setContentDescription("Settings");
         settings.setOnClickListener(v -> openSettings());
         header.addView(settings, new LinearLayout.LayoutParams(dp(48), dp(48)));
@@ -143,8 +146,16 @@ public class MainActivity extends Activity {
                 ViewGroup.LayoutParams.WRAP_CONTENT
         ));
 
+        View tabDivider = new View(this);
+        tabDivider.setBackgroundColor(BORDER);
+        root.addView(tabDivider, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(2)
+        ));
+
         tabBar = new LinearLayout(this);
         tabBar.setOrientation(LinearLayout.HORIZONTAL);
+        tabBar.setBackgroundColor(0xfff9fafb);
         tabBar.setPadding(dp(8), dp(4), dp(8), dp(8));
         root.addView(tabBar, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -165,7 +176,7 @@ public class MainActivity extends Activity {
         button.setText(label);
         button.setAllCaps(false);
         button.setTextColor(0xffffffff);
-        button.setBackgroundColor(PURPLE);
+        button.setBackground(roundedBackground(PURPLE, PURPLE_DARK));
         button.setOnClickListener(listener);
         button.setMinHeight(dp(40));
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
@@ -177,6 +188,15 @@ public class MainActivity extends Activity {
         return button;
     }
 
+    private GradientDrawable roundedBackground(int fillColor, int borderColor) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setShape(GradientDrawable.RECTANGLE);
+        drawable.setColor(fillColor);
+        drawable.setCornerRadius(dp(12));
+        drawable.setStroke(dp(1), borderColor);
+        return drawable;
+    }
+
     private void renderTabBar() {
         tabBar.removeAllViews();
         for (String tab : Arrays.asList("Session", "Plan", "Books", "Summary")) {
@@ -184,7 +204,9 @@ public class MainActivity extends Activity {
             button.setText(tab);
             button.setAllCaps(false);
             button.setTextColor(0xffffffff);
-            button.setBackgroundColor(tab.equals(currentTab) ? PURPLE_DARK : PURPLE);
+            button.setBackground(tab.equals(currentTab)
+                    ? roundedBackground(PURPLE_DARK, PURPLE_DARK)
+                    : roundedBackground(PURPLE, PURPLE_DARK));
             button.setOnClickListener(v -> {
                 currentTab = tab;
                 showCurrentTab();
@@ -758,7 +780,7 @@ public class MainActivity extends Activity {
         spinner.setAdapter(adapter);
         spinner.setMinimumHeight(dp(44));
         if (backgroundColor != -1) {
-            spinner.setBackgroundColor(backgroundColor);
+            spinner.setBackground(roundedBackground(backgroundColor, DARK_GREEN_BORDER));
             spinner.setPadding(dp(8), 0, dp(8), 0);
         }
         int index = values.indexOf(selected);

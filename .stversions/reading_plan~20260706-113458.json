@@ -83,13 +83,7 @@
           "reading_sessions": []
         }
       ],
-      "simultaneous_groups": [
-        [
-          1,
-          2,
-          3
-        ]
-      ]
+      "simultaneous_groups": []
     },
     {
       "label": "Digital books",
@@ -98,33 +92,21 @@
           "number": 1,
           "title": "pragmatic",
           "start_page": 1,
-          "end_page": 352,
-          "current_page": 293,
-          "pages": 352,
-          "pages_read": 293,
-          "reading_sessions": [
-            {
-              "date": "2026-07-06",
-              "current_page": 293,
-              "pages_read": 293
-            }
-          ]
+          "end_page": 59,
+          "current_page": null,
+          "pages": 59,
+          "pages_read": 0,
+          "reading_sessions": []
         },
         {
           "number": 2,
           "title": "react",
           "start_page": 1,
-          "end_page": 350,
-          "current_page": 71,
-          "pages": 350,
-          "pages_read": 71,
-          "reading_sessions": [
-            {
-              "date": "2026-07-06",
-              "current_page": 71,
-              "pages_read": 71
-            }
-          ]
+          "end_page": 279,
+          "current_page": null,
+          "pages": 279,
+          "pages_read": 0,
+          "reading_sessions": []
         }
       ],
       "simultaneous_groups": []

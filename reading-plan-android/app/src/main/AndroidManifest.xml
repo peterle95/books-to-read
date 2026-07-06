@@ -1,9 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
         android:allowBackup="true"
-        android:icon="@drawable/books_cover"
+        android:icon="@mipmap/ic_launcher"
         android:label="Reading Plan"
-        android:roundIcon="@drawable/books_cover"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:theme="@style/AppTheme">
         <activity
             android:name=".MainActivity"
