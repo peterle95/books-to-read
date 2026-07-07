@@ -1,5 +1,5 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "start_date": "2026-07-05",
   "end_date": "2026-09-30",
   "end_label": "Target finish date",
@@ -138,6 +138,28 @@
               "date": "2026-07-06",
               "current_page": 71,
               "pages_read": 71
+            }
+          ]
+        }
+      ],
+      "simultaneous_groups": []
+    },
+    {
+      "label": "Audiobooks",
+      "books": [
+        {
+          "number": 1,
+          "title": "pane e bugie",
+          "start_time_seconds": 0,
+          "end_time_seconds": 29820,
+          "current_time_seconds": 60,
+          "duration_seconds": 29820,
+          "time_listened_seconds": 60,
+          "reading_sessions": [
+            {
+              "date": "2026-07-07",
+              "current_time_seconds": 60,
+              "time_listened_seconds": 60
             }
           ]
         }

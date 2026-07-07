@@ -14,7 +14,8 @@ DATE_FORMAT = "%Y-%m-%d"
 QUARTER_START_MONTHS = (1, 4, 7, 10)
 PHYSICAL_BOOKS_LABEL = "Physical books"
 DIGITAL_BOOKS_LABEL = "Digital books"
-BOOK_SECTION_LABELS = (PHYSICAL_BOOKS_LABEL, DIGITAL_BOOKS_LABEL)
+AUDIOBOOKS_LABEL = "Audiobooks"
+BOOK_SECTION_LABELS = (PHYSICAL_BOOKS_LABEL, DIGITAL_BOOKS_LABEL, AUDIOBOOKS_LABEL)
 
 
 @dataclass
@@ -115,11 +116,72 @@ def pages_remaining(book: Book) -> int:
     return max(book.pages - book.pages_read, 0)
 
 
+def is_audiobook_section(label: str) -> bool:
+    return label == AUDIOBOOKS_LABEL
+
+
+def parse_duration(value: str) -> int:
+    parts = value.strip().split(":")
+    if len(parts) not in {2, 3}:
+        raise ValueError("time must be HH:MM or HH:MM:SS")
+    try:
+        numbers = [int(part) for part in parts]
+    except ValueError as error:
+        raise ValueError("time fields must be whole numbers") from error
+    if any(number < 0 for number in numbers):
+        raise ValueError("time cannot be negative")
+    if len(numbers) == 2:
+        hours, minutes = numbers
+        seconds = 0
+    else:
+        hours, minutes, seconds = numbers
+    if minutes >= 60 or seconds >= 60:
+        raise ValueError("minutes and seconds must be below 60")
+    return hours * 3600 + minutes * 60 + seconds
+
+
+def format_duration(total_seconds: int | float) -> str:
+    seconds = max(0, int(round(total_seconds)))
+    hours, remainder = divmod(seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    if seconds:
+        return f"{hours}:{minutes:02d}:{seconds:02d}"
+    return f"{hours}:{minutes:02d}"
+
+
+def total_units(book: Book, section_label: str) -> int:
+    if is_audiobook_section(section_label):
+        return book.end_page - book.start_page
+    return book.pages
+
+
+def completed_units(book: Book, section_label: str) -> int:
+    if book.current_page is None:
+        return 0
+    if is_audiobook_section(section_label):
+        return min(max(book.current_page - book.start_page, 0), total_units(book, section_label))
+    return book.pages_read
+
+
+def remaining_units(book: Book, section_label: str) -> int:
+    return max(total_units(book, section_label) - completed_units(book, section_label), 0)
+
+
 def validate_page_range(start_page: int, end_page: int) -> None:
     if start_page < 0:
         raise ValueError("start page cannot be negative")
     if end_page < start_page:
         raise ValueError("end page must be on or after the start page")
+
+
+def validate_book_range(section_label: str, start: int, end: int) -> None:
+    if not is_audiobook_section(section_label):
+        validate_page_range(start, end)
+        return
+    if start < 0:
+        raise ValueError("start time cannot be negative")
+    if end < start:
+        raise ValueError("end time must be on or after the start time")
 
 
 def effective_remaining_start_date(
@@ -129,24 +191,37 @@ def effective_remaining_start_date(
     return min(max(start_date, today), end_date)
 
 
-def set_book_progress(book: Book, current_page: int | None) -> None:
+def set_book_progress(
+    book: Book, current_page: int | None, section_label: str = PHYSICAL_BOOKS_LABEL
+) -> None:
     if current_page is None:
         book.current_page = None
         return
     if current_page < book.start_page:
+        if is_audiobook_section(section_label):
+            raise ValueError("current time cannot be before the audiobook's start time")
         raise ValueError("current page cannot be before the book's start page")
     if current_page > book.end_page:
+        if is_audiobook_section(section_label):
+            raise ValueError("current time cannot be after the audiobook's end time")
         raise ValueError("current page cannot be after the book's end page")
     book.current_page = current_page
 
 
-def add_reading_session(book: Book, session_date: date, current_page: int) -> None:
-    previous_pages_read = book.pages_read
-    set_book_progress(book, current_page)
-    pages_read = book.pages_read - previous_pages_read
-    if pages_read <= 0:
+def add_reading_session(
+    book: Book,
+    session_date: date,
+    current_page: int,
+    section_label: str = PHYSICAL_BOOKS_LABEL,
+) -> None:
+    previous_completed = completed_units(book, section_label)
+    set_book_progress(book, current_page, section_label)
+    units_read = completed_units(book, section_label) - previous_completed
+    if units_read <= 0:
+        if is_audiobook_section(section_label):
+            raise ValueError("current time must be after the previously recorded time")
         raise ValueError("current page must be after the previously recorded page")
-    book.reading_sessions.append(ReadingSession(session_date, current_page, pages_read))
+    book.reading_sessions.append(ReadingSession(session_date, current_page, units_read))
 
 
 def remove_reading_session(book: Book, session_index: int) -> None:
@@ -341,9 +416,16 @@ def build_section_plan(
         return SectionPlan(section, [], 0.0, 0, 0.0, "achievable")
 
     period_days = inclusive_days_between(start_date, end_date)
-    daily_pace = sum(book.pages for book in section.books) / period_days
+    daily_pace = (
+        sum(total_units(book, section.label) for book in section.books) / period_days
+    )
     deadlines, total_pages, required_pace, overall_status = build_plan(
-        section.books, start_date, end_date, daily_pace, section.simultaneous_groups
+        section.books,
+        start_date,
+        end_date,
+        daily_pace,
+        section.simultaneous_groups,
+        lambda book: total_units(book, section.label),
     )
     return SectionPlan(
         section, deadlines, daily_pace, total_pages, required_pace, overall_status
@@ -371,15 +453,15 @@ def build_remaining_section_plan(
 
     remaining_start = effective_remaining_start_date(start_date, end_date, today)
     period_days = inclusive_days_between(remaining_start, end_date)
-    remaining_pages = sum(pages_remaining(book) for book in section.books)
-    daily_pace = 0.0 if remaining_pages == 0 else remaining_pages / period_days
+    remaining_total = sum(remaining_units(book, section.label) for book in section.books)
+    daily_pace = 0.0 if remaining_total == 0 else remaining_total / period_days
     deadlines, total_pages, required_pace, overall_status = build_plan(
         section.books,
         remaining_start,
         end_date,
         daily_pace,
         section.simultaneous_groups,
-        pages_remaining,
+        lambda book: remaining_units(book, section.label),
     )
     return SectionPlan(
         section, deadlines, daily_pace, total_pages, required_pace, overall_status
@@ -402,9 +484,14 @@ def build_remaining_section_plans(
 def summarize_section_plans(
     section_plans: list[SectionPlan],
 ) -> tuple[list[SectionPlan], int, float, str]:
-    total_pages = sum(section_plan.total_pages for section_plan in section_plans)
+    page_plans = [
+        section_plan
+        for section_plan in section_plans
+        if not is_audiobook_section(section_plan.section.label)
+    ]
+    total_pages = sum(section_plan.total_pages for section_plan in page_plans)
     highest_daily_pace = max(
-        (section_plan.daily_pace for section_plan in section_plans), default=0.0
+        (section_plan.daily_pace for section_plan in page_plans), default=0.0
     )
     overall_status = (
         "achievable"
@@ -427,6 +514,24 @@ def section_plan_by_label(
     )
 
 
+def section_plan_value(section_plan: SectionPlan, value: int | float) -> str:
+    if is_audiobook_section(section_plan.section.label):
+        return format_duration(value)
+    return str(int(value))
+
+
+def section_daily_pace(section_plan: SectionPlan) -> str:
+    if is_audiobook_section(section_plan.section.label):
+        return f"{format_duration(section_plan.daily_pace)}/day"
+    return f"{section_plan.daily_pace:.2f} pages/day"
+
+
+def section_csv_daily_pace(section_plan: SectionPlan) -> str:
+    if is_audiobook_section(section_plan.section.label):
+        return f"{format_duration(section_plan.daily_pace)}/day"
+    return f"{section_plan.daily_pace:.15g} pages/day"
+
+
 def average_pages_per_book(section_plan: SectionPlan) -> float:
     book_count = len(section_plan.section.books)
     return 0.0 if book_count == 0 else section_plan.total_pages / book_count
@@ -441,6 +546,7 @@ def optional_summary_stat_rows(
 ) -> list[tuple[str, str]]:
     physical_plan = section_plan_by_label(section_plans, PHYSICAL_BOOKS_LABEL)
     digital_plan = section_plan_by_label(section_plans, DIGITAL_BOOKS_LABEL)
+    audiobook_plan = section_plan_by_label(section_plans, AUDIOBOOKS_LABEL)
     rows: list[tuple[str, str]] = []
 
     if stats_options.book_counts:
@@ -448,6 +554,7 @@ def optional_summary_stat_rows(
             [
                 ("Physical book count", str(len(physical_plan.section.books))),
                 ("Digital book count", str(len(digital_plan.section.books))),
+                ("Audiobook count", str(len(audiobook_plan.section.books))),
             ]
         )
     if stats_options.page_share:
@@ -475,6 +582,10 @@ def optional_summary_stat_rows(
                     "Digital average pages/book",
                     f"{average_pages_per_book(digital_plan):.1f}",
                 ),
+                (
+                    "Audiobook average duration",
+                    format_duration(average_pages_per_book(audiobook_plan)),
+                ),
             ]
         )
     if stats_options.reading_period:
@@ -485,13 +596,15 @@ def optional_summary_stat_rows(
         pace_drivers = [
             section_plan.section.label
             for section_plan in section_plans
-            if section_plan.total_pages > 0
+            if not is_audiobook_section(section_plan.section.label)
+            and section_plan.total_pages > 0
             and abs(section_plan.daily_pace - highest_daily_pace) < 1e-9
         ]
+        driver_label = ", ".join(pace_drivers) if pace_drivers else "None"
         rows.append(
             (
                 "Pace driver",
-                f"{', '.join(pace_drivers)} ({highest_daily_pace:.2f} pages/day)",
+                f"{driver_label} ({highest_daily_pace:.2f} pages/day)",
             )
         )
 
@@ -506,6 +619,79 @@ def final_result_message(final_deadline: date, end_date: date, end_name: str) ->
         return f"You finish exactly on the {end_name}."
     late_days = abs(difference)
     return f"You finish {late_days} day{'s' if late_days != 1 else ''} after the {end_name}."
+
+
+def csv_table_headers(section_label: str) -> list[str]:
+    if is_audiobook_section(section_label):
+        return [
+            "Book",
+            "Title",
+            "Start time",
+            "End time",
+            "Current time",
+            "Duration",
+            "Time listened",
+            "Remaining time",
+            "Daily time",
+            "Cumulative remaining time",
+            "Start date",
+            "Deadline",
+            "Days allocated",
+            "Status",
+        ]
+    return [
+        "Book",
+        "Title",
+        "Start page",
+        "End page",
+        "Current page",
+        "Pages",
+        "Read pages",
+        "Remaining pages",
+        "Daily pages",
+        "Cumulative remaining pages",
+        "Start date",
+        "Deadline",
+        "Days allocated",
+        "Status",
+    ]
+
+
+def csv_table_row(deadline: BookDeadline, section_label: str) -> list[object]:
+    book = deadline.book
+    if is_audiobook_section(section_label):
+        return [
+            book.number,
+            book.title,
+            format_duration(book.start_page),
+            format_duration(book.end_page),
+            "" if book.current_page is None else format_duration(book.current_page),
+            format_duration(total_units(book, section_label)),
+            format_duration(completed_units(book, section_label)),
+            format_duration(remaining_units(book, section_label)),
+            format_duration(deadline.daily_pages),
+            format_duration(deadline.cumulative_pages),
+            deadline.start_date.isoformat(),
+            deadline.deadline.isoformat(),
+            deadline.days_allocated,
+            deadline.status,
+        ]
+    return [
+        book.number,
+        book.title,
+        book.start_page,
+        book.end_page,
+        "" if book.current_page is None else book.current_page,
+        book.pages,
+        book.pages_read,
+        pages_remaining(book),
+        f"{deadline.daily_pages:.15g}",
+        deadline.cumulative_pages,
+        deadline.start_date.isoformat(),
+        deadline.deadline.isoformat(),
+        deadline.days_allocated,
+        deadline.status,
+    ]
 
 
 def write_csv(
@@ -527,10 +713,17 @@ def write_csv(
         writer.writerow([end_label, end_date.isoformat()])
         physical_plan = section_plan_by_label(section_plans, PHYSICAL_BOOKS_LABEL)
         digital_plan = section_plan_by_label(section_plans, DIGITAL_BOOKS_LABEL)
+        audiobook_plan = section_plan_by_label(section_plans, AUDIOBOOKS_LABEL)
         writer.writerow(["Total remaining pages", total_pages])
         writer.writerow(["Physical remaining pages", physical_plan.total_pages])
         writer.writerow(["Digital remaining pages", digital_plan.total_pages])
+        writer.writerow(
+            ["Audiobook remaining time", format_duration(audiobook_plan.total_pages)]
+        )
         writer.writerow(["Highest daily pace", f"{highest_daily_pace:.15g} pages/day"])
+        writer.writerow(
+            ["Audiobook daily time", format_duration(audiobook_plan.daily_pace) + "/day"]
+        )
         writer.writerow(["Status", overall_status])
         for label, value in optional_summary_stat_rows(
             section_plans, start_date, end_date, highest_daily_pace, stats_options
@@ -540,9 +733,7 @@ def write_csv(
         for section_plan in section_plans:
             writer.writerow([])
             writer.writerow([section_plan.section.label])
-            writer.writerow(
-                ["Daily pace", f"{section_plan.daily_pace:.15g} pages/day"]
-            )
+            writer.writerow(["Daily pace", section_csv_daily_pace(section_plan)])
             if section_plan.section.simultaneous_groups:
                 writer.writerow(
                     [
@@ -553,47 +744,13 @@ def write_csv(
                         ),
                     ]
                 )
-            writer.writerow(
-                [
-                    "Book",
-                    "Title",
-                    "Start page",
-                    "End page",
-                    "Current page",
-                    "Pages",
-                    "Read pages",
-                    "Remaining pages",
-                    "Daily pages",
-                    "Cumulative remaining pages",
-                    "Start date",
-                    "Deadline",
-                    "Days allocated",
-                    "Status",
-                ]
-            )
+            writer.writerow(csv_table_headers(section_plan.section.label))
             for deadline in section_plan.deadlines:
-                writer.writerow(
-                    [
-                        deadline.book.number,
-                        deadline.book.title,
-                        deadline.book.start_page,
-                        deadline.book.end_page,
-                        "" if deadline.book.current_page is None else deadline.book.current_page,
-                        deadline.book.pages,
-                        deadline.book.pages_read,
-                        pages_remaining(deadline.book),
-                        f"{deadline.daily_pages:.15g}",
-                        deadline.cumulative_pages,
-                        deadline.start_date.isoformat(),
-                        deadline.deadline.isoformat(),
-                        deadline.days_allocated,
-                        deadline.status,
-                    ]
-                )
+                writer.writerow(csv_table_row(deadline, section_plan.section.label))
 
 
 def parse_csv_book_table(
-    rows: list[list[str]], header_index: int, stop_at_blank: bool
+    rows: list[list[str]], header_index: int, stop_at_blank: bool, section_label: str
 ) -> tuple[list[Book], int]:
     books: list[Book] = []
     index = header_index + 1
@@ -602,8 +759,13 @@ def parse_csv_book_table(
     start_page_index = header_indexes.get("Start page")
     end_page_index = header_indexes.get("End page")
     current_page_index = header_indexes.get("Current page")
+    start_time_index = header_indexes.get("Start time")
+    end_time_index = header_indexes.get("End time")
+    current_time_index = header_indexes.get("Current time")
     pages_index = header_indexes.get("Pages", 2)
     pages_read_index = header_indexes.get("Read pages", header_indexes.get("Pages read"))
+    duration_index = header_indexes.get("Duration")
+    time_listened_index = header_indexes.get("Time listened")
 
     while index < len(rows):
         row = rows[index]
@@ -617,33 +779,77 @@ def parse_csv_book_table(
         if len(row) < 3:
             raise ValueError("a book row is incomplete")
         try:
-            if start_page_index is not None and end_page_index is not None:
+            if is_audiobook_section(section_label):
+                if start_time_index is not None and end_time_index is not None:
+                    start_page = parse_duration(row[start_time_index])
+                    end_page = parse_duration(row[end_time_index])
+                else:
+                    duration = (
+                        parse_duration(row[duration_index])
+                        if duration_index is not None
+                        else parse_duration(row[pages_index])
+                    )
+                    start_page = 0
+                    end_page = duration
+                pages_read = (
+                    parse_duration(row[time_listened_index])
+                    if time_listened_index is not None
+                    and len(row) > time_listened_index
+                    and row[time_listened_index].strip()
+                    else 0
+                )
+                current_page = (
+                    parse_duration(row[current_time_index])
+                    if current_time_index is not None
+                    and len(row) > current_time_index
+                    and row[current_time_index].strip()
+                    else None
+                )
+            elif start_page_index is not None and end_page_index is not None:
                 start_page = int(row[start_page_index])
                 end_page = int(row[end_page_index])
+                pages_read = (
+                    int(row[pages_read_index])
+                    if pages_read_index is not None and len(row) > pages_read_index
+                    else 0
+                )
+                current_page = (
+                    int(row[current_page_index])
+                    if current_page_index is not None
+                    and len(row) > current_page_index
+                    and row[current_page_index].strip()
+                    else None
+                )
             else:
                 pages = int(row[pages_index])
                 start_page = 1
                 end_page = pages
-            pages_read = (
-                int(row[pages_read_index])
-                if pages_read_index is not None and len(row) > pages_read_index
-                else 0
-            )
-            current_page = (
-                int(row[current_page_index])
-                if current_page_index is not None
-                and len(row) > current_page_index
-                and row[current_page_index].strip()
-                else None
-            )
+                pages_read = (
+                    int(row[pages_read_index])
+                    if pages_read_index is not None and len(row) > pages_read_index
+                    else 0
+                )
+                current_page = (
+                    int(row[current_page_index])
+                    if current_page_index is not None
+                    and len(row) > current_page_index
+                    and row[current_page_index].strip()
+                    else None
+                )
         except ValueError as error:
+            if is_audiobook_section(section_label):
+                raise ValueError("audiobook time fields must be HH:MM or HH:MM:SS") from error
             raise ValueError("book page fields must be whole numbers") from error
         title = row[1].strip()
-        validate_page_range(start_page, end_page)
+        validate_book_range(section_label, start_page, end_page)
         if pages_read < 0 or not title:
-            raise ValueError("each book needs a title and valid page range")
+            raise ValueError("each book needs a title and valid range")
         if current_page is None and pages_read > 0:
-            current_page = start_page + pages_read - 1
+            current_page = (
+                start_page + pages_read
+                if is_audiobook_section(section_label)
+                else start_page + pages_read - 1
+            )
         if current_page is not None:
             current_page = min(max(current_page, start_page), end_page)
         books.append(
@@ -692,6 +898,7 @@ def load_csv_plan(
                 row[0] in BOOK_SECTION_LABELS
                 or row[:3] == ["Book", "Title", "Pages"]
                 or row[:3] == ["Book", "Title", "Start page"]
+                or row[:3] == ["Book", "Title", "Start time"]
             )
         ),
         len(rows),
@@ -759,7 +966,9 @@ def load_csv_plan(
                 index += 1
             if index >= len(rows) or rows[index][:2] != ["Book", "Title"]:
                 raise ValueError(f"missing {label} book table header")
-            books, index = parse_csv_book_table(rows, index, stop_at_blank=True)
+            books, index = parse_csv_book_table(
+                rows, index, stop_at_blank=True, section_label=label
+            )
             groups = parse_csv_simultaneous_groups(books, raw_groups, label)
             sections_by_label[label] = BookSection(label, books, groups)
         sections = [sections_by_label[label] for label in BOOK_SECTION_LABELS]
@@ -770,16 +979,23 @@ def load_csv_plan(
                 for index, row in enumerate(rows)
                 if row[:3] == ["Book", "Title", "Pages"]
                 or row[:3] == ["Book", "Title", "Start page"]
+                or row[:3] == ["Book", "Title", "Start time"]
             )
         except StopIteration as error:
             raise ValueError("missing book table header") from error
-        books, _ = parse_csv_book_table(rows, header_index, stop_at_blank=False)
+        books, _ = parse_csv_book_table(
+            rows,
+            header_index,
+            stop_at_blank=False,
+            section_label=PHYSICAL_BOOKS_LABEL,
+        )
         groups = parse_csv_simultaneous_groups(
             books, metadata.get("Simultaneous groups", "").strip(), PHYSICAL_BOOKS_LABEL
         )
         sections = [
             BookSection(PHYSICAL_BOOKS_LABEL, books, groups),
             BookSection(DIGITAL_BOOKS_LABEL, [], []),
+            BookSection(AUDIOBOOKS_LABEL, [], []),
         ]
 
     if not any(section.books for section in sections):
@@ -809,7 +1025,15 @@ def summary_stats_options_from_json(value: object | None) -> SummaryStatsOptions
     )
 
 
-def reading_session_to_json(session: ReadingSession) -> dict[str, object]:
+def reading_session_to_json(
+    session: ReadingSession, section_label: str
+) -> dict[str, object]:
+    if is_audiobook_section(section_label):
+        return {
+            "date": session.date.isoformat(),
+            "current_time_seconds": session.current_page,
+            "time_listened_seconds": session.pages_read,
+        }
     return {
         "date": session.date.isoformat(),
         "current_page": session.current_page,
@@ -828,7 +1052,21 @@ def parse_session_date(value: object) -> date:
         raise ValueError("invalid reading session") from error
 
 
-def book_to_json(book: Book) -> dict[str, object]:
+def book_to_json(book: Book, section_label: str) -> dict[str, object]:
+    if is_audiobook_section(section_label):
+        return {
+            "number": book.number,
+            "title": book.title,
+            "start_time_seconds": book.start_page,
+            "end_time_seconds": book.end_page,
+            "current_time_seconds": book.current_page,
+            "duration_seconds": total_units(book, section_label),
+            "time_listened_seconds": completed_units(book, section_label),
+            "reading_sessions": [
+                reading_session_to_json(session, section_label)
+                for session in book.reading_sessions
+            ],
+        }
     return {
         "number": book.number,
         "title": book.title,
@@ -838,36 +1076,55 @@ def book_to_json(book: Book) -> dict[str, object]:
         "pages": book.pages,
         "pages_read": book.pages_read,
         "reading_sessions": [
-            reading_session_to_json(session) for session in book.reading_sessions
+            reading_session_to_json(session, section_label)
+            for session in book.reading_sessions
         ],
     }
 
 
-def book_from_json(value: object, fallback_number: int) -> Book:
+def book_from_json(
+    value: object, fallback_number: int, section_label: str
+) -> Book:
     if not isinstance(value, dict):
         raise ValueError("each book must be a JSON object")
     title = str(value.get("title", "")).strip()
     if not title:
         raise ValueError("each book needs a title")
     try:
-        if "start_page" in value and "end_page" in value:
+        if is_audiobook_section(section_label):
+            if "start_time_seconds" in value and "end_time_seconds" in value:
+                start_page = int(value["start_time_seconds"])
+                end_page = int(value["end_time_seconds"])
+            else:
+                duration = int(value.get("duration_seconds", value.get("pages", 0)))
+                start_page = 0
+                end_page = duration
+            pages_read = int(value.get("time_listened_seconds", 0))
+            raw_current_page = value.get("current_time_seconds")
+        elif "start_page" in value and "end_page" in value:
             start_page = int(value["start_page"])
             end_page = int(value["end_page"])
+            pages_read = int(value.get("pages_read", 0))
+            raw_current_page = value.get("current_page")
         else:
             pages = int(value.get("pages", 0))
             start_page = 1
             end_page = pages
-        pages_read = int(value.get("pages_read", 0))
-        raw_current_page = value.get("current_page")
+            pages_read = int(value.get("pages_read", 0))
+            raw_current_page = value.get("current_page")
         current_page = (
             None
             if raw_current_page is None or raw_current_page == ""
             else int(raw_current_page)
         )
     except (TypeError, ValueError) as error:
+        if is_audiobook_section(section_label):
+            raise ValueError("audiobook time fields must be whole numbers") from error
         raise ValueError("book page fields must be whole numbers") from error
-    validate_page_range(start_page, end_page)
+    validate_book_range(section_label, start_page, end_page)
     if pages_read < 0:
+        if is_audiobook_section(section_label):
+            raise ValueError("time listened cannot be negative")
         raise ValueError("pages read cannot be negative")
 
     raw_sessions = value.get("reading_sessions", [])
@@ -880,7 +1137,30 @@ def book_from_json(value: object, fallback_number: int) -> Book:
             raise ValueError("each reading session must be a JSON object")
         session_date = parse_session_date(raw_session)
         try:
-            if "current_page" in raw_session:
+            if is_audiobook_section(section_label):
+                if "current_time_seconds" in raw_session:
+                    session_current_page = int(raw_session["current_time_seconds"])
+                    previous_total = (
+                        0
+                        if previous_current_page is None
+                        else previous_current_page - start_page
+                    )
+                    session_pages_read = int(
+                        raw_session.get(
+                            "time_listened_seconds",
+                            session_current_page - start_page - previous_total,
+                        )
+                    )
+                else:
+                    session_pages_read = int(
+                        raw_session.get("pages", raw_session.get("pages_read"))
+                    )
+                    session_current_page = (
+                        start_page + session_pages_read
+                        if previous_current_page is None
+                        else previous_current_page + session_pages_read
+                    )
+            elif "current_page" in raw_session:
                 session_current_page = int(raw_session["current_page"])
                 previous_total = (
                     0
@@ -903,6 +1183,8 @@ def book_from_json(value: object, fallback_number: int) -> Book:
         except (KeyError, TypeError, ValueError) as error:
             raise ValueError("invalid reading session") from error
         if session_pages_read <= 0:
+            if is_audiobook_section(section_label):
+                raise ValueError("reading session time must be positive")
             raise ValueError("reading session pages must be positive")
         session_current_page = min(max(session_current_page, start_page), end_page)
         reading_sessions.append(
@@ -915,7 +1197,11 @@ def book_from_json(value: object, fallback_number: int) -> Book:
     if current_page is None and reading_sessions:
         current_page = max(session.current_page for session in reading_sessions)
     elif current_page is None and pages_read > 0:
-        current_page = start_page + pages_read - 1
+        current_page = (
+            start_page + pages_read
+            if is_audiobook_section(section_label)
+            else start_page + pages_read - 1
+        )
     if current_page is not None:
         current_page = min(max(current_page, start_page), end_page)
 
@@ -932,7 +1218,7 @@ def book_from_json(value: object, fallback_number: int) -> Book:
 def book_section_to_json(section: BookSection) -> dict[str, object]:
     return {
         "label": section.label,
-        "books": [book_to_json(book) for book in section.books],
+        "books": [book_to_json(book, section.label) for book in section.books],
         "simultaneous_groups": [
             list(group) for group in section.simultaneous_groups
         ],
@@ -947,7 +1233,7 @@ def book_section_from_json(value: object, default_label: str) -> BookSection:
     if not isinstance(raw_books, list):
         raise ValueError(f"{label} books must be a list")
     books = [
-        book_from_json(book_value, fallback_number=index)
+        book_from_json(book_value, fallback_number=index, section_label=label)
         for index, book_value in enumerate(raw_books, start=1)
     ]
     renumber_books(books)
@@ -977,7 +1263,7 @@ def write_json_plan(
     stats_options: SummaryStatsOptions,
 ) -> None:
     payload = {
-        "schema_version": 3,
+        "schema_version": 4,
         "start_date": start_date.isoformat(),
         "end_date": end_date.isoformat(),
         "end_label": end_label,

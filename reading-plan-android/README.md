@@ -4,10 +4,10 @@ Native Android companion app for the desktop `reading_plan_gui.py` program.
 
 The app reads and writes the same `reading_plan.json` schema as the computer program:
 
-- `schema_version: 3`
-- physical and digital book sections
+- `schema_version: 4`
+- physical, digital, and audiobook sections
 - start/end dates and optional summary settings
-- reading sessions and current-page progress
+- reading sessions, current-page progress, and current audiobook time
 - simultaneous reading groups
 
 ## Syncthing setup
@@ -21,10 +21,10 @@ For fewer sync conflicts, enable Syncthing file versioning and avoid editing the
 
 ## Features
 
-- Session tab: log reading sessions by format, book, date, and current page.
+- Session tab: log reading sessions by format, book, date, current page, or current audiobook time.
 - Plan tab: edit start/finish dates, toggle optional summary stats, and recalculate.
-- Books tab: add, insert, replace, delete, reorder, and group physical or digital books.
-- Summary tab: view remaining-page totals and per-format deadline tables.
+- Books tab: add, insert, replace, delete, reorder, and group physical, digital, or audiobook entries. Audiobook times use `HH:MM` and also accept `HH:MM:SS`.
+- Summary tab: view remaining-page totals, audiobook remaining time, and per-format deadline tables.
 - CSV import/export is included for compatibility with the desktop program's CSV flow.
 
 ## Build
