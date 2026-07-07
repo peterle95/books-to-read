@@ -7,6 +7,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 from reading_plan import (
+    AUDIOBOOKS_LABEL,
     BOOK_SECTION_LABELS,
     DIGITAL_BOOKS_LABEL,
     PHYSICAL_BOOKS_LABEL,
@@ -15,20 +16,27 @@ from reading_plan import (
     SummaryStatsOptions,
     add_reading_session,
     build_remaining_section_plans,
+    completed_units,
     final_result_message,
+    format_duration,
     insertion_splits_simultaneous_group,
+    is_audiobook_section,
     load_csv_plan,
     load_json_plan,
     next_quarter_start,
     optional_summary_stat_rows,
     pages_remaining,
     parse_date,
+    parse_duration,
     period_end_from_start,
     remap_simultaneous_groups_after_addition,
     remap_simultaneous_groups_after_deletion,
+    remaining_units,
     remove_reading_session,
     renumber_books,
     section_plan_by_label,
+    section_daily_pace,
+    total_units,
     validate_simultaneous_groups,
     write_csv,
     write_json_plan,
@@ -37,7 +45,7 @@ from reading_plan import (
 
 DEFAULT_JSON_FILE = Path("reading_plan.json")
 
-PLAN_COLUMNS = (
+PAGE_PLAN_COLUMNS = (
     "Book",
     "Title",
     "Daily pages",
@@ -45,36 +53,60 @@ PLAN_COLUMNS = (
     "End page",
     "Current page",
     "Pages",
-    "Read",
     "Remaining",
-    "Cumulative remaining",
     "Start date",
     "Deadline",
     "Days allocated",
     "Status",
 )
-BOOK_COLUMNS = (
+AUDIO_PLAN_COLUMNS = (
+    "Book",
+    "Title",
+    "Daily time",
+    "Start time",
+    "End time",
+    "Current time",
+    "Duration",
+    "Remaining time",
+    "Start date",
+    "Deadline",
+    "Days allocated",
+    "Status",
+)
+PAGE_BOOK_COLUMNS = (
     "Book",
     "Title",
     "Start page",
     "End page",
     "Current page",
     "Pages",
-    "Read",
     "Remaining",
 )
-SESSION_COLUMNS = ("Date", "Format", "Book", "Current page", "Pages read")
+AUDIO_BOOK_COLUMNS = (
+    "Book",
+    "Title",
+    "Start time",
+    "End time",
+    "Current time",
+    "Duration",
+    "Remaining time",
+)
+SESSION_COLUMNS = ("Date", "Format", "Book", "Current page/time", "Read/listened")
 PLAN_COLUMN_WIDTHS = {
     "Book": 6,
     "Title": 28,
     "Daily pages": 12,
+    "Daily time": 12,
     "Start page": 10,
     "End page": 10,
     "Current page": 12,
+    "Start time": 10,
+    "End time": 10,
+    "Current time": 12,
     "Pages": 8,
-    "Read": 8,
     "Remaining": 10,
-    "Cumulative remaining": 20,
+    "Duration": 10,
+    "Remaining time": 14,
     "Start date": 12,
     "Deadline": 12,
     "Days allocated": 14,
@@ -85,10 +117,23 @@ DAILY_PAGES_PURPLE_DARK = "#4c1d95"
 
 
 def blank_sections() -> list[BookSection]:
-    return [
-        BookSection(PHYSICAL_BOOKS_LABEL, [], []),
-        BookSection(DIGITAL_BOOKS_LABEL, [], []),
-    ]
+    return [BookSection(label, [], []) for label in BOOK_SECTION_LABELS]
+
+
+def book_columns(label: str) -> tuple[str, ...]:
+    return AUDIO_BOOK_COLUMNS if is_audiobook_section(label) else PAGE_BOOK_COLUMNS
+
+
+def plan_columns(label: str) -> tuple[str, ...]:
+    return AUDIO_PLAN_COLUMNS if is_audiobook_section(label) else PAGE_PLAN_COLUMNS
+
+
+def display_value(label: str, value: int | float | None) -> str:
+    if value is None:
+        return ""
+    if is_audiobook_section(label):
+        return format_duration(value)
+    return str(int(value))
 
 
 def groups_to_text(groups: list[tuple[int, ...]]) -> str:
@@ -221,7 +266,8 @@ class ReadingPlanApp(tk.Tk):
         ttk.Entry(form, textvariable=self.session_date_var, width=14).grid(
             row=1, column=1, sticky="w", padx=(8, 18), pady=(10, 0)
         )
-        ttk.Label(form, text="Current page").grid(row=1, column=2, sticky="w", pady=(10, 0))
+        self.session_progress_label = ttk.Label(form, text="Current page")
+        self.session_progress_label.grid(row=1, column=2, sticky="w", pady=(10, 0))
         ttk.Entry(form, textvariable=self.session_current_page_var, width=12).grid(
             row=1, column=3, sticky="w", padx=(8, 18), pady=(10, 0)
         )
@@ -245,8 +291,8 @@ class ReadingPlanApp(tk.Tk):
             "Date": 120,
             "Format": 160,
             "Book": 460,
-            "Current page": 120,
-            "Pages read": 100,
+            "Current page/time": 130,
+            "Read/listened": 110,
         }
         for column in SESSION_COLUMNS:
             self.session_tree.heading(column, text=column)
@@ -310,7 +356,7 @@ class ReadingPlanApp(tk.Tk):
         labels = [
             ("book_counts", "Book counts"),
             ("page_share", "Page share"),
-            ("average_pages", "Average pages"),
+            ("average_pages", "Average pages/time"),
             ("reading_period", "Reading period"),
             ("pace_driver", "Pace driver"),
         ]
@@ -345,7 +391,7 @@ class ReadingPlanApp(tk.Tk):
 
         tree = ttk.Treeview(
             tree_frame,
-            columns=BOOK_COLUMNS,
+            columns=book_columns(label),
             show="headings",
             selectmode="browse",
             height=12,
@@ -357,10 +403,14 @@ class ReadingPlanApp(tk.Tk):
             "End page": 100,
             "Current page": 110,
             "Pages": 90,
-            "Read": 90,
             "Remaining": 110,
+            "Start time": 100,
+            "End time": 100,
+            "Current time": 110,
+            "Duration": 90,
+            "Remaining time": 120,
         }
-        for column in BOOK_COLUMNS:
+        for column in book_columns(label):
             tree.heading(column, text=column)
             tree.column(column, width=widths[column], anchor="w")
         tree.grid(row=0, column=0, sticky="nsew")
@@ -383,11 +433,13 @@ class ReadingPlanApp(tk.Tk):
         ttk.Entry(editor, textvariable=self.title_vars[label]).grid(
             row=0, column=1, sticky="ew", padx=(8, 12), columnspan=3
         )
-        ttk.Label(editor, text="Start page").grid(row=1, column=0, sticky="w", pady=(10, 0))
+        start_label = "Start time" if is_audiobook_section(label) else "Start page"
+        end_label = "End time" if is_audiobook_section(label) else "End page"
+        ttk.Label(editor, text=start_label).grid(row=1, column=0, sticky="w", pady=(10, 0))
         ttk.Entry(editor, textvariable=self.start_page_vars[label], width=10).grid(
             row=1, column=1, sticky="w", padx=(8, 12), pady=(10, 0)
         )
-        ttk.Label(editor, text="End page").grid(row=1, column=2, sticky="w", pady=(10, 0))
+        ttk.Label(editor, text=end_label).grid(row=1, column=2, sticky="w", pady=(10, 0))
         ttk.Entry(editor, textvariable=self.end_page_vars[label], width=10).grid(
             row=1, column=3, sticky="w", padx=(8, 0), pady=(10, 0)
         )
@@ -667,20 +719,31 @@ class ReadingPlanApp(tk.Tk):
             tree = self.book_trees[section.label]
             tree.delete(*tree.get_children())
             for book in section.books:
-                tree.insert(
-                    "",
-                    "end",
-                    iid=str(book.number),
-                    values=(
+                if is_audiobook_section(section.label):
+                    values = (
+                        book.number,
+                        book.title,
+                        format_duration(book.start_page),
+                        format_duration(book.end_page),
+                        display_value(section.label, book.current_page),
+                        format_duration(total_units(book, section.label)),
+                        format_duration(remaining_units(book, section.label)),
+                    )
+                else:
+                    values = (
                         book.number,
                         book.title,
                         book.start_page,
                         book.end_page,
                         "" if book.current_page is None else book.current_page,
                         book.pages,
-                        book.pages_read,
                         pages_remaining(book),
-                    ),
+                    )
+                tree.insert(
+                    "",
+                    "end",
+                    iid=str(book.number),
+                    values=values,
                 )
 
     def refresh_group_entries(self) -> None:
@@ -689,6 +752,9 @@ class ReadingPlanApp(tk.Tk):
 
     def refresh_session_books(self) -> None:
         section = self.section_by_label(self.session_section_var.get())
+        self.session_progress_label.configure(
+            text="Current time" if is_audiobook_section(section.label) else "Current page"
+        )
         values = [self.book_choice(book) for book in section.books]
         self.session_book_combo.configure(values=values)
         if values and self.session_book_var.get() not in values:
@@ -702,14 +768,23 @@ class ReadingPlanApp(tk.Tk):
         if selected is None:
             self.session_remaining_var.set("No book selected.")
             return
-        _section, book = selected
-        current_page = (
-            "not started" if book.current_page is None else str(book.current_page)
+        section, book = selected
+        current = (
+            "not started"
+            if book.current_page is None
+            else display_value(section.label, book.current_page)
         )
-        self.session_remaining_var.set(
-            f"{book.title}: current page {current_page}; "
-            f"{book.pages_read} read, {pages_remaining(book)} remaining."
-        )
+        if is_audiobook_section(section.label):
+            self.session_remaining_var.set(
+                f"{book.title}: current time {current}; "
+                f"{format_duration(completed_units(book, section.label))} listened, "
+                f"{format_duration(remaining_units(book, section.label))} remaining."
+            )
+        else:
+            self.session_remaining_var.set(
+                f"{book.title}: current page {current}; "
+                f"{book.pages_read} read, {pages_remaining(book)} remaining."
+            )
 
     def refresh_session_table(self) -> None:
         self.session_tree.delete(*self.session_tree.get_children())
@@ -725,8 +800,8 @@ class ReadingPlanApp(tk.Tk):
                             session.date.isoformat(),
                             section.label,
                             f"{book.number}. {book.title}",
-                            session.current_page,
-                            session.pages_read,
+                            display_value(section.label, session.current_page),
+                            display_value(section.label, session.pages_read),
                         ),
                     )
 
@@ -792,6 +867,7 @@ class ReadingPlanApp(tk.Tk):
     ) -> None:
         physical_plan = section_plan_by_label(section_plans, PHYSICAL_BOOKS_LABEL)
         digital_plan = section_plan_by_label(section_plans, DIGITAL_BOOKS_LABEL)
+        audiobook_plan = section_plan_by_label(section_plans, AUDIOBOOKS_LABEL)
         lines = [
             "Reading plan",
             f"Start date: {start_date.isoformat()}",
@@ -799,7 +875,9 @@ class ReadingPlanApp(tk.Tk):
             f"Remaining pages: {total_pages}",
             f"Physical remaining pages: {physical_plan.total_pages}",
             f"Digital remaining pages: {digital_plan.total_pages}",
+            f"Audiobook remaining time: {format_duration(audiobook_plan.total_pages)}",
             f"Highest remaining daily pace: {highest_daily_pace:.2f} pages/day",
+            f"Audiobook remaining daily time: {format_duration(audiobook_plan.daily_pace)}/day",
             f"Status: {overall_status}",
         ]
         for label, value in optional_summary_stat_rows(
@@ -814,9 +892,7 @@ class ReadingPlanApp(tk.Tk):
             if not section_plan.deadlines:
                 detail_lines.append("No books.")
                 continue
-            detail_lines.append(
-                f"Remaining daily pace: {section_plan.daily_pace:.2f} pages/day"
-            )
+            detail_lines.append(f"Remaining daily pace: {section_daily_pace(section_plan)}")
             detail_lines.append(
                 final_result_message(
                     section_plan.deadlines[-1].deadline, end_date, end_name
@@ -830,7 +906,8 @@ class ReadingPlanApp(tk.Tk):
             table = self.plan_tables[section_plan.section.label]
             for child in table.winfo_children():
                 child.destroy()
-            for column_index, column in enumerate(PLAN_COLUMNS):
+            columns = plan_columns(section_plan.section.label)
+            for column_index, column in enumerate(columns):
                 self.add_plan_table_cell(
                     table,
                     text=column,
@@ -841,25 +918,39 @@ class ReadingPlanApp(tk.Tk):
                 )
             for row_index, deadline in enumerate(section_plan.deadlines, start=1):
                 book = deadline.book
-                values = {
-                    "Book": book.number,
-                    "Title": book.title,
-                    "Daily pages": f"{deadline.daily_pages:.2f}",
-                    "Start page": book.start_page,
-                    "End page": book.end_page,
-                    "Current page": (
-                        "" if book.current_page is None else book.current_page
-                    ),
-                    "Pages": book.pages,
-                    "Read": book.pages_read,
-                    "Remaining": pages_remaining(book),
-                    "Cumulative remaining": deadline.cumulative_pages,
-                    "Start date": deadline.start_date.isoformat(),
-                    "Deadline": deadline.deadline.isoformat(),
-                    "Days allocated": deadline.days_allocated,
-                    "Status": deadline.status,
-                }
-                for column_index, column in enumerate(PLAN_COLUMNS):
+                if is_audiobook_section(section_plan.section.label):
+                    values = {
+                        "Book": book.number,
+                        "Title": book.title,
+                        "Daily time": format_duration(deadline.daily_pages),
+                        "Start time": format_duration(book.start_page),
+                        "End time": format_duration(book.end_page),
+                        "Current time": display_value(section_plan.section.label, book.current_page),
+                        "Duration": format_duration(total_units(book, section_plan.section.label)),
+                        "Remaining time": format_duration(remaining_units(book, section_plan.section.label)),
+                        "Start date": deadline.start_date.isoformat(),
+                        "Deadline": deadline.deadline.isoformat(),
+                        "Days allocated": deadline.days_allocated,
+                        "Status": deadline.status,
+                    }
+                else:
+                    values = {
+                        "Book": book.number,
+                        "Title": book.title,
+                        "Daily pages": f"{deadline.daily_pages:.2f}",
+                        "Start page": book.start_page,
+                        "End page": book.end_page,
+                        "Current page": (
+                            "" if book.current_page is None else book.current_page
+                        ),
+                        "Pages": book.pages,
+                        "Remaining": pages_remaining(book),
+                        "Start date": deadline.start_date.isoformat(),
+                        "Deadline": deadline.deadline.isoformat(),
+                        "Days allocated": deadline.days_allocated,
+                        "Status": deadline.status,
+                    }
+                for column_index, column in enumerate(columns):
                     self.add_plan_table_cell(
                         table,
                         text=str(values[column]),
@@ -878,7 +969,7 @@ class ReadingPlanApp(tk.Tk):
         column_name: str,
         is_header: bool,
     ) -> None:
-        is_daily_pages = column_name == "Daily pages"
+        is_daily_pages = column_name in {"Daily pages", "Daily time"}
         background = "#f3f4f6" if is_header else "#ffffff"
         foreground = "#111827"
         if is_daily_pages:
@@ -972,11 +1063,14 @@ class ReadingPlanApp(tk.Tk):
         if selected is None:
             self.show_error("Select a book first")
             return
-        _section, book = selected
+        section, book = selected
         try:
             session_date = parse_date(self.session_date_var.get().strip())
-            current_page = int(self.session_current_page_var.get().strip())
-            add_reading_session(book, session_date, current_page)
+            if is_audiobook_section(section.label):
+                current_page = parse_duration(self.session_current_page_var.get().strip())
+            else:
+                current_page = int(self.session_current_page_var.get().strip())
+            add_reading_session(book, session_date, current_page, section.label)
         except ValueError as error:
             self.show_error(str(error))
             return
@@ -1018,8 +1112,8 @@ class ReadingPlanApp(tk.Tk):
             return
         book = section.books[index]
         self.title_vars[label].set(book.title)
-        self.start_page_vars[label].set(str(book.start_page))
-        self.end_page_vars[label].set(str(book.end_page))
+        self.start_page_vars[label].set(display_value(label, book.start_page))
+        self.end_page_vars[label].set(display_value(label, book.end_page))
 
     def read_book_fields(
         self,
@@ -1035,24 +1129,45 @@ class ReadingPlanApp(tk.Tk):
         raw_start_page = self.start_page_vars[label].get().strip()
         raw_end_page = self.end_page_vars[label].get().strip()
         try:
-            start_page = (
-                default_start_page
-                if not raw_start_page and default_start_page is not None
-                else int(raw_start_page)
-            )
-            end_page = (
-                default_end_page
-                if not raw_end_page and default_end_page is not None
-                else int(raw_end_page)
-            )
+            if is_audiobook_section(label):
+                start_page = (
+                    default_start_page
+                    if not raw_start_page and default_start_page is not None
+                    else parse_duration(raw_start_page)
+                )
+                end_page = (
+                    default_end_page
+                    if not raw_end_page and default_end_page is not None
+                    else parse_duration(raw_end_page)
+                )
+            else:
+                start_page = (
+                    default_start_page
+                    if not raw_start_page and default_start_page is not None
+                    else int(raw_start_page)
+                )
+                end_page = (
+                    default_end_page
+                    if not raw_end_page and default_end_page is not None
+                    else int(raw_end_page)
+                )
         except ValueError:
-            self.show_error("Start page and end page must be whole numbers")
+            if is_audiobook_section(label):
+                self.show_error("Start time and end time must be HH:MM or HH:MM:SS")
+            else:
+                self.show_error("Start page and end page must be whole numbers")
             return None
-        if start_page < 0:
+        if is_audiobook_section(label) and start_page < 0:
+            self.show_error("Start time cannot be negative")
+            return None
+        if not is_audiobook_section(label) and start_page < 0:
             self.show_error("Start page cannot be negative")
             return None
         if end_page < start_page:
-            self.show_error("End page must be on or after the start page")
+            if is_audiobook_section(label):
+                self.show_error("End time must be on or after the start time")
+            else:
+                self.show_error("End page must be on or after the start page")
             return None
         return title, start_page, end_page
 
@@ -1060,7 +1175,9 @@ class ReadingPlanApp(tk.Tk):
         section = self.section_by_label(label)
         position = len(section.books) + 1
         values = self.read_book_fields(
-            label, default_title=f"Book {position}", default_start_page=1
+            label,
+            default_title=f"Book {position}",
+            default_start_page=0 if is_audiobook_section(label) else 1,
         )
         if values is None:
             return
@@ -1087,7 +1204,9 @@ class ReadingPlanApp(tk.Tk):
             self.show_error("Insert before or after the simultaneous group instead")
             return
         values = self.read_book_fields(
-            label, default_title=f"Book {position}", default_start_page=1
+            label,
+            default_title=f"Book {position}",
+            default_start_page=0 if is_audiobook_section(label) else 1,
         )
         if values is None:
             return

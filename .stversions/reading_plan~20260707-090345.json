@@ -1,5 +1,5 @@
 {
-  "schema_version": 4,
+  "schema_version": 3,
   "start_date": "2026-07-05",
   "end_date": "2026-09-30",
   "end_label": "Target finish date",
@@ -35,19 +35,14 @@
           "title": "wild swans",
           "start_page": 1,
           "end_page": 669,
-          "current_page": 219,
+          "current_page": 210,
           "pages": 669,
-          "pages_read": 219,
+          "pages_read": 210,
           "reading_sessions": [
             {
               "date": "2026-07-06",
               "current_page": 210,
               "pages_read": 210
-            },
-            {
-              "date": "2026-07-06",
-              "current_page": 219,
-              "pages_read": 9
             }
           ]
         },
@@ -104,24 +99,14 @@
           "title": "pragmatic",
           "start_page": 1,
           "end_page": 352,
-          "current_page": 303,
+          "current_page": 293,
           "pages": 352,
-          "pages_read": 303,
+          "pages_read": 293,
           "reading_sessions": [
             {
               "date": "2026-07-06",
               "current_page": 293,
               "pages_read": 293
-            },
-            {
-              "date": "2026-07-06",
-              "current_page": 299,
-              "pages_read": 6
-            },
-            {
-              "date": "2026-07-06",
-              "current_page": 303,
-              "pages_read": 4
             }
           ]
         },
@@ -138,28 +123,6 @@
               "date": "2026-07-06",
               "current_page": 71,
               "pages_read": 71
-            }
-          ]
-        }
-      ],
-      "simultaneous_groups": []
-    },
-    {
-      "label": "Audiobooks",
-      "books": [
-        {
-          "number": 1,
-          "title": "pane e bugie",
-          "start_time_seconds": 0,
-          "end_time_seconds": 29820,
-          "current_time_seconds": 60,
-          "duration_seconds": 29820,
-          "time_listened_seconds": 60,
-          "reading_sessions": [
-            {
-              "date": "2026-07-07",
-              "current_time_seconds": 60,
-              "time_listened_seconds": 60
             }
           ]
         }
