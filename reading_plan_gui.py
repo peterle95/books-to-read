@@ -45,9 +45,7 @@ PLAN_COLUMNS = (
     "End page",
     "Current page",
     "Pages",
-    "Read",
     "Remaining",
-    "Cumulative remaining",
     "Start date",
     "Deadline",
     "Days allocated",
@@ -60,7 +58,6 @@ BOOK_COLUMNS = (
     "End page",
     "Current page",
     "Pages",
-    "Read",
     "Remaining",
 )
 SESSION_COLUMNS = ("Date", "Format", "Book", "Current page", "Pages read")
@@ -72,9 +69,7 @@ PLAN_COLUMN_WIDTHS = {
     "End page": 10,
     "Current page": 12,
     "Pages": 8,
-    "Read": 8,
     "Remaining": 10,
-    "Cumulative remaining": 20,
     "Start date": 12,
     "Deadline": 12,
     "Days allocated": 14,
@@ -357,7 +352,6 @@ class ReadingPlanApp(tk.Tk):
             "End page": 100,
             "Current page": 110,
             "Pages": 90,
-            "Read": 90,
             "Remaining": 110,
         }
         for column in BOOK_COLUMNS:
@@ -678,7 +672,6 @@ class ReadingPlanApp(tk.Tk):
                         book.end_page,
                         "" if book.current_page is None else book.current_page,
                         book.pages,
-                        book.pages_read,
                         pages_remaining(book),
                     ),
                 )
@@ -851,9 +844,7 @@ class ReadingPlanApp(tk.Tk):
                         "" if book.current_page is None else book.current_page
                     ),
                     "Pages": book.pages,
-                    "Read": book.pages_read,
                     "Remaining": pages_remaining(book),
-                    "Cumulative remaining": deadline.cumulative_pages,
                     "Start date": deadline.start_date.isoformat(),
                     "Deadline": deadline.deadline.isoformat(),
                     "Days allocated": deadline.days_allocated,

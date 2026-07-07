@@ -605,7 +605,7 @@ public class MainActivity extends Activity {
         HorizontalScrollView scroll = new HorizontalScrollView(this);
         TableLayout table = new TableLayout(this);
         scroll.addView(table);
-        addTableRow(table, true, Arrays.asList("Book", "Title", "Start page", "End page", "Current page", "Pages", "Read", "Remaining"), -1);
+        addTableRow(table, true, Arrays.asList("Book", "Title", "Start page", "End page", "Current page", "Pages", "Remaining"), -1);
         for (int i = 0; i < section.books.size(); i++) {
             Book book = section.books.get(i);
             List<String> row = Arrays.asList(
@@ -615,7 +615,6 @@ public class MainActivity extends Activity {
                     String.valueOf(book.endPage),
                     book.currentPage == null ? "" : String.valueOf(book.currentPage),
                     String.valueOf(book.pages()),
-                    String.valueOf(book.pagesRead()),
                     String.valueOf(pagesRemaining(book))
             );
             int index = i;
@@ -634,7 +633,7 @@ public class MainActivity extends Activity {
         scroll.addView(table);
         List<String> headers = Arrays.asList(
                 "Book", "Title", "Daily pages", "Start page", "End page", "Current page",
-                "Pages", "Read", "Remaining", "Cumulative remaining", "Start date",
+                "Pages", "Remaining", "Start date",
                 "Deadline", "Days allocated", "Status"
         );
         addTableRow(table, true, headers, -1);
@@ -648,9 +647,7 @@ public class MainActivity extends Activity {
                     String.valueOf(book.endPage),
                     book.currentPage == null ? "" : String.valueOf(book.currentPage),
                     String.valueOf(book.pages()),
-                    String.valueOf(book.pagesRead()),
                     String.valueOf(pagesRemaining(book)),
-                    String.valueOf(deadline.cumulativePages),
                     deadline.startDate.toString(),
                     deadline.deadline.toString(),
                     String.valueOf(deadline.daysAllocated),
