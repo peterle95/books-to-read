@@ -8,7 +8,9 @@ import android.content.SharedPreferences;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
+import android.text.Editable;
 import android.text.InputType;
+import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -292,20 +294,30 @@ public class MainActivity extends Activity {
         box.addView(label(audiobookSection ? "Current time" : "Current page"));
         box.addView(pageInput);
 
-        TextView remaining = label("");
-        box.addView(remaining);
-        Runnable updateRemaining = () -> {
+        TextView target = label("");
+        box.addView(target);
+        Runnable updateTarget = () -> {
             Book book = selectedBookFromSpinner(selectedBookSection, bookSpinner);
             if (book == null) {
-                remaining.setText("Select a book first.");
-            } else if (isAudiobookSection(selectedBookSection)) {
-                remaining.setText("Remaining time: " + formatDuration(unitsRemaining(book, selectedBookSection)));
-            } else {
-                remaining.setText("Remaining pages: " + pagesRemaining(book));
+                target.setText("Select a book first.");
+                return;
+            }
+            LocalDate targetDate;
+            try {
+                targetDate = parseDate(dateInput.getText().toString().trim());
+            } catch (IllegalArgumentException ex) {
+                target.setText("Enter a valid session date.");
+                return;
+            }
+            try {
+                target.setText(sessionTargetText(selectedBookSection, book, targetDate));
+            } catch (IllegalArgumentException ex) {
+                target.setText("Target unavailable: " + ex.getMessage());
             }
         };
-        bookSpinner.setOnItemSelectedListener(new SimpleItemSelectedListener(updateRemaining));
-        updateRemaining.run();
+        bookSpinner.setOnItemSelectedListener(new SimpleItemSelectedListener(updateTarget));
+        dateInput.addTextChangedListener(new SimpleTextWatcher(updateTarget));
+        updateTarget.run();
 
         Button add = actionButton("Add Session", v -> {
             Book book = selectedBookFromSpinner(selectedBookSection, bookSpinner);
@@ -1179,11 +1191,11 @@ public class MainActivity extends Activity {
     }
 
     private BookSection bookSectionFromJson(JSONObject object, String defaultLabel) throws JSONException {
-        String label = object.optString("label", defaultLabel).trim();
-        if (label.isEmpty()) {
-            label = defaultLabel;
-        }
+        String label = canonicalSectionLabel(object.optString("label", defaultLabel), defaultLabel);
         BookSection section = new BookSection(label);
+        if (!BOOK_SECTION_LABELS.contains(label)) {
+            return section;
+        }
         JSONArray rawBooks = object.optJSONArray("books");
         if (rawBooks != null) {
             for (int i = 0; i < rawBooks.length(); i++) {
@@ -1630,6 +1642,83 @@ public class MainActivity extends Activity {
             return formatDuration(sectionPlan.dailyPace) + "/day";
         }
         return format2(sectionPlan.dailyPace) + " pages/day";
+    }
+
+    private String sessionTargetText(String sectionLabel, Book book, LocalDate targetDate) {
+        PlanSummary summary = buildRemainingPlans();
+        SectionPlan sectionPlan = sectionPlanByLabel(summary.sectionPlans, sectionLabel);
+        BookDeadline deadline = deadlineForBook(sectionPlan, book);
+        if (deadline == null) {
+            return book.title + ": no target available.";
+        }
+
+        String unitName = isAudiobookSection(sectionLabel) ? "time" : "page";
+        String current = book.currentPage == null ? "not started" : displayValue(sectionLabel, book.currentPage);
+        if (targetDate.isBefore(deadline.startDate)) {
+            String dailyPace = targetDailyPaceText(sectionLabel, deadline.dailyPages);
+            String firstTarget = targetDisplayValue(
+                    sectionLabel,
+                    book,
+                    targetUnitsForDate(book, sectionLabel, deadline, deadline.startDate)
+            );
+            return book.title + ": target starts " + deadline.startDate
+                    + "; first target " + unitName + " " + firstTarget + " (" + dailyPace + ").";
+        }
+
+        String target = targetDisplayValue(
+                sectionLabel,
+                book,
+                targetUnitsForDate(book, sectionLabel, deadline, targetDate)
+        );
+        String dailyPace = targetDailyPaceText(sectionLabel, deadline.dailyPages);
+        if (isAudiobookSection(sectionLabel)) {
+            return book.title + ": current time " + current + "; target time for "
+                    + targetDate + ": " + target + " (" + dailyPace + ").";
+        }
+        return book.title + ": current page " + current + "; target page for "
+                + targetDate + ": " + target + " (" + dailyPace + ").";
+    }
+
+    private static BookDeadline deadlineForBook(SectionPlan sectionPlan, Book book) {
+        for (BookDeadline deadline : sectionPlan.deadlines) {
+            if (deadline.book == book) {
+                return deadline;
+            }
+        }
+        return null;
+    }
+
+    private static int targetUnitsForDate(Book book, String sectionLabel, BookDeadline deadline, LocalDate targetDate) {
+        int total = totalUnits(book, sectionLabel);
+        int completed = completedUnits(book, sectionLabel);
+        if (unitsRemaining(book, sectionLabel) <= 0 || targetDate.isAfter(deadline.deadline)) {
+            return total;
+        }
+        if (targetDate.isBefore(deadline.startDate) || deadline.dailyPages <= 0) {
+            return completed;
+        }
+
+        LocalDate activeDate = targetDate.isAfter(deadline.deadline) ? deadline.deadline : targetDate;
+        long elapsedDays = ChronoUnit.DAYS.between(deadline.startDate, activeDate) + 1;
+        int scheduledUnits = (int) Math.ceil(deadline.dailyPages * elapsedDays - 1e-9);
+        return Math.min(Math.max(completed + scheduledUnits, completed), total);
+    }
+
+    private static String targetDisplayValue(String sectionLabel, Book book, int targetUnits) {
+        if (isAudiobookSection(sectionLabel)) {
+            return formatDuration(book.startPage + targetUnits);
+        }
+        if (targetUnits <= 0) {
+            return String.valueOf(book.startPage);
+        }
+        return String.valueOf(book.startPage + targetUnits - 1);
+    }
+
+    private static String targetDailyPaceText(String sectionLabel, double dailyPages) {
+        if (isAudiobookSection(sectionLabel)) {
+            return formatDuration(dailyPages) + "/day";
+        }
+        return format2(dailyPages) + " pages/day";
     }
 
     private static String sessionText(String sectionLabel, Book book, ReadingSession session) {
@@ -2164,6 +2253,41 @@ public class MainActivity extends Activity {
         return AUDIOBOOKS_LABEL.equals(label);
     }
 
+    private static String canonicalSectionLabel(String rawLabel, String defaultLabel) {
+        String label = rawLabel == null ? "" : rawLabel.trim();
+        if (label.isEmpty()) {
+            label = defaultLabel;
+        }
+        String normalized = label.toLowerCase(Locale.US).replaceAll("[^a-z0-9]", "");
+        switch (normalized) {
+            case "physical":
+            case "physicalbook":
+            case "physicalbooks":
+            case "paperbook":
+            case "paperbooks":
+            case "printbook":
+            case "printbooks":
+                return PHYSICAL_BOOKS_LABEL;
+            case "digital":
+            case "digitalbook":
+            case "digitalbooks":
+            case "ebook":
+            case "ebooks":
+            case "kindlebook":
+            case "kindlebooks":
+                return DIGITAL_BOOKS_LABEL;
+            case "audio":
+            case "audiobook":
+            case "audiobooks":
+                return AUDIOBOOKS_LABEL;
+            default:
+                if (BOOK_SECTION_LABELS.contains(defaultLabel) && !BOOK_SECTION_LABELS.contains(label)) {
+                    return defaultLabel;
+                }
+                return label;
+        }
+    }
+
     private static int parseBookUnit(String sectionLabel, String value) {
         return isAudiobookSection(sectionLabel)
                 ? parseDuration(value)
@@ -2435,6 +2559,27 @@ public class MainActivity extends Activity {
 
     private static String cell(List<String> row, int index) {
         return index < row.size() ? row.get(index).trim() : "";
+    }
+
+    private static class SimpleTextWatcher implements TextWatcher {
+        private final Runnable callback;
+
+        SimpleTextWatcher(Runnable callback) {
+            this.callback = callback;
+        }
+
+        @Override
+        public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+        }
+
+        @Override
+        public void onTextChanged(CharSequence s, int start, int before, int count) {
+        }
+
+        @Override
+        public void afterTextChanged(Editable s) {
+            callback.run();
+        }
     }
 
     private static class SimpleItemSelectedListener implements android.widget.AdapterView.OnItemSelectedListener {

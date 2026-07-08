@@ -104,9 +104,9 @@
           "title": "pragmatic",
           "start_page": 1,
           "end_page": 352,
-          "current_page": 307,
+          "current_page": 303,
           "pages": 352,
-          "pages_read": 307,
+          "pages_read": 303,
           "reading_sessions": [
             {
               "date": "2026-07-06",
@@ -121,11 +121,6 @@
             {
               "date": "2026-07-06",
               "current_page": 303,
-              "pages_read": 4
-            },
-            {
-              "date": "2026-07-07",
-              "current_page": 307,
               "pages_read": 4
             }
           ]

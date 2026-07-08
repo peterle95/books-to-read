@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 from datetime import date
+from math import ceil
 from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
@@ -12,6 +13,7 @@ from reading_plan import (
     DIGITAL_BOOKS_LABEL,
     PHYSICAL_BOOKS_LABEL,
     Book,
+    BookDeadline,
     BookSection,
     SummaryStatsOptions,
     add_reading_session,
@@ -134,6 +136,36 @@ def display_value(label: str, value: int | float | None) -> str:
     if is_audiobook_section(label):
         return format_duration(value)
     return str(int(value))
+
+
+def target_units_for_date(
+    book: Book, section_label: str, deadline: BookDeadline, target_date: date
+) -> int:
+    total = total_units(book, section_label)
+    completed = completed_units(book, section_label)
+    if remaining_units(book, section_label) <= 0 or target_date > deadline.deadline:
+        return total
+    if target_date < deadline.start_date or deadline.daily_pages <= 0:
+        return completed
+
+    active_date = min(target_date, deadline.deadline)
+    elapsed_days = (active_date - deadline.start_date).days + 1
+    scheduled_units = ceil(deadline.daily_pages * elapsed_days - 1e-9)
+    return min(max(completed + scheduled_units, completed), total)
+
+
+def target_display_value(book: Book, section_label: str, target_units: int) -> str:
+    if is_audiobook_section(section_label):
+        return format_duration(book.start_page + target_units)
+    if target_units <= 0:
+        return str(book.start_page)
+    return str(book.start_page + target_units - 1)
+
+
+def target_daily_pace_text(section_label: str, daily_pages: float) -> str:
+    if is_audiobook_section(section_label):
+        return f"{format_duration(daily_pages)}/day"
+    return f"{daily_pages:.2f} pages/day"
 
 
 def groups_to_text(groups: list[tuple[int, ...]]) -> str:
@@ -265,6 +297,9 @@ class ReadingPlanApp(tk.Tk):
         ttk.Label(form, text="Date").grid(row=1, column=0, sticky="w", pady=(10, 0))
         ttk.Entry(form, textvariable=self.session_date_var, width=14).grid(
             row=1, column=1, sticky="w", padx=(8, 18), pady=(10, 0)
+        )
+        self.session_date_var.trace_add(
+            "write", lambda *_args: self.refresh_session_remaining()
         )
         self.session_progress_label = ttk.Label(form, text="Current page")
         self.session_progress_label.grid(row=1, column=2, sticky="w", pady=(10, 0))
@@ -769,22 +804,76 @@ class ReadingPlanApp(tk.Tk):
             self.session_remaining_var.set("No book selected.")
             return
         section, book = selected
+        try:
+            target_date = parse_date(self.session_date_var.get().strip())
+        except ValueError:
+            self.session_remaining_var.set("Enter a valid session date.")
+            return
+        try:
+            deadline = self.session_deadline(section, book)
+        except ValueError as error:
+            self.session_remaining_var.set(f"Target unavailable: {error}")
+            return
+        if deadline is None:
+            self.session_remaining_var.set(f"{book.title}: no target available.")
+            return
+        self.session_remaining_var.set(
+            self.session_target_message(section, book, deadline, target_date)
+        )
+
+    def session_deadline(
+        self, section: BookSection, book: Book
+    ) -> BookDeadline | None:
+        start_date, end_date, _end_label, _end_name = self.current_dates()
+        section_plans, _total_pages, _highest_daily_pace, _overall_status = (
+            build_remaining_section_plans(self.sections, start_date, end_date)
+        )
+        section_plan = section_plan_by_label(section_plans, section.label)
+        for deadline in section_plan.deadlines:
+            if deadline.book is book:
+                return deadline
+        return None
+
+    def session_target_message(
+        self,
+        section: BookSection,
+        book: Book,
+        deadline: BookDeadline,
+        target_date: date,
+    ) -> str:
+        unit_name = "time" if is_audiobook_section(section.label) else "page"
         current = (
             "not started"
             if book.current_page is None
             else display_value(section.label, book.current_page)
         )
+        if target_date < deadline.start_date:
+            daily_pace = target_daily_pace_text(section.label, deadline.daily_pages)
+            first_target = target_display_value(
+                book,
+                section.label,
+                target_units_for_date(book, section.label, deadline, deadline.start_date),
+            )
+            return (
+                f"{book.title}: target starts {deadline.start_date.isoformat()}; "
+                f"first target {unit_name} {first_target} ({daily_pace})."
+            )
+
+        target = target_display_value(
+            book,
+            section.label,
+            target_units_for_date(book, section.label, deadline, target_date),
+        )
+        daily_pace = target_daily_pace_text(section.label, deadline.daily_pages)
         if is_audiobook_section(section.label):
-            self.session_remaining_var.set(
-                f"{book.title}: current time {current}; "
-                f"{format_duration(completed_units(book, section.label))} listened, "
-                f"{format_duration(remaining_units(book, section.label))} remaining."
+            return (
+                f"{book.title}: current time {current}; target time for "
+                f"{target_date.isoformat()}: {target} ({daily_pace})."
             )
-        else:
-            self.session_remaining_var.set(
-                f"{book.title}: current page {current}; "
-                f"{book.pages_read} read, {pages_remaining(book)} remaining."
-            )
+        return (
+            f"{book.title}: current page {current}; target page for "
+            f"{target_date.isoformat()}: {target} ({daily_pace})."
+        )
 
     def refresh_session_table(self) -> None:
         self.session_tree.delete(*self.session_tree.get_children())

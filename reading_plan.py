@@ -18,6 +18,37 @@ AUDIOBOOKS_LABEL = "Audiobooks"
 BOOK_SECTION_LABELS = (PHYSICAL_BOOKS_LABEL, DIGITAL_BOOKS_LABEL, AUDIOBOOKS_LABEL)
 
 
+def canonical_section_label(label: object, default_label: str) -> str:
+    raw_label = str(label).strip()
+    if not raw_label:
+        raw_label = default_label
+    normalized = "".join(character for character in raw_label.lower() if character.isalnum())
+    aliases = {
+        "physical": PHYSICAL_BOOKS_LABEL,
+        "physicalbook": PHYSICAL_BOOKS_LABEL,
+        "physicalbooks": PHYSICAL_BOOKS_LABEL,
+        "paperbook": PHYSICAL_BOOKS_LABEL,
+        "paperbooks": PHYSICAL_BOOKS_LABEL,
+        "printbook": PHYSICAL_BOOKS_LABEL,
+        "printbooks": PHYSICAL_BOOKS_LABEL,
+        "digital": DIGITAL_BOOKS_LABEL,
+        "digitalbook": DIGITAL_BOOKS_LABEL,
+        "digitalbooks": DIGITAL_BOOKS_LABEL,
+        "ebook": DIGITAL_BOOKS_LABEL,
+        "ebooks": DIGITAL_BOOKS_LABEL,
+        "kindlebook": DIGITAL_BOOKS_LABEL,
+        "kindlebooks": DIGITAL_BOOKS_LABEL,
+        "audio": AUDIOBOOKS_LABEL,
+        "audiobook": AUDIOBOOKS_LABEL,
+        "audiobooks": AUDIOBOOKS_LABEL,
+    }
+    if normalized in aliases:
+        return aliases[normalized]
+    if default_label in BOOK_SECTION_LABELS and raw_label not in BOOK_SECTION_LABELS:
+        return default_label
+    return raw_label
+
+
 @dataclass
 class ReadingSession:
     date: date
@@ -1228,7 +1259,9 @@ def book_section_to_json(section: BookSection) -> dict[str, object]:
 def book_section_from_json(value: object, default_label: str) -> BookSection:
     if not isinstance(value, dict):
         raise ValueError("each section must be a JSON object")
-    label = str(value.get("label", default_label)).strip() or default_label
+    label = canonical_section_label(value.get("label", default_label), default_label)
+    if label not in BOOK_SECTION_LABELS:
+        return BookSection(label, [], [])
     raw_books = value.get("books", [])
     if not isinstance(raw_books, list):
         raise ValueError(f"{label} books must be a list")
