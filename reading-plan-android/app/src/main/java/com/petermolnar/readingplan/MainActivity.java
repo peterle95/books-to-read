@@ -692,13 +692,13 @@ public class MainActivity extends Activity {
         boolean audiobookSection = isAudiobookSection(sectionPlan.section.label);
         List<String> headers = audiobookSection
                 ? Arrays.asList(
-                        "Book", "Title", "Daily time", "Start time", "End time", "Current time",
-                        "Duration", "Remaining time", "Start date",
+                        "Book", "Title", "Daily time", "Remaining time", "Start time", "End time",
+                        "Current time", "Duration", "Start date",
                         "Deadline", "Days allocated", "Status"
                 )
                 : Arrays.asList(
-                        "Book", "Title", "Daily pages", "Start page", "End page", "Current page",
-                        "Pages", "Remaining", "Start date",
+                        "Book", "Title", "Daily pages", "Remaining", "Start page", "End page",
+                        "Current page", "Pages", "Start date",
                         "Deadline", "Days allocated", "Status"
                 );
         addTableRow(table, true, headers, -1);
@@ -709,11 +709,11 @@ public class MainActivity extends Activity {
                             String.valueOf(book.number),
                             book.title,
                             formatDuration(deadline.dailyPages),
+                            formatDuration(unitsRemaining(book, sectionPlan.section.label)),
                             formatDuration(book.startPage),
                             formatDuration(book.endPage),
                             displayValue(sectionPlan.section.label, book.currentPage),
                             formatDuration(totalUnits(book, sectionPlan.section.label)),
-                            formatDuration(unitsRemaining(book, sectionPlan.section.label)),
                             deadline.startDate.toString(),
                             deadline.deadline.toString(),
                             String.valueOf(deadline.daysAllocated),
@@ -723,11 +723,11 @@ public class MainActivity extends Activity {
                             String.valueOf(book.number),
                             book.title,
                             format2(deadline.dailyPages),
+                            String.valueOf(pagesRemaining(book)),
                             String.valueOf(book.startPage),
                             String.valueOf(book.endPage),
                             book.currentPage == null ? "" : String.valueOf(book.currentPage),
                             String.valueOf(book.pages()),
-                            String.valueOf(pagesRemaining(book)),
                             deadline.startDate.toString(),
                             deadline.deadline.toString(),
                             String.valueOf(deadline.daysAllocated),

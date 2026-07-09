@@ -35,9 +35,9 @@
           "title": "wild swans",
           "start_page": 1,
           "end_page": 669,
-          "current_page": 219,
+          "current_page": 227,
           "pages": 669,
-          "pages_read": 219,
+          "pages_read": 227,
           "reading_sessions": [
             {
               "date": "2026-07-06",
@@ -48,6 +48,11 @@
               "date": "2026-07-06",
               "current_page": 219,
               "pages_read": 9
+            },
+            {
+              "date": "2026-07-07",
+              "current_page": 227,
+              "pages_read": 8
             }
           ]
         },
@@ -56,14 +61,19 @@
           "title": "changing order",
           "start_page": 1,
           "end_page": 559,
-          "current_page": 94,
+          "current_page": 126,
           "pages": 559,
-          "pages_read": 94,
+          "pages_read": 126,
           "reading_sessions": [
             {
               "date": "2026-07-06",
               "current_page": 94,
               "pages_read": 94
+            },
+            {
+              "date": "2026-07-07",
+              "current_page": 126,
+              "pages_read": 32
             }
           ]
         },
@@ -104,9 +114,9 @@
           "title": "pragmatic",
           "start_page": 1,
           "end_page": 352,
-          "current_page": 307,
+          "current_page": 311,
           "pages": 352,
-          "pages_read": 307,
+          "pages_read": 311,
           "reading_sessions": [
             {
               "date": "2026-07-06",
@@ -126,6 +136,11 @@
             {
               "date": "2026-07-07",
               "current_page": 307,
+              "pages_read": 4
+            },
+            {
+              "date": "2026-07-08",
+              "current_page": 311,
               "pages_read": 4
             }
           ]
