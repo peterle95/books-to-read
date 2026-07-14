@@ -291,7 +291,7 @@ public class MainActivity extends Activity {
         EditText pageInput = editText("", audiobookSection ? InputType.TYPE_CLASS_TEXT : InputType.TYPE_CLASS_NUMBER);
         box.addView(label("Date"));
         box.addView(dateInput);
-        box.addView(label(audiobookSection ? "Current time" : "Current page"));
+        box.addView(label(audiobookSection ? "Time left" : "Current page"));
         box.addView(pageInput);
 
         TextView target = label("");
@@ -328,7 +328,7 @@ public class MainActivity extends Activity {
             try {
                 LocalDate sessionDate = parseDate(dateInput.getText().toString().trim());
                 int currentPage = isAudiobookSection(selectedBookSection)
-                        ? parseDuration(pageInput.getText().toString().trim())
+                        ? currentTimeFromRemaining(book, parseDuration(pageInput.getText().toString().trim()))
                         : Integer.parseInt(pageInput.getText().toString().trim());
                 addReadingSession(book, sessionDate, currentPage, selectedBookSection);
                 selectedBookIndex = book.number - 1;
@@ -650,7 +650,7 @@ public class MainActivity extends Activity {
                 table,
                 true,
                 audiobookSection
-                        ? Arrays.asList("Book", "Title", "Start time", "End time", "Current time", "Duration", "Remaining time")
+                        ? Arrays.asList("Book", "Title", "Start time", "End time", "Remaining time", "Duration")
                         : Arrays.asList("Book", "Title", "Start page", "End page", "Current page", "Pages", "Remaining"),
                 -1
         );
@@ -662,9 +662,8 @@ public class MainActivity extends Activity {
                             book.title,
                             formatDuration(book.startPage),
                             formatDuration(book.endPage),
-                            displayValue(section.label, book.currentPage),
-                            formatDuration(totalUnits(book, section.label)),
-                            formatDuration(unitsRemaining(book, section.label))
+                            formatDuration(unitsRemaining(book, section.label)),
+                            formatDuration(totalUnits(book, section.label))
                     )
                     : Arrays.asList(
                             String.valueOf(book.number),
@@ -693,8 +692,7 @@ public class MainActivity extends Activity {
         List<String> headers = audiobookSection
                 ? Arrays.asList(
                         "Book", "Title", "Daily time", "Remaining time", "Start time", "End time",
-                        "Current time", "Duration", "Start date",
-                        "Deadline", "Days allocated", "Status"
+                        "Duration", "Start date", "Deadline", "Days allocated", "Status"
                 )
                 : Arrays.asList(
                         "Book", "Title", "Daily pages", "Remaining", "Start page", "End page",
@@ -712,7 +710,6 @@ public class MainActivity extends Activity {
                             formatDuration(unitsRemaining(book, sectionPlan.section.label)),
                             formatDuration(book.startPage),
                             formatDuration(book.endPage),
-                            displayValue(sectionPlan.section.label, book.currentPage),
                             formatDuration(totalUnits(book, sectionPlan.section.label)),
                             deadline.startDate.toString(),
                             deadline.deadline.toString(),
@@ -1162,12 +1159,17 @@ public class MainActivity extends Activity {
             object.put("current_time_seconds", book.currentPage == null ? JSONObject.NULL : book.currentPage);
             object.put("duration_seconds", totalUnits(book, sectionLabel));
             object.put("time_listened_seconds", completedUnits(book, sectionLabel));
+            object.put(
+                    "remaining_time_seconds",
+                    book.currentPage == null ? JSONObject.NULL : unitsRemaining(book, sectionLabel)
+            );
             JSONArray sessions = new JSONArray();
             for (ReadingSession session : book.readingSessions) {
                 JSONObject item = new JSONObject();
                 item.put("date", session.date.toString());
                 item.put("current_time_seconds", session.currentPage);
                 item.put("time_listened_seconds", session.pagesRead);
+                item.put("remaining_time_seconds", remainingTimeAt(book, session.currentPage));
                 sessions.put(item);
             }
             object.put("reading_sessions", sessions);
@@ -1246,7 +1248,9 @@ public class MainActivity extends Activity {
         validateBookRange(sectionLabel, startPage, endPage);
 
         Integer currentPage = null;
-        if (isAudiobookSection(sectionLabel) && object.has("current_time_seconds") && !object.isNull("current_time_seconds")) {
+        if (isAudiobookSection(sectionLabel) && object.has("remaining_time_seconds") && !object.isNull("remaining_time_seconds")) {
+            currentPage = currentTimeFromRemaining(startPage, endPage, object.getInt("remaining_time_seconds"));
+        } else if (isAudiobookSection(sectionLabel) && object.has("current_time_seconds") && !object.isNull("current_time_seconds")) {
             currentPage = object.getInt("current_time_seconds");
         } else if (object.has("current_page") && !object.isNull("current_page")) {
             currentPage = object.getInt("current_page");
@@ -1270,7 +1274,15 @@ public class MainActivity extends Activity {
                 int sessionCurrentPage;
                 int sessionPagesRead;
                 if (isAudiobookSection(sectionLabel)) {
-                    if (rawSession.has("current_time_seconds")) {
+                    if (rawSession.has("remaining_time_seconds") && !rawSession.isNull("remaining_time_seconds")) {
+                        sessionCurrentPage = currentTimeFromRemaining(
+                                startPage,
+                                endPage,
+                                rawSession.getInt("remaining_time_seconds")
+                        );
+                        int previousTotal = previousCurrentPage == null ? 0 : previousCurrentPage - startPage;
+                        sessionPagesRead = rawSession.optInt("time_listened_seconds", sessionCurrentPage - startPage - previousTotal);
+                    } else if (rawSession.has("current_time_seconds")) {
                         sessionCurrentPage = rawSession.getInt("current_time_seconds");
                         int previousTotal = previousCurrentPage == null ? 0 : previousCurrentPage - startPage;
                         sessionPagesRead = rawSession.optInt("time_listened_seconds", sessionCurrentPage - startPage - previousTotal);
@@ -1465,6 +1477,7 @@ public class MainActivity extends Activity {
         Integer startTimeIndex = headerIndexes.get("Start time");
         Integer endTimeIndex = headerIndexes.get("End time");
         Integer currentTimeIndex = headerIndexes.get("Current time");
+        Integer remainingTimeIndex = headerIndexes.get("Remaining time");
         Integer pagesIndex = headerIndexes.containsKey("Pages") ? headerIndexes.get("Pages") : 2;
         Integer pagesReadIndex = headerIndexes.containsKey("Read pages")
                 ? headerIndexes.get("Read pages")
@@ -1518,7 +1531,13 @@ public class MainActivity extends Activity {
                 pagesRead = pagesReadIndex == null ? 0 : intCell(row, pagesReadIndex);
             }
             Integer currentPage = null;
-            if (isAudiobookSection(sectionLabel) && currentTimeIndex != null && currentTimeIndex < row.size() && !row.get(currentTimeIndex).trim().isEmpty()) {
+            if (isAudiobookSection(sectionLabel) && remainingTimeIndex != null && remainingTimeIndex < row.size() && !row.get(remainingTimeIndex).trim().isEmpty()) {
+                currentPage = currentTimeFromRemaining(
+                        startPage,
+                        endPage,
+                        parseDuration(cell(row, remainingTimeIndex))
+                );
+            } else if (isAudiobookSection(sectionLabel) && currentTimeIndex != null && currentTimeIndex < row.size() && !row.get(currentTimeIndex).trim().isEmpty()) {
                 currentPage = parseDuration(cell(row, currentTimeIndex));
             } else if (currentPageIndex != null && currentPageIndex < row.size() && !row.get(currentPageIndex).trim().isEmpty()) {
                 currentPage = Integer.parseInt(row.get(currentPageIndex).trim());
@@ -1587,8 +1606,8 @@ public class MainActivity extends Activity {
     private static List<String> csvHeaders(String sectionLabel) {
         if (isAudiobookSection(sectionLabel)) {
             return Arrays.asList(
-                    "Book", "Title", "Start time", "End time", "Current time", "Duration",
-                    "Time listened", "Remaining time", "Daily time", "Cumulative remaining time",
+                    "Book", "Title", "Start time", "End time", "Remaining time", "Duration",
+                    "Daily time", "Cumulative remaining time",
                     "Start date", "Deadline", "Days allocated", "Status"
             );
         }
@@ -1607,10 +1626,8 @@ public class MainActivity extends Activity {
                     book.title,
                     formatDuration(book.startPage),
                     formatDuration(book.endPage),
-                    displayValue(sectionLabel, book.currentPage),
-                    formatDuration(totalUnits(book, sectionLabel)),
-                    formatDuration(completedUnits(book, sectionLabel)),
                     formatDuration(unitsRemaining(book, sectionLabel)),
+                    formatDuration(totalUnits(book, sectionLabel)),
                     formatDuration(deadline.dailyPages),
                     formatDuration(deadline.cumulativePages),
                     deadline.startDate.toString(),
@@ -1652,8 +1669,14 @@ public class MainActivity extends Activity {
             return book.title + ": no target available.";
         }
 
-        String unitName = isAudiobookSection(sectionLabel) ? "time" : "page";
-        String current = book.currentPage == null ? "not started" : displayValue(sectionLabel, book.currentPage);
+        boolean audiobook = isAudiobookSection(sectionLabel);
+        String unitName = audiobook ? "time left" : "page";
+        String current = "not started";
+        if (book.currentPage != null) {
+            current = audiobook
+                    ? formatDuration(remainingTimeAt(book, book.currentPage))
+                    : displayValue(sectionLabel, book.currentPage);
+        }
         if (targetDate.isBefore(deadline.startDate)) {
             String dailyPace = targetDailyPaceText(sectionLabel, deadline.dailyPages);
             String firstTarget = targetDisplayValue(
@@ -1671,8 +1694,9 @@ public class MainActivity extends Activity {
                 targetUnitsForDate(book, sectionLabel, deadline, targetDate)
         );
         String dailyPace = targetDailyPaceText(sectionLabel, deadline.dailyPages);
-        if (isAudiobookSection(sectionLabel)) {
-            return book.title + ": current time " + current + "; target time for "
+        if (audiobook) {
+            return book.title + ": current time left " + current
+                    + "; target time left for "
                     + targetDate + ": " + target + " (" + dailyPace + ").";
         }
         return book.title + ": current page " + current + "; target page for "
@@ -1706,7 +1730,7 @@ public class MainActivity extends Activity {
 
     private static String targetDisplayValue(String sectionLabel, Book book, int targetUnits) {
         if (isAudiobookSection(sectionLabel)) {
-            return formatDuration(book.startPage + targetUnits);
+            return formatDuration(Math.max(totalUnits(book, sectionLabel) - targetUnits, 0));
         }
         if (targetUnits <= 0) {
             return String.valueOf(book.startPage);
@@ -1724,8 +1748,8 @@ public class MainActivity extends Activity {
     private static String sessionText(String sectionLabel, Book book, ReadingSession session) {
         if (isAudiobookSection(sectionLabel)) {
             return session.date + " | " + sectionLabel + " | "
-                    + book.number + ". " + book.title + " | time "
-                    + formatDuration(session.currentPage) + " | +"
+                    + book.number + ". " + book.title + " | time left "
+                    + formatDuration(remainingTimeAt(book, session.currentPage)) + " | +"
                     + formatDuration(session.pagesRead);
         }
         return session.date + " | " + sectionLabel + " | "
@@ -1939,7 +1963,7 @@ public class MainActivity extends Activity {
         int pagesRead = completedUnits(book, sectionLabel) - previousPagesRead;
         if (pagesRead <= 0) {
             throw new IllegalArgumentException(isAudiobookSection(sectionLabel)
-                    ? "current time must be after the previously recorded time"
+                    ? "time left must be less than the previously recorded time left"
                     : "current page must be after the previously recorded page");
         }
         book.readingSessions.add(new ReadingSession(sessionDate, currentPage, pagesRead));
@@ -1964,12 +1988,12 @@ public class MainActivity extends Activity {
     private void setBookProgress(Book book, int currentPage, String sectionLabel) {
         if (currentPage < book.startPage) {
             throw new IllegalArgumentException(isAudiobookSection(sectionLabel)
-                    ? "current time cannot be before the audiobook's start time"
+                    ? "time left cannot be greater than the audiobook duration"
                     : "current page cannot be before the book's start page");
         }
         if (currentPage > book.endPage) {
             throw new IllegalArgumentException(isAudiobookSection(sectionLabel)
-                    ? "current time cannot be after the audiobook's end time"
+                    ? "time left cannot be negative"
                     : "current page cannot be after the book's end page");
         }
         book.currentPage = currentPage;
@@ -2346,6 +2370,25 @@ public class MainActivity extends Activity {
 
     private static int unitsRemaining(Book book, String sectionLabel) {
         return Math.max(totalUnits(book, sectionLabel) - completedUnits(book, sectionLabel), 0);
+    }
+
+    private static int remainingTimeAt(Book book, int currentTime) {
+        return Math.max(book.endPage - currentTime, 0);
+    }
+
+    private static int currentTimeFromRemaining(Book book, int remainingTime) {
+        return currentTimeFromRemaining(book.startPage, book.endPage, remainingTime);
+    }
+
+    private static int currentTimeFromRemaining(int startTime, int endTime, int remainingTime) {
+        int duration = endTime - startTime;
+        if (remainingTime < 0) {
+            throw new IllegalArgumentException("remaining time cannot be negative");
+        }
+        if (remainingTime > duration) {
+            throw new IllegalArgumentException("remaining time cannot be greater than the audiobook duration");
+        }
+        return endTime - remainingTime;
     }
 
     private static LocalDate parseDate(String value) {

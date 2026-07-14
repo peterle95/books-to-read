@@ -19,6 +19,7 @@ from reading_plan import (
     add_reading_session,
     build_remaining_section_plans,
     completed_units,
+    current_time_from_remaining,
     final_result_message,
     format_duration,
     insertion_splits_simultaneous_group,
@@ -31,6 +32,7 @@ from reading_plan import (
     parse_date,
     parse_duration,
     period_end_from_start,
+    remaining_time_at_current,
     remap_simultaneous_groups_after_addition,
     remap_simultaneous_groups_after_deletion,
     remaining_units,
@@ -68,7 +70,6 @@ AUDIO_PLAN_COLUMNS = (
     "Remaining time",
     "Start time",
     "End time",
-    "Current time",
     "Duration",
     "Start date",
     "Deadline",
@@ -89,11 +90,16 @@ AUDIO_BOOK_COLUMNS = (
     "Title",
     "Start time",
     "End time",
-    "Current time",
-    "Duration",
     "Remaining time",
+    "Duration",
 )
-SESSION_COLUMNS = ("Date", "Format", "Book", "Current page/time", "Read/listened")
+SESSION_COLUMNS = (
+    "Date",
+    "Format",
+    "Book",
+    "Current page/time left",
+    "Session progress",
+)
 PLAN_COLUMN_WIDTHS = {
     "Book": 6,
     "Title": 28,
@@ -104,7 +110,6 @@ PLAN_COLUMN_WIDTHS = {
     "Current page": 12,
     "Start time": 10,
     "End time": 10,
-    "Current time": 12,
     "Pages": 8,
     "Remaining": 10,
     "Duration": 10,
@@ -156,7 +161,7 @@ def target_units_for_date(
 
 def target_display_value(book: Book, section_label: str, target_units: int) -> str:
     if is_audiobook_section(section_label):
-        return format_duration(book.start_page + target_units)
+        return format_duration(max(total_units(book, section_label) - target_units, 0))
     if target_units <= 0:
         return str(book.start_page)
     return str(book.start_page + target_units - 1)
@@ -326,8 +331,8 @@ class ReadingPlanApp(tk.Tk):
             "Date": 120,
             "Format": 160,
             "Book": 460,
-            "Current page/time": 130,
-            "Read/listened": 110,
+            "Current page/time left": 170,
+            "Session progress": 120,
         }
         for column in SESSION_COLUMNS:
             self.session_tree.heading(column, text=column)
@@ -441,7 +446,6 @@ class ReadingPlanApp(tk.Tk):
             "Remaining": 110,
             "Start time": 100,
             "End time": 100,
-            "Current time": 110,
             "Duration": 90,
             "Remaining time": 120,
         }
@@ -760,9 +764,8 @@ class ReadingPlanApp(tk.Tk):
                         book.title,
                         format_duration(book.start_page),
                         format_duration(book.end_page),
-                        display_value(section.label, book.current_page),
-                        format_duration(total_units(book, section.label)),
                         format_duration(remaining_units(book, section.label)),
+                        format_duration(total_units(book, section.label)),
                     )
                 else:
                     values = (
@@ -788,7 +791,7 @@ class ReadingPlanApp(tk.Tk):
     def refresh_session_books(self) -> None:
         section = self.section_by_label(self.session_section_var.get())
         self.session_progress_label.configure(
-            text="Current time" if is_audiobook_section(section.label) else "Current page"
+            text="Time left" if is_audiobook_section(section.label) else "Current page"
         )
         values = [self.book_choice(book) for book in section.books]
         self.session_book_combo.configure(values=values)
@@ -841,12 +844,15 @@ class ReadingPlanApp(tk.Tk):
         deadline: BookDeadline,
         target_date: date,
     ) -> str:
-        unit_name = "time" if is_audiobook_section(section.label) else "page"
-        current = (
-            "not started"
-            if book.current_page is None
-            else display_value(section.label, book.current_page)
-        )
+        audiobook = is_audiobook_section(section.label)
+        unit_name = "time left" if audiobook else "page"
+        current = "not started"
+        if book.current_page is not None:
+            current = (
+                format_duration(remaining_time_at_current(book, book.current_page))
+                if audiobook
+                else display_value(section.label, book.current_page)
+            )
         if target_date < deadline.start_date:
             daily_pace = target_daily_pace_text(section.label, deadline.daily_pages)
             first_target = target_display_value(
@@ -865,9 +871,10 @@ class ReadingPlanApp(tk.Tk):
             target_units_for_date(book, section.label, deadline, target_date),
         )
         daily_pace = target_daily_pace_text(section.label, deadline.daily_pages)
-        if is_audiobook_section(section.label):
+        if audiobook:
             return (
-                f"{book.title}: current time {current}; target time for "
+                f"{book.title}: current time left {current}; "
+                f"target time left for "
                 f"{target_date.isoformat()}: {target} ({daily_pace})."
             )
         return (
@@ -889,7 +896,13 @@ class ReadingPlanApp(tk.Tk):
                             session.date.isoformat(),
                             section.label,
                             f"{book.number}. {book.title}",
-                            display_value(section.label, session.current_page),
+                            (
+                                format_duration(
+                                    remaining_time_at_current(book, session.current_page)
+                                )
+                                if is_audiobook_section(section.label)
+                                else display_value(section.label, session.current_page)
+                            ),
                             display_value(section.label, session.pages_read),
                         ),
                     )
@@ -1014,7 +1027,6 @@ class ReadingPlanApp(tk.Tk):
                         "Daily time": format_duration(deadline.daily_pages),
                         "Start time": format_duration(book.start_page),
                         "End time": format_duration(book.end_page),
-                        "Current time": display_value(section_plan.section.label, book.current_page),
                         "Duration": format_duration(total_units(book, section_plan.section.label)),
                         "Remaining time": format_duration(remaining_units(book, section_plan.section.label)),
                         "Start date": deadline.start_date.isoformat(),
@@ -1156,7 +1168,9 @@ class ReadingPlanApp(tk.Tk):
         try:
             session_date = parse_date(self.session_date_var.get().strip())
             if is_audiobook_section(section.label):
-                current_page = parse_duration(self.session_current_page_var.get().strip())
+                current_page = current_time_from_remaining(
+                    book, parse_duration(self.session_current_page_var.get().strip())
+                )
             else:
                 current_page = int(self.session_current_page_var.get().strip())
             add_reading_session(book, session_date, current_page, section.label)

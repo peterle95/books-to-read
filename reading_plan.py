@@ -198,6 +198,27 @@ def remaining_units(book: Book, section_label: str) -> int:
     return max(total_units(book, section_label) - completed_units(book, section_label), 0)
 
 
+def remaining_time_at_current(book: Book, current_time: int) -> int:
+    return max(book.end_page - current_time, 0)
+
+
+def current_time_from_remaining_time(
+    start_time: int, end_time: int, remaining_time: int
+) -> int:
+    duration = end_time - start_time
+    if remaining_time < 0:
+        raise ValueError("remaining time cannot be negative")
+    if remaining_time > duration:
+        raise ValueError("remaining time cannot be greater than the audiobook duration")
+    return end_time - remaining_time
+
+
+def current_time_from_remaining(book: Book, remaining_time: int) -> int:
+    return current_time_from_remaining_time(
+        book.start_page, book.end_page, remaining_time
+    )
+
+
 def validate_page_range(start_page: int, end_page: int) -> None:
     if start_page < 0:
         raise ValueError("start page cannot be negative")
@@ -230,11 +251,11 @@ def set_book_progress(
         return
     if current_page < book.start_page:
         if is_audiobook_section(section_label):
-            raise ValueError("current time cannot be before the audiobook's start time")
+            raise ValueError("time left cannot be greater than the audiobook duration")
         raise ValueError("current page cannot be before the book's start page")
     if current_page > book.end_page:
         if is_audiobook_section(section_label):
-            raise ValueError("current time cannot be after the audiobook's end time")
+            raise ValueError("time left cannot be negative")
         raise ValueError("current page cannot be after the book's end page")
     book.current_page = current_page
 
@@ -250,7 +271,9 @@ def add_reading_session(
     units_read = completed_units(book, section_label) - previous_completed
     if units_read <= 0:
         if is_audiobook_section(section_label):
-            raise ValueError("current time must be after the previously recorded time")
+            raise ValueError(
+                "time left must be less than the previously recorded time left"
+            )
         raise ValueError("current page must be after the previously recorded page")
     book.reading_sessions.append(ReadingSession(session_date, current_page, units_read))
 
@@ -659,10 +682,8 @@ def csv_table_headers(section_label: str) -> list[str]:
             "Title",
             "Start time",
             "End time",
-            "Current time",
-            "Duration",
-            "Time listened",
             "Remaining time",
+            "Duration",
             "Daily time",
             "Cumulative remaining time",
             "Start date",
@@ -696,10 +717,8 @@ def csv_table_row(deadline: BookDeadline, section_label: str) -> list[object]:
             book.title,
             format_duration(book.start_page),
             format_duration(book.end_page),
-            "" if book.current_page is None else format_duration(book.current_page),
-            format_duration(total_units(book, section_label)),
-            format_duration(completed_units(book, section_label)),
             format_duration(remaining_units(book, section_label)),
+            format_duration(total_units(book, section_label)),
             format_duration(deadline.daily_pages),
             format_duration(deadline.cumulative_pages),
             deadline.start_date.isoformat(),
@@ -793,6 +812,7 @@ def parse_csv_book_table(
     start_time_index = header_indexes.get("Start time")
     end_time_index = header_indexes.get("End time")
     current_time_index = header_indexes.get("Current time")
+    remaining_time_index = header_indexes.get("Remaining time")
     pages_index = header_indexes.get("Pages", 2)
     pages_read_index = header_indexes.get("Read pages", header_indexes.get("Pages read"))
     duration_index = header_indexes.get("Duration")
@@ -829,13 +849,24 @@ def parse_csv_book_table(
                     and row[time_listened_index].strip()
                     else 0
                 )
-                current_page = (
-                    parse_duration(row[current_time_index])
-                    if current_time_index is not None
-                    and len(row) > current_time_index
-                    and row[current_time_index].strip()
-                    else None
-                )
+                if (
+                    remaining_time_index is not None
+                    and len(row) > remaining_time_index
+                    and row[remaining_time_index].strip()
+                ):
+                    current_page = current_time_from_remaining_time(
+                        start_page,
+                        end_page,
+                        parse_duration(row[remaining_time_index]),
+                    )
+                else:
+                    current_page = (
+                        parse_duration(row[current_time_index])
+                        if current_time_index is not None
+                        and len(row) > current_time_index
+                        and row[current_time_index].strip()
+                        else None
+                    )
             elif start_page_index is not None and end_page_index is not None:
                 start_page = int(row[start_page_index])
                 end_page = int(row[end_page_index])
@@ -1057,14 +1088,19 @@ def summary_stats_options_from_json(value: object | None) -> SummaryStatsOptions
 
 
 def reading_session_to_json(
-    session: ReadingSession, section_label: str
+    session: ReadingSession, section_label: str, book: Book | None = None
 ) -> dict[str, object]:
     if is_audiobook_section(section_label):
-        return {
+        payload: dict[str, object] = {
             "date": session.date.isoformat(),
             "current_time_seconds": session.current_page,
             "time_listened_seconds": session.pages_read,
         }
+        if book is not None:
+            payload["remaining_time_seconds"] = remaining_time_at_current(
+                book, session.current_page
+            )
+        return payload
     return {
         "date": session.date.isoformat(),
         "current_page": session.current_page,
@@ -1093,8 +1129,13 @@ def book_to_json(book: Book, section_label: str) -> dict[str, object]:
             "current_time_seconds": book.current_page,
             "duration_seconds": total_units(book, section_label),
             "time_listened_seconds": completed_units(book, section_label),
+            "remaining_time_seconds": (
+                None
+                if book.current_page is None
+                else remaining_units(book, section_label)
+            ),
             "reading_sessions": [
-                reading_session_to_json(session, section_label)
+                reading_session_to_json(session, section_label, book)
                 for session in book.reading_sessions
             ],
         }
@@ -1131,23 +1172,31 @@ def book_from_json(
                 start_page = 0
                 end_page = duration
             pages_read = int(value.get("time_listened_seconds", 0))
+            raw_remaining_time = value.get("remaining_time_seconds")
             raw_current_page = value.get("current_time_seconds")
         elif "start_page" in value and "end_page" in value:
             start_page = int(value["start_page"])
             end_page = int(value["end_page"])
             pages_read = int(value.get("pages_read", 0))
+            raw_remaining_time = None
             raw_current_page = value.get("current_page")
         else:
             pages = int(value.get("pages", 0))
             start_page = 1
             end_page = pages
             pages_read = int(value.get("pages_read", 0))
+            raw_remaining_time = None
             raw_current_page = value.get("current_page")
-        current_page = (
-            None
-            if raw_current_page is None or raw_current_page == ""
-            else int(raw_current_page)
-        )
+        if is_audiobook_section(section_label) and raw_remaining_time not in (None, ""):
+            current_page = current_time_from_remaining_time(
+                start_page, end_page, int(raw_remaining_time)
+            )
+        else:
+            current_page = (
+                None
+                if raw_current_page is None or raw_current_page == ""
+                else int(raw_current_page)
+            )
     except (TypeError, ValueError) as error:
         if is_audiobook_section(section_label):
             raise ValueError("audiobook time fields must be whole numbers") from error
@@ -1169,7 +1218,23 @@ def book_from_json(
         session_date = parse_session_date(raw_session)
         try:
             if is_audiobook_section(section_label):
-                if "current_time_seconds" in raw_session:
+                raw_remaining_time = raw_session.get("remaining_time_seconds")
+                if raw_remaining_time not in (None, ""):
+                    session_current_page = current_time_from_remaining_time(
+                        start_page, end_page, int(raw_remaining_time)
+                    )
+                    previous_total = (
+                        0
+                        if previous_current_page is None
+                        else previous_current_page - start_page
+                    )
+                    session_pages_read = int(
+                        raw_session.get(
+                            "time_listened_seconds",
+                            session_current_page - start_page - previous_total,
+                        )
+                    )
+                elif "current_time_seconds" in raw_session:
                     session_current_page = int(raw_session["current_time_seconds"])
                     previous_total = (
                         0

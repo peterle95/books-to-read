@@ -11,7 +11,7 @@ python3 reading_plan_gui.py
 The app opens `reading_plan.json` automatically when it starts. Changes are written back to the active JSON file automatically.
 
 Use the tabs to:
-- Log reading sessions by book, current page reached, or current audiobook time
+- Log reading sessions by book, current page reached, or audiobook time left
 - Quarter start date (defaults to next quarter start)
 - Set an optional custom target finish date
 - Add, replace, delete, reorder, and group physical or digital books using start and end page

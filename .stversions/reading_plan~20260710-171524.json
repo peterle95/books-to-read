@@ -35,9 +35,9 @@
           "title": "wild swans",
           "start_page": 1,
           "end_page": 669,
-          "current_page": 265,
+          "current_page": 227,
           "pages": 669,
-          "pages_read": 265,
+          "pages_read": 227,
           "reading_sessions": [
             {
               "date": "2026-07-06",
@@ -53,21 +53,6 @@
               "date": "2026-07-07",
               "current_page": 227,
               "pages_read": 8
-            },
-            {
-              "date": "2026-07-11",
-              "current_page": 244,
-              "pages_read": 17
-            },
-            {
-              "date": "2026-07-12",
-              "current_page": 260,
-              "pages_read": 16
-            },
-            {
-              "date": "2026-07-13",
-              "current_page": 265,
-              "pages_read": 5
             }
           ]
         },
@@ -76,9 +61,9 @@
           "title": "changing order",
           "start_page": 1,
           "end_page": 559,
-          "current_page": 138,
+          "current_page": 126,
           "pages": 559,
-          "pages_read": 138,
+          "pages_read": 126,
           "reading_sessions": [
             {
               "date": "2026-07-06",
@@ -89,11 +74,6 @@
               "date": "2026-07-07",
               "current_page": 126,
               "pages_read": 32
-            },
-            {
-              "date": "2026-07-11",
-              "current_page": 138,
-              "pages_read": 12
             }
           ]
         },
@@ -134,9 +114,9 @@
           "title": "pragmatic",
           "start_page": 1,
           "end_page": 352,
-          "current_page": 327,
+          "current_page": 311,
           "pages": 352,
-          "pages_read": 327,
+          "pages_read": 311,
           "reading_sessions": [
             {
               "date": "2026-07-06",
@@ -161,26 +141,6 @@
             {
               "date": "2026-07-08",
               "current_page": 311,
-              "pages_read": 4
-            },
-            {
-              "date": "2026-07-10",
-              "current_page": 312,
-              "pages_read": 1
-            },
-            {
-              "date": "2026-07-12",
-              "current_page": 315,
-              "pages_read": 3
-            },
-            {
-              "date": "2026-07-12",
-              "current_page": 323,
-              "pages_read": 8
-            },
-            {
-              "date": "2026-07-13",
-              "current_page": 327,
               "pages_read": 4
             }
           ]
@@ -212,36 +172,16 @@
           "title": "pane e bugie",
           "start_time_seconds": 0,
           "end_time_seconds": 29820,
-          "current_time_seconds": 13200,
+          "current_time_seconds": 60,
           "duration_seconds": 29820,
-          "time_listened_seconds": 13200,
+          "time_listened_seconds": 60,
           "reading_sessions": [
             {
               "date": "2026-07-07",
               "current_time_seconds": 60,
               "time_listened_seconds": 60
-            },
-            {
-              "date": "2026-07-09",
-              "current_time_seconds": 2340,
-              "time_listened_seconds": 2280
-            },
-            {
-              "date": "2026-07-10",
-              "current_time_seconds": 13200,
-              "time_listened_seconds": 10860
             }
           ]
-        },
-        {
-          "number": 2,
-          "title": "Nuclear War",
-          "start_time_seconds": 0,
-          "end_time_seconds": 40757,
-          "current_time_seconds": null,
-          "duration_seconds": 40757,
-          "time_listened_seconds": 0,
-          "reading_sessions": []
         }
       ],
       "simultaneous_groups": []
