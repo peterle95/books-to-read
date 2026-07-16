@@ -5,10 +5,10 @@
   "end_label": "Target finish date",
   "stats_options": {
     "book_counts": true,
-    "page_share": true,
-    "average_pages": true,
-    "reading_period": true,
-    "pace_driver": true
+    "page_share": false,
+    "average_pages": false,
+    "reading_period": false,
+    "pace_driver": false
   },
   "sections": [
     {
@@ -131,62 +131,6 @@
       "books": [
         {
           "number": 1,
-          "title": "pragmatic",
-          "start_page": 1,
-          "end_page": 352,
-          "current_page": 327,
-          "pages": 352,
-          "pages_read": 327,
-          "reading_sessions": [
-            {
-              "date": "2026-07-06",
-              "current_page": 293,
-              "pages_read": 293
-            },
-            {
-              "date": "2026-07-06",
-              "current_page": 299,
-              "pages_read": 6
-            },
-            {
-              "date": "2026-07-06",
-              "current_page": 303,
-              "pages_read": 4
-            },
-            {
-              "date": "2026-07-07",
-              "current_page": 307,
-              "pages_read": 4
-            },
-            {
-              "date": "2026-07-08",
-              "current_page": 311,
-              "pages_read": 4
-            },
-            {
-              "date": "2026-07-10",
-              "current_page": 312,
-              "pages_read": 1
-            },
-            {
-              "date": "2026-07-12",
-              "current_page": 315,
-              "pages_read": 3
-            },
-            {
-              "date": "2026-07-12",
-              "current_page": 323,
-              "pages_read": 8
-            },
-            {
-              "date": "2026-07-13",
-              "current_page": 327,
-              "pages_read": 4
-            }
-          ]
-        },
-        {
-          "number": 2,
           "title": "react",
           "start_page": 1,
           "end_page": 350,
@@ -212,24 +156,40 @@
           "title": "pane e bugie",
           "start_time_seconds": 0,
           "end_time_seconds": 29820,
-          "current_time_seconds": 13200,
+          "current_time_seconds": 15780,
           "duration_seconds": 29820,
-          "time_listened_seconds": 13200,
+          "time_listened_seconds": 15780,
+          "remaining_time_seconds": 14040,
           "reading_sessions": [
             {
               "date": "2026-07-07",
               "current_time_seconds": 60,
-              "time_listened_seconds": 60
+              "time_listened_seconds": 60,
+              "remaining_time_seconds": 29760
             },
             {
               "date": "2026-07-09",
               "current_time_seconds": 2340,
-              "time_listened_seconds": 2280
+              "time_listened_seconds": 2280,
+              "remaining_time_seconds": 27480
             },
             {
               "date": "2026-07-10",
               "current_time_seconds": 13200,
-              "time_listened_seconds": 10860
+              "time_listened_seconds": 10860,
+              "remaining_time_seconds": 16620
+            },
+            {
+              "date": "2026-07-14",
+              "current_time_seconds": 14040,
+              "time_listened_seconds": 840,
+              "remaining_time_seconds": 15780
+            },
+            {
+              "date": "2026-07-14",
+              "current_time_seconds": 15780,
+              "time_listened_seconds": 1740,
+              "remaining_time_seconds": 14040
             }
           ]
         },
@@ -241,6 +201,7 @@
           "current_time_seconds": null,
           "duration_seconds": 40757,
           "time_listened_seconds": 0,
+          "remaining_time_seconds": null,
           "reading_sessions": []
         }
       ],
