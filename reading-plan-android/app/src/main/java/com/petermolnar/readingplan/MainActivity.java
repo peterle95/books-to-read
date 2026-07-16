@@ -2,9 +2,11 @@ package com.petermolnar.readingplan;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.Dialog;
 import android.content.ContentResolver;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
@@ -14,6 +16,7 @@ import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.Window;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.CheckBox;
@@ -67,18 +70,24 @@ public class MainActivity extends Activity {
             DIGITAL_BOOKS_LABEL,
             AUDIOBOOKS_LABEL
     );
-    private static final int PURPLE = 0xff6d28d9;
-    private static final int PURPLE_DARK = 0xff4c1d95;
-    private static final int DARK_GREEN = 0xff166534;
-    private static final int DARK_GREEN_BORDER = 0xff14532d;
-    private static final int BORDER = 0xffd1d5db;
-    private static final int LIGHT_GRAY = 0xfff3f4f6;
-    private static final int TEXT = 0xff111827;
+    private static final int LATTE = 0xfff1e4d4;
+    private static final int CREAM = 0xfffff8f0;
+    private static final int LIGHT_CREAM = 0xfff7ede2;
+    private static final int ESPRESSO = 0xff3a241a;
+    private static final int MOCHA = 0xff6f4e37;
+    private static final int CARAMEL = 0xffb56b3c;
+    private static final int CARAMEL_DARK = 0xff87421e;
+    private static final int BORDER = 0xffd6baa1;
+    private static final int SUCCESS = 0xff3d6b4f;
+    private static final int SUCCESS_DARK = 0xff28513a;
+    private static final int ERROR = 0xff9f3a2b;
+    private static final int ERROR_DARK = 0xff6f231a;
 
     private LinearLayout root;
     private LinearLayout tabBar;
     private FrameLayout content;
-    private TextView statusView;
+    private Button jsonStatusButton;
+    private boolean jsonLoaded;
 
     private final List<BookSection> sections = blankSections();
     private StatsOptions statsOptions = new StatsOptions(true, true, true, true, true);
@@ -90,6 +99,8 @@ public class MainActivity extends Activity {
     private String previousTabBeforeSettings = "Session";
     private String selectedBookSection = PHYSICAL_BOOKS_LABEL;
     private int selectedBookIndex = -1;
+    private int selectedSessionBookNumber = -1;
+    private boolean summaryGenerated = false;
     private boolean restoring = false;
 
     @Override
@@ -105,7 +116,7 @@ public class MainActivity extends Activity {
     private void buildRoot() {
         root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(0xffffffff);
+        root.setBackgroundColor(LATTE);
 
         LinearLayout header = new LinearLayout(this);
         header.setOrientation(LinearLayout.HORIZONTAL);
@@ -118,7 +129,7 @@ public class MainActivity extends Activity {
 
         TextView title = new TextView(this);
         title.setText("Reading Plan");
-        title.setTextColor(TEXT);
+        title.setTextColor(ESPRESSO);
         title.setTextSize(22);
         title.setTypeface(null, 1);
         header.addView(title, new LinearLayout.LayoutParams(
@@ -127,10 +138,25 @@ public class MainActivity extends Activity {
                 1
         ));
 
+        jsonStatusButton = new Button(this);
+        jsonStatusButton.setText("JSON");
+        jsonStatusButton.setAllCaps(false);
+        jsonStatusButton.setTextColor(CREAM);
+        jsonStatusButton.setTextSize(13);
+        jsonStatusButton.setMinHeight(dp(44));
+        jsonStatusButton.setOnClickListener(v -> openSettings());
+        LinearLayout.LayoutParams jsonParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                dp(48)
+        );
+        jsonParams.setMargins(0, 0, dp(8), 0);
+        header.addView(jsonStatusButton, jsonParams);
+        updateJsonStatus();
+
         ImageButton settings = new ImageButton(this);
         settings.setImageResource(android.R.drawable.ic_menu_manage);
-        settings.setColorFilter(0xffffffff);
-        settings.setBackground(roundedBackground(PURPLE, PURPLE_DARK));
+        settings.setColorFilter(CREAM);
+        settings.setBackground(roundedBackground(CARAMEL, CARAMEL_DARK));
         settings.setContentDescription("Settings");
         settings.setOnClickListener(v -> openSettings());
         header.addView(settings, new LinearLayout.LayoutParams(dp(48), dp(48)));
@@ -142,13 +168,6 @@ public class MainActivity extends Activity {
                 1
         ));
 
-        statusView = new TextView(this);
-        statusView.setTextColor(0xff166534);
-        statusView.setPadding(dp(10), dp(6), dp(10), dp(6));
-        root.addView(statusView, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-        ));
 
         View tabDivider = new View(this);
         tabDivider.setBackgroundColor(BORDER);
@@ -159,7 +178,7 @@ public class MainActivity extends Activity {
 
         tabBar = new LinearLayout(this);
         tabBar.setOrientation(LinearLayout.HORIZONTAL);
-        tabBar.setBackgroundColor(0xfff9fafb);
+        tabBar.setBackgroundColor(LIGHT_CREAM);
         tabBar.setPadding(dp(8), dp(4), dp(8), dp(8));
         root.addView(tabBar, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -179,52 +198,108 @@ public class MainActivity extends Activity {
         Button button = new Button(this);
         button.setText(label);
         button.setAllCaps(false);
-        button.setTextColor(0xffffffff);
-        button.setBackground(roundedBackground(PURPLE, PURPLE_DARK));
+        button.setTextColor(CREAM);
+        button.setTextSize(15);
+        button.setBackground(roundedBackground(CARAMEL, CARAMEL_DARK));
         button.setOnClickListener(listener);
-        button.setMinHeight(dp(40));
+        button.setMinHeight(dp(48));
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
         );
-        params.setMargins(0, 0, dp(8), 0);
+        params.setMargins(0, 0, dp(8), dp(4));
         button.setLayoutParams(params);
         return button;
     }
 
+    private Button secondaryButton(String label, View.OnClickListener listener) {
+        Button button = new Button(this);
+        button.setText(label);
+        button.setAllCaps(false);
+        button.setTextColor(ESPRESSO);
+        button.setTextSize(14);
+        button.setBackground(roundedBackground(LIGHT_CREAM, BORDER));
+        button.setMinHeight(dp(44));
+        button.setOnClickListener(listener);
+        return button;
+    }
+
+    private Button selectionButton(String label, boolean selected) {
+        Button button = new Button(this);
+        button.setText(label);
+        button.setAllCaps(false);
+        button.setTextSize(14);
+        button.setTextColor(selected ? CREAM : ESPRESSO);
+        button.setGravity(Gravity.CENTER);
+        button.setSingleLine(false);
+        button.setMinHeight(dp(48));
+        button.setBackground(roundedBackground(selected ? MOCHA : LIGHT_CREAM, selected ? MOCHA : BORDER));
+        return button;
+    }
+
+    private LinearLayout metricColumn(String label, TextView value) {
+        LinearLayout column = new LinearLayout(this);
+        column.setOrientation(LinearLayout.VERTICAL);
+        TextView caption = new TextView(this);
+        caption.setText(label);
+        caption.setTextColor(MOCHA);
+        caption.setTextSize(12);
+        column.addView(caption);
+        column.addView(value);
+        return column;
+    }
+
+    private TextView metricValue() {
+        TextView value = new TextView(this);
+        value.setText("-");
+        value.setTextColor(ESPRESSO);
+        value.setTextSize(21);
+        value.setTypeface(null, 1);
+        value.setPadding(0, dp(2), 0, 0);
+        return value;
+    }
     private GradientDrawable roundedBackground(int fillColor, int borderColor) {
         GradientDrawable drawable = new GradientDrawable();
         drawable.setShape(GradientDrawable.RECTANGLE);
         drawable.setColor(fillColor);
-        drawable.setCornerRadius(dp(12));
+        drawable.setCornerRadius(dp(14));
         drawable.setStroke(dp(1), borderColor);
         return drawable;
     }
 
+    private LinearLayout surfaceCard() {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(14), dp(12), dp(14), dp(12));
+        card.setBackground(roundedBackground(CREAM, BORDER));
+        card.setElevation(dp(2));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        params.setMargins(0, 0, 0, dp(12));
+        card.setLayoutParams(params);
+        return card;
+    }
     private void renderTabBar() {
         tabBar.removeAllViews();
         for (String tab : Arrays.asList("Session", "Plan", "Books", "Summary")) {
+            boolean selected = tab.equals(currentTab);
             Button button = new Button(this);
             button.setText(tab);
             button.setAllCaps(false);
-            button.setTextColor(0xffffffff);
-            button.setBackground(tab.equals(currentTab)
-                    ? roundedBackground(PURPLE_DARK, PURPLE_DARK)
-                    : roundedBackground(PURPLE, PURPLE_DARK));
+            button.setTextSize(13);
+            button.setTextColor(selected ? CREAM : ESPRESSO);
+            button.setBackground(roundedBackground(selected ? ESPRESSO : CREAM, selected ? ESPRESSO : BORDER));
             button.setOnClickListener(v -> {
                 currentTab = tab;
                 showCurrentTab();
             });
-            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                    0,
-                    dp(42),
-                    1
-            );
-            params.setMargins(dp(2), 0, dp(2), 0);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(46), 1);
+            params.setMargins(dp(3), 0, dp(3), 0);
             tabBar.addView(button, params);
         }
     }
-
     private void showCurrentTab() {
         refreshHeader();
         renderTabBar();
@@ -260,67 +335,74 @@ public class MainActivity extends Activity {
         LinearLayout box = verticalBox();
         scroll.addView(box);
 
-        LinearLayout sessionHeader = row();
-        sessionHeader.setPadding(0, 0, 0, dp(8));
-        TextView heading = heading("Reading session");
-        heading.setPadding(0, dp(4), 0, 0);
-        sessionHeader.addView(heading, new LinearLayout.LayoutParams(
-                0,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                1
-        ));
-        sessionHeader.addView(actionButton("New plan", v -> confirmNewPlan()));
-        box.addView(sessionHeader);
+        LinearLayout header = row();
+        header.addView(heading("Reading session"), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        header.addView(secondaryButton("New plan", v -> confirmNewPlan()));
+        header.addView(actionButton("Entries", v -> showEntriesSheet()));
+        box.addView(header);
 
-        Spinner sectionSpinner = spinner(BOOK_SECTION_LABELS, selectedBookSection, DARK_GREEN, 0xffffffff);
-        box.addView(label("Format"));
-        box.addView(sectionSpinner);
+        LinearLayout formatCard = surfaceCard();
+        formatCard.addView(sectionTitle("Choose a format"));
+        LinearLayout formats = row();
+        addFormatButton(formats, "Physical", PHYSICAL_BOOKS_LABEL);
+        addFormatButton(formats, "Digital", DIGITAL_BOOKS_LABEL);
+        addFormatButton(formats, "Audiobooks", AUDIOBOOKS_LABEL);
+        formatCard.addView(formats);
+        box.addView(formatCard);
 
-        List<String> bookChoices = bookChoices(sectionByLabel(selectedBookSection));
-        Spinner bookSpinner = spinner(bookChoices, "", DARK_GREEN, 0xffffffff);
-        box.addView(label("Book"));
-        box.addView(bookSpinner);
+        BookSection section = sectionByLabel(selectedBookSection);
+        Book selected = selectedSessionBook();
+        LinearLayout bookCard = surfaceCard();
+        bookCard.addView(sectionTitle("Choose a book"));
+        if (section.books.isEmpty()) {
+            TextView empty = label("Add a book in the Books tab before logging a session.");
+            empty.setTextColor(MOCHA);
+            bookCard.addView(empty);
+        } else {
+            addSessionBookButtons(bookCard, section);
+        }
+        box.addView(bookCard);
 
-        sectionSpinner.setOnItemSelectedListener(new SimpleItemSelectedListener(() -> {
-            selectedBookSection = String.valueOf(sectionSpinner.getSelectedItem());
-            showCurrentTab();
-        }));
-
+        LinearLayout detailsCard = surfaceCard();
         boolean audiobookSection = isAudiobookSection(selectedBookSection);
         EditText dateInput = editText(LocalDate.now().toString(), InputType.TYPE_CLASS_TEXT);
         EditText pageInput = editText("", audiobookSection ? InputType.TYPE_CLASS_TEXT : InputType.TYPE_CLASS_NUMBER);
-        box.addView(label("Date"));
-        box.addView(dateInput);
-        box.addView(label(audiobookSection ? "Time left" : "Current page"));
-        box.addView(pageInput);
+        detailsCard.addView(label("Date"));
+        detailsCard.addView(dateInput);
+        detailsCard.addView(label(audiobookSection ? "Time left" : "Current page"));
+        detailsCard.addView(pageInput);
 
-        TextView target = label("");
-        box.addView(target);
+        LinearLayout metrics = row();
+        metrics.setPadding(dp(12), dp(10), dp(12), dp(10));
+        metrics.setBackground(roundedBackground(LIGHT_CREAM, BORDER));
+        TextView targetValue = metricValue();
+        TextView paceValue = metricValue();
+        String targetLabel = audiobookSection ? "Target time left" : "Target page";
+        String paceLabel = audiobookSection ? "Time per day" : "Pages per day";
+        metrics.addView(metricColumn(targetLabel, targetValue), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        metrics.addView(metricColumn(paceLabel, paceValue), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        detailsCard.addView(metrics);
         Runnable updateTarget = () -> {
-            Book book = selectedBookFromSpinner(selectedBookSection, bookSpinner);
+            Book book = selectedSessionBook();
             if (book == null) {
-                target.setText("Select a book first.");
-                return;
-            }
-            LocalDate targetDate;
-            try {
-                targetDate = parseDate(dateInput.getText().toString().trim());
-            } catch (IllegalArgumentException ex) {
-                target.setText("Enter a valid session date.");
+                targetValue.setText("-");
+                paceValue.setText("-");
                 return;
             }
             try {
-                target.setText(sessionTargetText(selectedBookSection, book, targetDate));
+                SessionTarget target = sessionTarget(selectedBookSection, book, parseDate(dateInput.getText().toString().trim()));
+                targetValue.setText(target.value);
+                paceValue.setText(target.dailyPace);
             } catch (IllegalArgumentException ex) {
-                target.setText("Target unavailable: " + ex.getMessage());
+                targetValue.setText("-");
+                paceValue.setText("-");
             }
         };
-        bookSpinner.setOnItemSelectedListener(new SimpleItemSelectedListener(updateTarget));
         dateInput.addTextChangedListener(new SimpleTextWatcher(updateTarget));
         updateTarget.run();
 
-        Button add = actionButton("Add Session", v -> {
-            Book book = selectedBookFromSpinner(selectedBookSection, bookSpinner);
+        Button add = actionButton("Add session", v -> {
+            Book book = selectedSessionBook();
             if (book == null) {
                 showError("Select a book first");
                 return;
@@ -331,51 +413,158 @@ public class MainActivity extends Activity {
                         ? currentTimeFromRemaining(book, parseDuration(pageInput.getText().toString().trim()))
                         : Integer.parseInt(pageInput.getText().toString().trim());
                 addReadingSession(book, sessionDate, currentPage, selectedBookSection);
-                selectedBookIndex = book.number - 1;
+                selectedSessionBookNumber = book.number;
                 afterStateChange("Session added");
             } catch (IllegalArgumentException ex) {
                 showError(ex.getMessage());
             }
         });
-        box.addView(add);
+        add.setEnabled(selected != null);
+        detailsCard.addView(add);
+        box.addView(detailsCard);
+        return scroll;
+    }
 
-        box.addView(sectionTitle("Sessions"));
-        boolean hasSessions = false;
+    private void addFormatButton(LinearLayout container, String label, String sectionLabel) {
+        Button button = selectionButton(label, sectionLabel.equals(selectedBookSection));
+        button.setOnClickListener(v -> {
+            selectedBookSection = sectionLabel;
+            selectedSessionBookNumber = -1;
+            showCurrentTab();
+        });
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(48), 1);
+        params.setMargins(0, 0, dp(6), 0);
+        container.addView(button, params);
+    }
+
+    private void addSessionBookButtons(LinearLayout container, BookSection section) {
+        for (int start = 0; start < section.books.size(); start += 2) {
+            LinearLayout bookRow = row();
+            for (int index = start; index < Math.min(start + 2, section.books.size()); index++) {
+                Book book = section.books.get(index);
+                Button button = selectionButton(book.number + ". " + book.title, book.number == selectedSessionBookNumber);
+                int bookNumber = book.number;
+                button.setOnClickListener(v -> {
+                    selectedSessionBookNumber = bookNumber;
+                    showCurrentTab();
+                });
+                LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
+                params.setMargins(0, 0, index + 1 < section.books.size() ? dp(6) : 0, dp(6));
+                bookRow.addView(button, params);
+            }
+            container.addView(bookRow);
+        }
+    }
+
+    private Book selectedSessionBook() {
+        BookSection section = sectionByLabel(selectedBookSection);
+        for (Book book : section.books) {
+            if (book.number == selectedSessionBookNumber) {
+                return book;
+            }
+        }
+        if (section.books.isEmpty()) {
+            selectedSessionBookNumber = -1;
+            return null;
+        }
+        Book first = section.books.get(0);
+        selectedSessionBookNumber = first.number;
+        return first;
+    }
+
+    private void showEntriesSheet() {
+        Dialog sheet = new Dialog(this);
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(20), dp(12), dp(20), dp(20));
+        panel.setBackgroundColor(CREAM);
+
+        View handle = new View(this);
+        handle.setBackground(roundedBackground(BORDER, BORDER));
+        LinearLayout.LayoutParams handleParams = new LinearLayout.LayoutParams(dp(44), dp(5));
+        handleParams.gravity = Gravity.CENTER_HORIZONTAL;
+        handleParams.setMargins(0, 0, 0, dp(12));
+        panel.addView(handle, handleParams);
+
+        LinearLayout header = row();
+        header.addView(heading("Entries"), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        Button close = secondaryButton("Close", v -> sheet.dismiss());
+        header.addView(close);
+        panel.addView(header);
+
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout entriesBox = new LinearLayout(this);
+        entriesBox.setOrientation(LinearLayout.VERTICAL);
+        scroll.addView(entriesBox);
+        List<SessionEntry> entries = allSessionEntries();
+        if (entries.isEmpty()) {
+            TextView empty = label("No reading entries yet. Add your first session from the Session tab.");
+            empty.setTextColor(MOCHA);
+            empty.setPadding(0, dp(24), 0, dp(24));
+            entriesBox.addView(empty);
+        } else {
+            for (SessionEntry entry : entries) {
+                LinearLayout card = surfaceCard();
+                TextView title = sectionTitle(entry.book.number + ". " + entry.book.title);
+                title.setPadding(0, 0, 0, dp(4));
+                card.addView(title);
+                TextView details = label(entry.session.date + "  •  " + entry.section.label + "\n" + sessionEntryProgress(entry));
+                details.setTextColor(MOCHA);
+                card.addView(details);
+                Button delete = secondaryButton("Delete", v -> confirmDeleteEntry(sheet, entry));
+                card.addView(delete);
+                entriesBox.addView(card);
+            }
+        }
+        panel.addView(scroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
+
+        sheet.setContentView(panel);
+        Window window = sheet.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawable(new ColorDrawable(CREAM));
+            window.setGravity(Gravity.BOTTOM);
+        }
+        sheet.show();
+        if (sheet.getWindow() != null) {
+            sheet.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, (int) (getResources().getDisplayMetrics().heightPixels * 0.86f));
+        }
+    }
+
+    private List<SessionEntry> allSessionEntries() {
+        List<SessionEntry> entries = new ArrayList<>();
         for (int sectionIndex = 0; sectionIndex < sections.size(); sectionIndex++) {
             BookSection section = sections.get(sectionIndex);
             for (int bookIndex = 0; bookIndex < section.books.size(); bookIndex++) {
                 Book book = section.books.get(bookIndex);
                 for (int sessionIndex = 0; sessionIndex < book.readingSessions.size(); sessionIndex++) {
-                    hasSessions = true;
-                    ReadingSession session = book.readingSessions.get(sessionIndex);
-                    LinearLayout row = row();
-                    TextView text = label(sessionText(section.label, book, session));
-                    row.addView(text, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
-                    int finalSectionIndex = sectionIndex;
-                    int finalBookIndex = bookIndex;
-                    int finalSessionIndex = sessionIndex;
-                    Button delete = actionButton("Delete", v -> {
-                        try {
-                            removeReadingSession(
-                                    sections.get(finalSectionIndex).books.get(finalBookIndex),
-                                    finalSessionIndex
-                            );
-                            afterStateChange("Session deleted");
-                        } catch (IllegalArgumentException ex) {
-                            showError(ex.getMessage());
-                        }
-                    });
-                    row.addView(delete);
-                    box.addView(row);
+                    entries.add(new SessionEntry(sectionIndex, bookIndex, sessionIndex, section, book, book.readingSessions.get(sessionIndex)));
                 }
             }
         }
-        if (!hasSessions) {
-            box.addView(label("No sessions yet."));
-        }
-        return scroll;
+        Collections.sort(entries, (left, right) -> right.session.date.compareTo(left.session.date));
+        return entries;
     }
 
+    private String sessionEntryProgress(SessionEntry entry) {
+        if (isAudiobookSection(entry.section.label)) {
+            return "Time left " + formatDuration(remainingTimeAt(entry.book, entry.session.currentPage)) + "  •  listened " + formatDuration(entry.session.pagesRead);
+        }
+        return "Current page " + entry.session.currentPage + "  •  read +" + entry.session.pagesRead + " pages";
+    }
+
+    private void confirmDeleteEntry(Dialog sheet, SessionEntry entry) {
+        new AlertDialog.Builder(this)
+                .setTitle("Delete entry?")
+                .setMessage("This session will be removed and the book progress recalculated.")
+                .setPositiveButton("Delete", (dialog, which) -> {
+                    removeReadingSession(sections.get(entry.sectionIndex).books.get(entry.bookIndex), entry.sessionIndex);
+                    sheet.dismiss();
+                    afterStateChange("Session deleted");
+                    showEntriesSheet();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
     private View buildSettingsView() {
         ScrollView scroll = new ScrollView(this);
         LinearLayout box = verticalBox();
@@ -412,9 +601,7 @@ public class MainActivity extends Activity {
 
         box.addView(heading("Plan"));
         EditText startInput = editText(startDate.toString(), InputType.TYPE_CLASS_TEXT);
-        CheckBox customTarget = new CheckBox(this);
-        customTarget.setText("Custom finish date");
-        customTarget.setChecked("Target finish date".equals(endLabel));
+        CheckBox customTarget = checkBox("Custom finish date", "Target finish date".equals(endLabel));
         EditText endInput = editText(endDate.toString(), InputType.TYPE_CLASS_TEXT);
 
         box.addView(label("Start date"));
@@ -628,19 +815,35 @@ public class MainActivity extends Activity {
 
         PlanSummary summary = buildRemainingPlans();
         box.addView(heading("Summary"));
-        box.addView(monoText(summaryText(summary, true)));
+        LinearLayout summaryCard = surfaceCard();
+        TextView helper = label(summaryGenerated
+                ? "Your current reading-plan summary is shown below. Generate again after reviewing changes."
+                : "Generate a clear overview when you are ready to review your reading plan.");
+        helper.setTextColor(MOCHA);
+        summaryCard.addView(helper);
+        summaryCard.addView(actionButton(summaryGenerated ? "Regenerate summary" : "Generate summary", v -> {
+            summaryGenerated = true;
+            showCurrentTab();
+        }));
+        if (summaryGenerated) {
+            summaryCard.addView(monoText(summaryText(summary, true)));
+        }
+        box.addView(summaryCard);
 
         for (SectionPlan sectionPlan : summary.sectionPlans) {
             box.addView(sectionTitle(sectionPlan.section.label));
             if (sectionPlan.deadlines.isEmpty()) {
-                box.addView(label("No books."));
+                LinearLayout emptyCard = surfaceCard();
+                TextView empty = label("No books yet. Add one in the Books tab to create a reading plan.");
+                empty.setTextColor(MOCHA);
+                emptyCard.addView(empty);
+                box.addView(emptyCard);
             } else {
                 box.addView(planTable(sectionPlan));
             }
         }
         return scroll;
     }
-
     private HorizontalScrollView bookTable(BookSection section) {
         HorizontalScrollView scroll = new HorizontalScrollView(this);
         TableLayout table = new TableLayout(this);
@@ -675,7 +878,7 @@ public class MainActivity extends Activity {
                             String.valueOf(pagesRemaining(book))
                     );
             int index = i;
-            TableRow tableRow = addTableRow(table, false, row, i == selectedBookIndex ? PURPLE : -1);
+            TableRow tableRow = addTableRow(table, false, row, i == selectedBookIndex ? CARAMEL : -1);
             tableRow.setOnClickListener(v -> {
                 selectedBookIndex = index;
                 showCurrentTab();
@@ -742,18 +945,18 @@ public class MainActivity extends Activity {
             TextView cell = new TextView(this);
             cell.setText(value);
             cell.setTextSize(13);
-            cell.setTextColor(rowColor == PURPLE ? 0xffffffff : TEXT);
-            cell.setPadding(dp(8), dp(6), dp(8), dp(6));
+            cell.setTextColor(rowColor == CARAMEL ? CREAM : ESPRESSO);
+            cell.setPadding(dp(10), dp(8), dp(10), dp(8));
             cell.setGravity(Gravity.CENTER_VERTICAL);
             cell.setSingleLine(false);
-            cell.setMinWidth(dp(90));
+            cell.setMinWidth(dp(96));
             if (header) {
                 cell.setTypeface(null, 1);
-                cell.setBackgroundColor(LIGHT_GRAY);
+                cell.setBackgroundColor(LIGHT_CREAM);
             } else if (rowColor != -1) {
                 cell.setBackgroundColor(rowColor);
             } else {
-                cell.setBackgroundColor(0xffffffff);
+                cell.setBackgroundColor(CREAM);
             }
             row.addView(cell);
         }
@@ -763,7 +966,7 @@ public class MainActivity extends Activity {
     private LinearLayout verticalBox() {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(12), dp(8), dp(12), dp(16));
+        box.setPadding(dp(16), dp(12), dp(16), dp(20));
         return box;
     }
 
@@ -777,9 +980,9 @@ public class MainActivity extends Activity {
 
     private TextView heading(String text) {
         TextView view = label(text);
-        view.setTextSize(20);
+        view.setTextSize(24);
         view.setTypeface(null, 1);
-        view.setPadding(0, dp(4), 0, dp(10));
+        view.setPadding(0, dp(4), 0, dp(12));
         return view;
     }
 
@@ -787,14 +990,14 @@ public class MainActivity extends Activity {
         TextView view = label(text);
         view.setTextSize(16);
         view.setTypeface(null, 1);
-        view.setPadding(0, dp(14), 0, dp(6));
+        view.setPadding(0, dp(12), 0, dp(8));
         return view;
     }
 
     private TextView label(String text) {
         TextView view = new TextView(this);
         view.setText(text);
-        view.setTextColor(TEXT);
+        view.setTextColor(ESPRESSO);
         view.setTextSize(14);
         view.setPadding(0, dp(4), 0, dp(4));
         return view;
@@ -804,29 +1007,35 @@ public class MainActivity extends Activity {
         TextView view = label(text);
         view.setTextSize(13);
         view.setTypeface(android.graphics.Typeface.MONOSPACE);
-        view.setPadding(dp(8), dp(8), dp(8), dp(8));
-        view.setBackgroundColor(0xfff9fafb);
+        view.setPadding(dp(12), dp(12), dp(12), dp(12));
+        view.setBackground(roundedBackground(LIGHT_CREAM, BORDER));
         return view;
     }
 
     private EditText editText(String value, int inputType) {
         EditText edit = new EditText(this);
         edit.setText(value);
+        edit.setTextColor(ESPRESSO);
+        edit.setTextSize(16);
         edit.setSingleLine(true);
         edit.setInputType(inputType);
         edit.setSelectAllOnFocus(false);
+        edit.setPadding(dp(12), 0, dp(12), 0);
+        edit.setMinHeight(dp(50));
+        edit.setBackground(roundedBackground(CREAM, BORDER));
         return edit;
     }
 
     private CheckBox checkBox(String label, boolean checked) {
         CheckBox box = new CheckBox(this);
         box.setText(label);
+        box.setTextColor(ESPRESSO);
         box.setChecked(checked);
+        box.setMinHeight(dp(44));
         return box;
     }
-
     private Spinner spinner(List<String> values, String selected) {
-        return spinner(values, selected, -1, TEXT);
+        return spinner(values, selected, -1, ESPRESSO);
     }
 
     private Spinner spinner(List<String> values, String selected, int backgroundColor, int selectedTextColor) {
@@ -846,18 +1055,16 @@ public class MainActivity extends Activity {
             @Override
             public View getDropDownView(int position, View convertView, ViewGroup parent) {
                 View view = super.getDropDownView(position, convertView, parent);
-                styleSpinnerText(view, TEXT);
-                view.setBackgroundColor(0xffffffff);
+                styleSpinnerText(view, ESPRESSO);
+                view.setBackgroundColor(CREAM);
                 return view;
             }
         };
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinner.setAdapter(adapter);
-        spinner.setMinimumHeight(dp(44));
-        if (backgroundColor != -1) {
-            spinner.setBackground(roundedBackground(backgroundColor, DARK_GREEN_BORDER));
-            spinner.setPadding(dp(8), 0, dp(8), 0);
-        }
+        spinner.setMinimumHeight(dp(48));
+        spinner.setBackground(roundedBackground(backgroundColor == -1 ? CREAM : backgroundColor, BORDER));
+        spinner.setPadding(dp(8), 0, dp(8), 0);
         int index = values.indexOf(selected);
         if (index >= 0) {
             spinner.setSelection(index);
@@ -878,27 +1085,39 @@ public class MainActivity extends Activity {
         return jsonUri == null ? "Not connected" : jsonUri.toString();
     }
 
-    private void refreshHeader() {
-        if (statusView.getText().length() == 0) {
-            setStatus(jsonUri == null ? "Connect the Syncthing reading_plan.json file." : "Ready", false);
+    private void updateJsonStatus() {
+        boolean healthy = jsonLoaded && jsonUri != null;
+        if (jsonStatusButton == null) {
+            return;
         }
+        jsonStatusButton.setText("JSON");
+        jsonStatusButton.setTextColor(CREAM);
+        jsonStatusButton.setBackground(roundedBackground(healthy ? SUCCESS : ERROR, healthy ? SUCCESS_DARK : ERROR_DARK));
+        jsonStatusButton.setContentDescription(healthy ? "JSON loaded" : "JSON not loaded");
+    }
+
+    private void setJsonLoaded(boolean loaded) {
+        jsonLoaded = loaded && jsonUri != null;
+        updateJsonStatus();
+    }
+
+    private void refreshHeader() {
+        updateJsonStatus();
     }
 
     private void afterStateChange(String message) {
+        summaryGenerated = false;
         autosaveJson(message);
         showCurrentTab();
     }
 
     private void setStatus(String message, boolean error) {
-        statusView.setText(message);
-        statusView.setTextColor(error ? 0xff991b1b : 0xff166534);
+        // Success and sync details are intentionally represented by the JSON indicator.
     }
 
     private void showError(String message) {
-        setStatus(message, true);
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
     }
-
     @Override
     public void onBackPressed() {
         if ("Settings".equals(currentTab)) {
@@ -930,7 +1149,7 @@ public class MainActivity extends Activity {
         SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
         String savedUri = prefs.getString(PREF_JSON_URI, null);
         if (savedUri == null) {
-            setStatus("Connect the Syncthing reading_plan.json file.", false);
+            setJsonLoaded(false);
             return;
         }
         jsonUri = Uri.parse(savedUri);
@@ -998,15 +1217,17 @@ public class MainActivity extends Activity {
 
     private void reloadFromJson() {
         if (jsonUri == null) {
+            setJsonLoaded(false);
             showError("Connect a JSON file first");
             return;
         }
         try {
             CsvPlan plan = loadJson(readText(jsonUri));
             applyPlan(plan);
-            setStatus("Loaded synced JSON file", false);
+            setJsonLoaded(true);
             showCurrentTab();
         } catch (IOException | JSONException | IllegalArgumentException ex) {
+            setJsonLoaded(false);
             showError("Could not load JSON: " + ex.getMessage());
         }
     }
@@ -1016,13 +1237,14 @@ public class MainActivity extends Activity {
             return;
         }
         if (jsonUri == null) {
-            setStatus("Connect the Syncthing reading_plan.json file to save changes.", true);
+            setJsonLoaded(false);
             return;
         }
         try {
             writeText(jsonUri, jsonText());
-            setStatus(successMessage + " to synced JSON", false);
+            setJsonLoaded(true);
         } catch (IOException | JSONException ex) {
+            setJsonLoaded(false);
             showError("Autosave failed: " + ex.getMessage());
         }
     }
@@ -1661,48 +1883,20 @@ public class MainActivity extends Activity {
         return format2(sectionPlan.dailyPace) + " pages/day";
     }
 
-    private String sessionTargetText(String sectionLabel, Book book, LocalDate targetDate) {
+    private SessionTarget sessionTarget(String sectionLabel, Book book, LocalDate targetDate) {
         PlanSummary summary = buildRemainingPlans();
         SectionPlan sectionPlan = sectionPlanByLabel(summary.sectionPlans, sectionLabel);
         BookDeadline deadline = deadlineForBook(sectionPlan, book);
         if (deadline == null) {
-            return book.title + ": no target available.";
+            throw new IllegalArgumentException("no target available");
         }
-
-        boolean audiobook = isAudiobookSection(sectionLabel);
-        String unitName = audiobook ? "time left" : "page";
-        String current = "not started";
-        if (book.currentPage != null) {
-            current = audiobook
-                    ? formatDuration(remainingTimeAt(book, book.currentPage))
-                    : displayValue(sectionLabel, book.currentPage);
-        }
-        if (targetDate.isBefore(deadline.startDate)) {
-            String dailyPace = targetDailyPaceText(sectionLabel, deadline.dailyPages);
-            String firstTarget = targetDisplayValue(
-                    sectionLabel,
-                    book,
-                    targetUnitsForDate(book, sectionLabel, deadline, deadline.startDate)
-            );
-            return book.title + ": target starts " + deadline.startDate
-                    + "; first target " + unitName + " " + firstTarget + " (" + dailyPace + ").";
-        }
-
         String target = targetDisplayValue(
                 sectionLabel,
                 book,
                 targetUnitsForDate(book, sectionLabel, deadline, targetDate)
         );
-        String dailyPace = targetDailyPaceText(sectionLabel, deadline.dailyPages);
-        if (audiobook) {
-            return book.title + ": current time left " + current
-                    + "; target time left for "
-                    + targetDate + ": " + target + " (" + dailyPace + ").";
-        }
-        return book.title + ": current page " + current + "; target page for "
-                + targetDate + ": " + target + " (" + dailyPace + ").";
+        return new SessionTarget(target, sessionDailyPaceValue(sectionLabel, deadline.dailyPages));
     }
-
     private static BookDeadline deadlineForBook(SectionPlan sectionPlan, Book book) {
         for (BookDeadline deadline : sectionPlan.deadlines) {
             if (deadline.book == book) {
@@ -1738,11 +1932,8 @@ public class MainActivity extends Activity {
         return String.valueOf(book.startPage + targetUnits - 1);
     }
 
-    private static String targetDailyPaceText(String sectionLabel, double dailyPages) {
-        if (isAudiobookSection(sectionLabel)) {
-            return formatDuration(dailyPages) + "/day";
-        }
-        return format2(dailyPages) + " pages/day";
+    private static String sessionDailyPaceValue(String sectionLabel, double dailyPages) {
+        return isAudiobookSection(sectionLabel) ? formatDuration(dailyPages) : format2(dailyPages);
     }
 
     private static String sessionText(String sectionLabel, Book book, ReadingSession session) {
@@ -2651,6 +2842,32 @@ public class MainActivity extends Activity {
         int pages(Book book);
     }
 
+    private static class SessionTarget {
+        final String value;
+        final String dailyPace;
+
+        SessionTarget(String value, String dailyPace) {
+            this.value = value;
+            this.dailyPace = dailyPace;
+        }
+    }
+    private static class SessionEntry {
+        final int sectionIndex;
+        final int bookIndex;
+        final int sessionIndex;
+        final BookSection section;
+        final Book book;
+        final ReadingSession session;
+
+        SessionEntry(int sectionIndex, int bookIndex, int sessionIndex, BookSection section, Book book, ReadingSession session) {
+            this.sectionIndex = sectionIndex;
+            this.bookIndex = bookIndex;
+            this.sessionIndex = sessionIndex;
+            this.section = section;
+            this.book = book;
+            this.session = session;
+        }
+    }
     private static class ReadingSession {
         final LocalDate date;
         final int currentPage;
