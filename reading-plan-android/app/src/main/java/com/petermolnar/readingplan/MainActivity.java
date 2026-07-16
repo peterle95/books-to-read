@@ -639,6 +639,9 @@ public class MainActivity extends Activity {
                         readingPeriod.isChecked(),
                         paceDriver.isChecked()
                 );
+                for (BookSection section : sections) {
+                    invalidateBaselineSchedules(section);
+                }
                 afterStateChange("Plan recalculated");
             } catch (IllegalArgumentException ex) {
                 showError(ex.getMessage());
@@ -704,6 +707,7 @@ public class MainActivity extends Activity {
             section.books.add(new Book(section.books.size() + 1, fields.title, fields.startPage, fields.endPage));
             renumberBooks(section.books);
             selectedBookIndex = section.books.size() - 1;
+            invalidateBaselineSchedules(section);
             afterStateChange("Book added");
         }));
         buttons1.addView(actionButton("Insert Before", v -> {
@@ -736,6 +740,7 @@ public class MainActivity extends Activity {
                 showError(ex.getMessage());
                 return;
             }
+            invalidateBaselineSchedules(section);
             afterStateChange("Book inserted");
         }));
         box.addView(buttons1);
@@ -759,6 +764,7 @@ public class MainActivity extends Activity {
                     ? oldBook.readingSessions
                     : new ArrayList<>();
             section.books.set(selectedBookIndex, new Book(oldBook.number, fields.title, fields.startPage, fields.endPage, currentPage, sessions));
+            invalidateBaselineSchedules(section);
             afterStateChange("Book replaced");
         }));
         buttons2.addView(actionButton("Delete Selected", v -> {
@@ -776,6 +782,7 @@ public class MainActivity extends Activity {
                 return;
             }
             selectedBookIndex = Math.min(selectedBookIndex, section.books.size() - 1);
+            invalidateBaselineSchedules(section);
             afterStateChange("Book deleted");
         }));
         box.addView(buttons2);
@@ -792,6 +799,7 @@ public class MainActivity extends Activity {
         groupButtons.addView(actionButton("Apply", v -> {
             try {
                 section.simultaneousGroups = validateSimultaneousGroups(section.books, parseGroupText(groupsInput.getText().toString()));
+                invalidateBaselineSchedules(section);
                 afterStateChange("Groups updated");
             } catch (IllegalArgumentException ex) {
                 showError(ex.getMessage());
@@ -799,6 +807,7 @@ public class MainActivity extends Activity {
         }));
         groupButtons.addView(actionButton("Clear", v -> {
             section.simultaneousGroups = new ArrayList<>();
+            invalidateBaselineSchedules(section);
             afterStateChange("Groups cleared");
         }));
         box.addView(groupButtons);
@@ -1225,6 +1234,7 @@ public class MainActivity extends Activity {
             CsvPlan plan = loadJson(readText(jsonUri));
             applyPlan(plan);
             setJsonLoaded(true);
+            autosaveJson("Migrated baseline schedule");
             showCurrentTab();
         } catch (IOException | JSONException | IllegalArgumentException ex) {
             setJsonLoaded(false);
@@ -1321,6 +1331,7 @@ public class MainActivity extends Activity {
         for (String label : BOOK_SECTION_LABELS) {
             loadedSections.add(byLabel.get(label));
         }
+        ensureBaselineSchedules(loadedSections, loadedStart, loadedEnd);
         return new CsvPlan(
                 loadedSections,
                 loadedStart,
@@ -1331,8 +1342,9 @@ public class MainActivity extends Activity {
     }
 
     private String jsonText() throws JSONException {
+        ensureBaselineSchedules(sections, startDate, endDate);
         JSONObject payload = new JSONObject();
-        payload.put("schema_version", 4);
+        payload.put("schema_version", 5);
         payload.put("start_date", startDate.toString());
         payload.put("end_date", endDate.toString());
         payload.put("end_label", endLabel);
@@ -1375,6 +1387,7 @@ public class MainActivity extends Activity {
         JSONObject object = new JSONObject();
         object.put("number", book.number);
         object.put("title", book.title);
+        object.put("baseline_schedule", baselineScheduleToJson(book.baselineSchedule));
         if (isAudiobookSection(sectionLabel)) {
             object.put("start_time_seconds", book.startPage);
             object.put("end_time_seconds", book.endPage);
@@ -1552,7 +1565,34 @@ public class MainActivity extends Activity {
         if (currentPage != null) {
             currentPage = clamp(currentPage, startPage, endPage);
         }
-        return new Book(fallbackNumber, title, startPage, endPage, currentPage, sessions);
+        BaselineSchedule baselineSchedule = null;
+        if (object.has("baseline_schedule") && !object.isNull("baseline_schedule")) {
+            baselineSchedule = baselineScheduleFromJson(object.getJSONObject("baseline_schedule"));
+        }
+        return new Book(fallbackNumber, title, startPage, endPage, currentPage, sessions, baselineSchedule);
+    }
+
+    private static Object baselineScheduleToJson(BaselineSchedule schedule) throws JSONException {
+        if (schedule == null) {
+            return JSONObject.NULL;
+        }
+        JSONObject object = new JSONObject();
+        object.put("start_date", schedule.startDate.toString());
+        object.put("deadline", schedule.deadline.toString());
+        object.put("daily_target", schedule.dailyTarget);
+        return object;
+    }
+
+    private static BaselineSchedule baselineScheduleFromJson(JSONObject object) throws JSONException {
+        try {
+            return new BaselineSchedule(
+                    parseDate(object.getString("start_date")),
+                    parseDate(object.getString("deadline")),
+                    object.getDouble("daily_target")
+            );
+        } catch (JSONException | IllegalArgumentException ex) {
+            throw new IllegalArgumentException("invalid baseline_schedule", ex);
+        }
     }
 
     private StatsOptions statsOptionsFromJson(JSONObject object) {
@@ -1980,6 +2020,51 @@ public class MainActivity extends Activity {
         return text.toString();
     }
 
+    private void ensureBaselineSchedules(
+            List<BookSection> planSections, LocalDate planStart, LocalDate planEnd
+    ) {
+        for (BookSection section : planSections) {
+            for (Book book : section.books) {
+                if (book.baselineSchedule == null) {
+                    calculateBaselineSchedules(planSections, planStart, planEnd);
+                    return;
+                }
+            }
+        }
+    }
+
+    private void calculateBaselineSchedules(
+            List<BookSection> planSections, LocalDate planStart, LocalDate planEnd
+    ) {
+        for (BookSection section : planSections) {
+            int sectionUnits = 0;
+            for (Book book : section.books) {
+                sectionUnits += totalUnits(book, section.label);
+            }
+            double dailyPace = section.books.isEmpty()
+                    ? 0.0
+                    : (double) sectionUnits / inclusiveDaysBetween(planStart, planEnd);
+            SectionPlan plan = buildPlan(
+                    section,
+                    planStart,
+                    planEnd,
+                    dailyPace,
+                    book -> totalUnits(book, section.label)
+            );
+            for (BookDeadline deadline : plan.deadlines) {
+                deadline.book.baselineSchedule = new BaselineSchedule(
+                        deadline.startDate, deadline.deadline, deadline.dailyPages
+                );
+            }
+        }
+    }
+
+    private void invalidateBaselineSchedules(BookSection section) {
+        for (Book book : section.books) {
+            book.baselineSchedule = null;
+        }
+    }
+
     private PlanSummary buildRemainingPlans() {
         List<SectionPlan> plans = new ArrayList<>();
         for (BookSection section : sections) {
@@ -2009,7 +2094,80 @@ public class MainActivity extends Activity {
             remainingPages += unitsRemaining(book, section.label);
         }
         double dailyPace = remainingPages == 0 ? 0.0 : (double) remainingPages / periodDays;
-        return buildPlan(section, remainingStart, end, dailyPace, book -> unitsRemaining(book, section.label));
+        SectionPlan plan = buildPlan(
+                section,
+                remainingStart,
+                end,
+                dailyPace,
+                book -> unitsRemaining(book, section.label)
+        );
+        return withPersistedBaselineDeadlines(plan, end, today);
+    }
+
+    private SectionPlan withPersistedBaselineDeadlines(SectionPlan plan, LocalDate end, LocalDate today) {
+        for (Book book : plan.section.books) {
+            if (book.baselineSchedule == null) {
+                return plan;
+            }
+        }
+        List<BookDeadline> deadlines = new ArrayList<>();
+        for (BookDeadline deadline : plan.deadlines) {
+            BaselineSchedule baseline = deadline.book.baselineSchedule;
+            String status = baseline.deadline.isBefore(end)
+                    ? "before end"
+                    : baseline.deadline.equals(end) ? "on end date" : "after end";
+
+            deadlines.add(new BookDeadline(
+                    deadline.book,
+                    deadline.cumulativePages,
+                    baseline.startDate,
+                    baseline.deadline,
+                    inclusiveDaysBetween(baseline.startDate, baseline.deadline),
+                    baseline.dailyTarget,
+                    status
+            ));
+        }
+        return new SectionPlan(
+                plan.section,
+                deadlines,
+                currentRequiredSectionPace(plan.section, today),
+                plan.totalPages,
+                plan.requiredPace,
+                plan.overallStatus
+        );
+    }
+
+    private double currentRequiredSectionPace(BookSection section, LocalDate today) {
+        Set<Integer> groupedBookIds = new HashSet<>();
+        double highestPace = 0.0;
+        for (List<Integer> group : section.simultaneousGroups) {
+            double groupPace = 0.0;
+            for (Integer bookId : group) {
+                Book book = section.books.get(bookId - 1);
+                groupPace += currentRequiredPace(book, section.label, book.baselineSchedule, today);
+                groupedBookIds.add(bookId);
+            }
+            highestPace = Math.max(highestPace, groupPace);
+        }
+        for (Book book : section.books) {
+            if (!groupedBookIds.contains(book.number)) {
+                highestPace = Math.max(
+                        highestPace,
+                        currentRequiredPace(book, section.label, book.baselineSchedule, today)
+                );
+            }
+        }
+        return highestPace;
+    }
+
+    private static double currentRequiredPace(
+            Book book, String sectionLabel, BaselineSchedule baseline, LocalDate today
+    ) {
+        LocalDate requiredStart = effectiveRemainingStartDate(
+                baseline.startDate, baseline.deadline, today
+        );
+        return (double) unitsRemaining(book, sectionLabel)
+                / inclusiveDaysBetween(requiredStart, baseline.deadline);
     }
 
     private SectionPlan buildPlan(BookSection section, LocalDate start, LocalDate end, double dailyPace, PageCounter counter) {
@@ -2229,6 +2387,7 @@ public class MainActivity extends Activity {
         renumberBooks(section.books);
         section.simultaneousGroups = remapGroupsByBookIdentity(section.books, oldGroupBooks);
         selectedBookIndex = section.books.indexOf(selected);
+        invalidateBaselineSchedules(section);
         afterStateChange("Book moved");
     }
 
@@ -2880,6 +3039,18 @@ public class MainActivity extends Activity {
         }
     }
 
+    private static class BaselineSchedule {
+        final LocalDate startDate;
+        final LocalDate deadline;
+        final double dailyTarget;
+
+        BaselineSchedule(LocalDate startDate, LocalDate deadline, double dailyTarget) {
+            this.startDate = startDate;
+            this.deadline = deadline;
+            this.dailyTarget = dailyTarget;
+        }
+    }
+
     private static class Book {
         int number;
         final String title;
@@ -2887,18 +3058,32 @@ public class MainActivity extends Activity {
         final int endPage;
         Integer currentPage;
         final List<ReadingSession> readingSessions;
+        BaselineSchedule baselineSchedule;
 
         Book(int number, String title, int startPage, int endPage) {
-            this(number, title, startPage, endPage, null, new ArrayList<>());
+            this(number, title, startPage, endPage, null, new ArrayList<>(), null);
         }
 
         Book(int number, String title, int startPage, int endPage, Integer currentPage, List<ReadingSession> readingSessions) {
+            this(number, title, startPage, endPage, currentPage, readingSessions, null);
+        }
+
+        Book(
+                int number,
+                String title,
+                int startPage,
+                int endPage,
+                Integer currentPage,
+                List<ReadingSession> readingSessions,
+                BaselineSchedule baselineSchedule
+        ) {
             this.number = number;
             this.title = title;
             this.startPage = startPage;
             this.endPage = endPage;
             this.currentPage = currentPage;
             this.readingSessions = readingSessions;
+            this.baselineSchedule = baselineSchedule;
         }
 
         int pages() {

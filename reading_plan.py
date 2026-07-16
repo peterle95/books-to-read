@@ -57,6 +57,13 @@ class ReadingSession:
 
 
 @dataclass
+class BaselineSchedule:
+    start_date: date
+    deadline: date
+    daily_target: float
+
+
+@dataclass
 class Book:
     number: int
     title: str
@@ -64,6 +71,7 @@ class Book:
     end_page: int
     current_page: int | None = None
     reading_sessions: list[ReadingSession] = field(default_factory=list)
+    baseline_schedule: BaselineSchedule | None = None
 
     @property
     def pages(self) -> int:
@@ -200,6 +208,20 @@ def remaining_units(book: Book, section_label: str) -> int:
 
 def remaining_time_at_current(book: Book, current_time: int) -> int:
     return max(book.end_page - current_time, 0)
+
+
+def current_required_pace(
+    book: Book,
+    section_label: str,
+    baseline_schedule: BaselineSchedule,
+    today: date | None = None,
+) -> float:
+    remaining_start = effective_remaining_start_date(
+        baseline_schedule.start_date, baseline_schedule.deadline, today
+    )
+    return remaining_units(book, section_label) / inclusive_days_between(
+        remaining_start, baseline_schedule.deadline
+    )
 
 
 def current_time_from_remaining_time(
@@ -496,6 +518,53 @@ def build_section_plans(
     return summarize_section_plans(section_plans)
 
 
+def current_required_section_pace(
+    section: BookSection, today: date | None = None
+) -> float:
+    grouped_book_ids = {
+        book_id for group in section.simultaneous_groups for book_id in group
+    }
+    paces = [
+        sum(
+            current_required_pace(
+                section.books[book_id - 1],
+                section.label,
+                section.books[book_id - 1].baseline_schedule,
+                today,
+            )
+            for book_id in group
+        )
+        for group in section.simultaneous_groups
+    ]
+    paces.extend(
+        current_required_pace(book, section.label, book.baseline_schedule, today)
+        for book in section.books
+        if book.number not in grouped_book_ids
+    )
+    return max(paces, default=0.0)
+
+
+def calculate_baseline_schedules(
+    sections: list[BookSection], start_date: date, end_date: date
+) -> None:
+    for section in sections:
+        for deadline in build_section_plan(section, start_date, end_date).deadlines:
+            deadline.book.baseline_schedule = BaselineSchedule(
+                deadline.start_date, deadline.deadline, deadline.daily_pages
+            )
+
+
+def ensure_baseline_schedules(
+    sections: list[BookSection], start_date: date, end_date: date
+) -> None:
+    if any(
+        book.baseline_schedule is None
+        for section in sections
+        for book in section.books
+    ):
+        calculate_baseline_schedules(sections, start_date, end_date)
+
+
 def build_remaining_section_plan(
     section: BookSection,
     start_date: date,
@@ -517,6 +586,31 @@ def build_remaining_section_plan(
         section.simultaneous_groups,
         lambda book: remaining_units(book, section.label),
     )
+    if all(book.baseline_schedule is not None for book in section.books):
+        deadlines = [
+            BookDeadline(
+                book=deadline.book,
+                cumulative_pages=deadline.cumulative_pages,
+                start_date=deadline.book.baseline_schedule.start_date,
+                deadline=deadline.book.baseline_schedule.deadline,
+                days_allocated=inclusive_days_between(
+                    deadline.book.baseline_schedule.start_date,
+                    deadline.book.baseline_schedule.deadline,
+                ),
+                daily_pages=deadline.book.baseline_schedule.daily_target,
+                status=(
+                    "before end"
+                    if deadline.book.baseline_schedule.deadline < end_date
+                    else (
+                        "on end date"
+                        if deadline.book.baseline_schedule.deadline == end_date
+                        else "after end"
+                    )
+                ),
+            )
+            for deadline in deadlines
+        ]
+        daily_pace = current_required_section_pace(section, today)
     return SectionPlan(
         section, deadlines, daily_pace, total_pages, required_pace, overall_status
     )
@@ -1120,6 +1214,15 @@ def parse_session_date(value: object) -> date:
 
 
 def book_to_json(book: Book, section_label: str) -> dict[str, object]:
+    baseline_schedule = (
+        None
+        if book.baseline_schedule is None
+        else {
+            "start_date": book.baseline_schedule.start_date.isoformat(),
+            "deadline": book.baseline_schedule.deadline.isoformat(),
+            "daily_target": book.baseline_schedule.daily_target,
+        }
+    )
     if is_audiobook_section(section_label):
         return {
             "number": book.number,
@@ -1134,6 +1237,7 @@ def book_to_json(book: Book, section_label: str) -> dict[str, object]:
                 if book.current_page is None
                 else remaining_units(book, section_label)
             ),
+            "baseline_schedule": baseline_schedule,
             "reading_sessions": [
                 reading_session_to_json(session, section_label, book)
                 for session in book.reading_sessions
@@ -1147,6 +1251,7 @@ def book_to_json(book: Book, section_label: str) -> dict[str, object]:
         "current_page": book.current_page,
         "pages": book.pages,
         "pages_read": book.pages_read,
+        "baseline_schedule": baseline_schedule,
         "reading_sessions": [
             reading_session_to_json(session, section_label)
             for session in book.reading_sessions
@@ -1301,6 +1406,20 @@ def book_from_json(
     if current_page is not None:
         current_page = min(max(current_page, start_page), end_page)
 
+    raw_baseline = value.get("baseline_schedule")
+    baseline_schedule: BaselineSchedule | None = None
+    if raw_baseline is not None:
+        if not isinstance(raw_baseline, dict):
+            raise ValueError("baseline_schedule must be a JSON object")
+        try:
+            baseline_schedule = BaselineSchedule(
+                parse_date(str(raw_baseline["start_date"])),
+                parse_date(str(raw_baseline["deadline"])),
+                float(raw_baseline["daily_target"]),
+            )
+        except (KeyError, TypeError, ValueError) as error:
+            raise ValueError("invalid baseline_schedule") from error
+
     return Book(
         number=fallback_number,
         title=title,
@@ -1308,6 +1427,7 @@ def book_from_json(
         end_page=end_page,
         current_page=current_page,
         reading_sessions=reading_sessions,
+        baseline_schedule=baseline_schedule,
     )
 
 
@@ -1360,8 +1480,9 @@ def write_json_plan(
     end_label: str,
     stats_options: SummaryStatsOptions,
 ) -> None:
+    ensure_baseline_schedules(sections, start_date, end_date)
     payload = {
-        "schema_version": 4,
+        "schema_version": 5,
         "start_date": start_date.isoformat(),
         "end_date": end_date.isoformat(),
         "end_label": end_label,
@@ -1424,6 +1545,7 @@ def load_json_plan(
             sections_by_label[section.label] = section
 
     sections = [sections_by_label[label] for label in BOOK_SECTION_LABELS]
+    ensure_baseline_schedules(sections, start_date, end_date)
     return (
         sections,
         start_date,

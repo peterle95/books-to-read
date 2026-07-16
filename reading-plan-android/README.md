@@ -4,7 +4,7 @@ Native Android companion app for the desktop `reading_plan_gui.py` program.
 
 The app reads and writes the same `reading_plan.json` schema as the computer program:
 
-- `schema_version: 4`
+- `schema_version: 5 (with per-book baseline schedules)`
 - physical, digital, and audiobook sections
 - start/end dates and optional summary settings
 - reading sessions, current-page progress, and audiobook time left

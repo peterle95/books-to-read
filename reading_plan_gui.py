@@ -19,6 +19,7 @@ from reading_plan import (
     add_reading_session,
     build_remaining_section_plans,
     completed_units,
+    ensure_baseline_schedules,
     current_time_from_remaining,
     final_result_message,
     format_duration,
@@ -353,7 +354,7 @@ class ReadingPlanApp(tk.Tk):
             ("Open JSON", self.open_json),
             ("Import CSV", self.import_csv),
             ("Export CSV", self.export_csv),
-            ("Recalculate", self.refresh_and_autosave),
+            ("Recalculate", self.recalculate_plan),
         ]
         for index, (label, command) in enumerate(actions):
             ttk.Button(toolbar, text=label, command=command).grid(
@@ -614,6 +615,7 @@ class ReadingPlanApp(tk.Tk):
             self.refresh_all(autosave=False)
         finally:
             self.suspend_autosave = False
+        self.autosave_json()
 
     def open_json(self) -> None:
         filename = filedialog.askopenfilename(
@@ -742,6 +744,12 @@ class ReadingPlanApp(tk.Tk):
         self.stat_vars["average_pages"].set(options.average_pages)
         self.stat_vars["reading_period"].set(options.reading_period)
         self.stat_vars["pace_driver"].set(options.pace_driver)
+
+    def recalculate_plan(self) -> None:
+        for section in self.sections:
+            for book in section.books:
+                book.baseline_schedule = None
+        self.refresh_all(autosave=True)
 
     def refresh_and_autosave(self) -> None:
         self.refresh_all(autosave=True)
@@ -917,6 +925,7 @@ class ReadingPlanApp(tk.Tk):
             return
 
         try:
+            ensure_baseline_schedules(self.sections, start_date, end_date)
             section_plans, total_pages, highest_daily_pace, overall_status = (
                 build_remaining_section_plans(self.sections, start_date, end_date)
             )
@@ -1446,14 +1455,20 @@ class ReadingPlanApp(tk.Tk):
             self.show_error(str(error))
             return
         section.simultaneous_groups = groups
+        for book in section.books:
+            book.baseline_schedule = None
         self.after_state_change()
 
     def clear_groups(self, label: str) -> None:
         section = self.section_by_label(label)
         section.simultaneous_groups = []
+        for book in section.books:
+            book.baseline_schedule = None
         self.after_state_change()
 
     def after_book_edit(self, label: str, select_index: int | None = None) -> None:
+        for book in self.section_by_label(label).books:
+            book.baseline_schedule = None
         self.refresh_book_tables()
         self.refresh_group_entries()
         if select_index is not None:
