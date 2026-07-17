@@ -736,7 +736,7 @@ def apply_deadline_override(
                     else 0.0
                 )
                 group_book.baseline_schedule = BaselineSchedule(
-                    shared_start, shared_deadline, daily_target
+                    group_start, shared_deadline, daily_target
                 )
 
     section.baseline_needs_recalculation = False

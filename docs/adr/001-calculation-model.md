@@ -47,7 +47,7 @@ Applying an override:
 4. Computes the book's pace from its remaining work between its effective remaining start date and override deadline, excluding rest days.
 5. Replaces that book's baseline schedule with the resulting independent schedule.
 
-The effective remaining start date is used as the persisted schedule start date. This prevents the schedule from claiming that already elapsed or rest days are still available for the book.
+The effective remaining start date is used as the persisted schedule start date. This prevents the schedule from claiming that already elapsed or rest days are still available for the book. When a group is recalculated after detachment, the same effective start is persisted for every remaining shared member.
 
 Clearing an override restores the book to the plan end date, or to the containing group's existing shared deadline when another group member still supplies one, and recalculates its pace.
 
@@ -61,7 +61,7 @@ This means an override creates an **independent schedule** for exactly the selec
 
 `build_remaining_section_plan` is a view of unfinished work from the current date; it is not a baseline mutation.
 
-When overrides exist, the function schedules non-overridden books while treating overridden books as zero work in that ordinary pass. It then adds each overridden book as a fixed time slot using its override deadline, effective start date, remaining work, and per-book pace. The resulting deadlines are sorted back into book order, and the section status considers both ordinary and overridden deadlines.
+When overrides exist, the function schedules non-overridden books while treating overridden books as zero work in that ordinary pass. It then adds each overridden book as a fixed time slot using its persisted baseline start date, override deadline, remaining work, and per-book pace. Fixed slots remain in book order; a slot that overlaps an earlier fixed slot or leaves no available reading days makes the section not achievable. The algorithm never changes an explicit override deadline. The resulting deadlines are sorted back into book order, and the section status considers both ordinary and overridden deadlines.
 
 Without overrides, the function delegates directly to the ordinary `build_plan` flow.
 
@@ -72,6 +72,8 @@ The session view obtains a book's target from its persisted `BaselineSchedule`, 
 ## Consequences
 
 - The baseline schedule is stable and explainable across progress updates.
+- Physical, digital, and audiobook sections share the same override and fixed-slot semantics; only their unit conversion differs.
+- JSON persistence stores both BaselineSchedule and deadline_override, and loading/recalculation reapplies persisted overrides before consumers read the schedule.
 - Deadline overrides are respected consistently in the plan table, remaining-plan view, and session targets.
 - A group member can be independently scheduled without destroying the shared schedule of the remaining group.
 - Explicit recalculation remains the operation that creates a new baseline commitment.
