@@ -701,7 +701,7 @@ def apply_deadline_override(
     pace_start = effective_remaining_start_date(start_date, deadline, today, rest_days)
     available_days = available_reading_days_count(pace_start, deadline, rest_days)
     daily_target = remaining / available_days if remaining and available_days else 0.0
-    book.baseline_schedule = BaselineSchedule(start_date, deadline, daily_target)
+    book.baseline_schedule = BaselineSchedule(pace_start, deadline, daily_target)
 
     if containing_group:
         active_group = tuple(
@@ -764,6 +764,7 @@ def build_remaining_section_plan(
     if not section.books:
         return SectionPlan(section, [], 0.0, 0, 0.0, "achievable")
 
+    today = today or date.today()
     remaining_start = effective_remaining_start_date(
         start_date, end_date, today, rest_days
     )
@@ -776,19 +777,89 @@ def build_remaining_section_plan(
         if remaining_total == 0 or period_days == 0
         else remaining_total / period_days
     )
-    deadlines, total_pages, required_pace, overall_status = build_plan(
-        section.books,
-        remaining_start,
-        end_date,
-        daily_pace,
-        active_simultaneous_groups(section),
-        lambda book: remaining_units(book, section.label),
-        rest_days,
+    required_pace = daily_pace
+    overridden_books = {
+        book.number: book
+        for book in section.books
+        if book.deadline_override is not None
+    }
+
+    if overridden_books:
+        scheduled_deadlines, _scheduled_total, _scheduled_required, _scheduled_status = (
+            build_plan(
+                section.books,
+                remaining_start,
+                end_date,
+                daily_pace,
+                active_simultaneous_groups(section),
+                lambda book: (
+                    0
+                    if book.number in overridden_books
+                    else remaining_units(book, section.label)
+                ),
+                rest_days,
+            )
+        )
+        deadlines = [
+            deadline
+            for deadline in scheduled_deadlines
+            if deadline.book.number not in overridden_books
+        ]
+        for book in overridden_books.values():
+            override_deadline = book.deadline_override
+            override_start = effective_remaining_start_date(
+                remaining_start, override_deadline, today, rest_days
+            )
+            available_days = available_reading_days_count(
+                override_start, override_deadline, rest_days
+            )
+            remaining = remaining_units(book, section.label)
+            override_pace = (
+                remaining / available_days if remaining and available_days else 0.0
+            )
+            if override_deadline < end_date:
+                status = "before end"
+            elif override_deadline == end_date:
+                status = "on end date"
+            else:
+                status = "after end"
+            deadlines.append(
+                BookDeadline(
+                    book=book,
+                    cumulative_pages=remaining,
+                    start_date=override_start,
+                    deadline=override_deadline,
+                    days_allocated=available_days,
+                    daily_pages=override_pace,
+                    status=status,
+                )
+            )
+        deadlines.sort(key=lambda deadline: deadline.book.number)
+    else:
+        deadlines, _total_pages, required_pace, overall_status = build_plan(
+            section.books,
+            remaining_start,
+            end_date,
+            daily_pace,
+            active_simultaneous_groups(section),
+            lambda book: remaining_units(book, section.label),
+            rest_days,
+        )
+        return SectionPlan(
+            section, deadlines, daily_pace, _total_pages, required_pace, overall_status
+        )
+
+    overall_status = (
+        "achievable"
+        if not remaining_total
+        or (period_days and (not deadlines or max(
+            deadline.deadline for deadline in deadlines
+        ) <= end_date))
+        else "not achievable"
     )
     return SectionPlan(
-        section, deadlines, daily_pace, total_pages, required_pace, overall_status
+        section, deadlines, daily_pace, remaining_total, required_pace, overall_status
     )
-
 
 def build_remaining_section_plans(
     sections: list[BookSection],

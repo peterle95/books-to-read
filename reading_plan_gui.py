@@ -1033,17 +1033,18 @@ class ReadingPlanApp(tk.Tk):
     def session_deadline(
         self, section: BookSection, book: Book
     ) -> BookDeadline | None:
-        start_date, end_date, _end_label, _end_name = self.current_dates()
-        section_plans, _total_pages, _highest_daily_pace, _overall_status = (
-            build_remaining_section_plans(
-                self.sections, start_date, end_date, rest_days=self.rest_days
-            )
+        if book.baseline_schedule is None:
+            return None
+        bl = book.baseline_schedule
+        return BookDeadline(
+            book=book,
+            cumulative_pages=0,
+            start_date=bl.start_date,
+            deadline=bl.deadline,
+            days_allocated=0,
+            daily_pages=bl.daily_target,
+            status="",
         )
-        section_plan = section_plan_by_label(section_plans, section.label)
-        for deadline in section_plan.deadlines:
-            if deadline.book is book:
-                return deadline
-        return None
 
     def session_target_message(
         self,
@@ -1239,17 +1240,21 @@ class ReadingPlanApp(tk.Tk):
                 )
             for row_index, deadline in enumerate(section_plan.deadlines, start=1):
                 book = deadline.book
+                bl = book.baseline_schedule
+                start_date = deadline.start_date if bl is None else bl.start_date
+                deadline_date = deadline.deadline if bl is None else bl.deadline
+                daily_target = deadline.daily_pages if bl is None else bl.daily_target
                 if is_audiobook_section(section_plan.section.label):
                     values = {
                         "Book": book.number,
                         "Title": book.title,
-                        "Daily time": format_duration(deadline.daily_pages),
+                        "Daily time": format_duration(daily_target),
                         "Remaining time": format_duration(remaining_units(book, section_plan.section.label)),
                         "Start time": format_duration(book.start_page),
                         "End time": format_duration(book.end_page),
                         "Duration": format_duration(total_units(book, section_plan.section.label)),
-                        "Start date": deadline.start_date.isoformat(),
-                        "Deadline": deadline.deadline.isoformat(),
+                        "Start date": start_date.isoformat(),
+                        "Deadline": deadline_date.isoformat(),
                         "Days allocated": deadline.days_allocated,
                         "Status": deadline.status,
                     }
@@ -1257,7 +1262,7 @@ class ReadingPlanApp(tk.Tk):
                     values = {
                         "Book": book.number,
                         "Title": book.title,
-                        "Daily pages": f"{deadline.daily_pages:.2f}",
+                        "Daily pages": f"{daily_target:.2f}",
                         "Remaining": pages_remaining(book),
                         "Start page": book.start_page,
                         "End page": book.end_page,
@@ -1265,8 +1270,8 @@ class ReadingPlanApp(tk.Tk):
                             "" if book.current_page is None else book.current_page
                         ),
                         "Pages": book.pages,
-                        "Start date": deadline.start_date.isoformat(),
-                        "Deadline": deadline.deadline.isoformat(),
+                        "Start date": start_date.isoformat(),
+                        "Deadline": deadline_date.isoformat(),
                         "Days allocated": deadline.days_allocated,
                         "Status": deadline.status,
                     }

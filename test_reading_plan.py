@@ -6,6 +6,7 @@ from pathlib import Path
 
 from reading_plan import (
     Book,
+    BookDeadline,
     BookSection,
     RestDayRange,
     SummaryStatsOptions,
@@ -20,6 +21,7 @@ from reading_plan import (
     recalculate_baseline_schedules,
     write_json_plan,
 )
+from reading_plan_gui import ReadingPlanApp, target_units_for_date
 
 
 class BaselineSchedulePersistenceTests(unittest.TestCase):
@@ -356,7 +358,7 @@ class DeadlineOverrideTests(unittest.TestCase):
         )
 
         book = sections[0].books[0]
-        self.assertEqual(date(2026, 7, 1), book.baseline_schedule.start_date)
+        self.assertEqual(date(2026, 7, 10), book.baseline_schedule.start_date)
         self.assertEqual(date(2026, 8, 1), book.baseline_schedule.deadline)
         self.assertAlmostEqual(80 / 23, book.baseline_schedule.daily_target)
         self.assertEqual(unaffected, sections[0].books[1].baseline_schedule)
@@ -380,7 +382,7 @@ class DeadlineOverrideTests(unittest.TestCase):
 
         overridden = sections[0].books[1].baseline_schedule
         self.assertEqual(date(2026, 8, 1), overridden.deadline)
-        self.assertEqual(date(2026, 7, 1), overridden.start_date)
+        self.assertEqual(date(2026, 7, 10), overridden.start_date)
         self.assertEqual(date(2026, 8, 1), sections[0].books[1].deadline_override)
         self.assertEqual(original_first.deadline, sections[0].books[0].baseline_schedule.deadline)
         self.assertEqual(original_third.deadline, sections[0].books[2].baseline_schedule.deadline)
@@ -388,6 +390,94 @@ class DeadlineOverrideTests(unittest.TestCase):
             sections[0].books[0].baseline_schedule.deadline,
             sections[0].books[2].baseline_schedule.deadline,
         )
+
+    def test_remaining_plan_uses_override_deadline_and_pace(self):
+        sections = self.make_sections([Book(1, "One", 1, 100)])
+        calculate_baseline_schedules(sections, date(2026, 7, 1), date(2026, 9, 30))
+        apply_deadline_override(
+            sections[0],
+            sections[0].books[0],
+            date(2026, 8, 1),
+            date(2026, 9, 30),
+            date(2026, 7, 10),
+        )
+
+        plans, *_ = build_remaining_section_plans(
+            sections, date(2026, 7, 1), date(2026, 9, 30), date(2026, 7, 10)
+        )
+        deadline = plans[0].deadlines[0]
+
+        self.assertEqual(date(2026, 7, 10), deadline.start_date)
+        self.assertEqual(date(2026, 8, 1), deadline.deadline)
+        self.assertEqual(23, deadline.days_allocated)
+        self.assertAlmostEqual(100 / 23, deadline.daily_pages)
+
+    def test_remaining_plan_recalculates_group_around_override(self):
+        sections = self.make_sections(
+            [Book(1, "One", 1, 10), Book(2, "Two", 1, 20), Book(3, "Three", 1, 30)],
+            [(1, 2, 3)],
+        )
+        calculate_baseline_schedules(sections, date(2026, 7, 1), date(2026, 9, 30))
+        apply_deadline_override(
+            sections[0],
+            sections[0].books[1],
+            date(2026, 8, 1),
+            date(2026, 9, 30),
+            date(2026, 7, 10),
+        )
+
+        plans, *_ = build_remaining_section_plans(
+            sections, date(2026, 7, 1), date(2026, 9, 30), date(2026, 7, 10)
+        )
+        deadlines = {item.book.number: item for item in plans[0].deadlines}
+
+        self.assertEqual(date(2026, 8, 1), deadlines[2].deadline)
+        self.assertAlmostEqual(20 / 23, deadlines[2].daily_pages)
+        self.assertEqual(deadlines[1].deadline, deadlines[3].deadline)
+        self.assertEqual(date(2026, 9, 3), deadlines[1].deadline)
+        self.assertAlmostEqual(15 / 83, deadlines[1].daily_pages)
+        self.assertAlmostEqual(45 / 83, deadlines[3].daily_pages)
+
+    def test_session_target_uses_the_persisted_override_schedule(self):
+        sections = self.make_sections([Book(1, "One", 1, 100)])
+        calculate_baseline_schedules(sections, date(2026, 7, 1), date(2026, 9, 30))
+        apply_deadline_override(
+            sections[0],
+            sections[0].books[0],
+            date(2026, 8, 1),
+            date(2026, 9, 30),
+            date(2026, 7, 10),
+        )
+
+        session_deadline = ReadingPlanApp.__new__(ReadingPlanApp).session_deadline(
+            sections[0], sections[0].books[0]
+        )
+        target = target_units_for_date(
+            sections[0].books[0], sections[0].label, session_deadline, date(2026, 7, 15)
+        )
+
+        self.assertEqual(date(2026, 7, 10), session_deadline.start_date)
+        self.assertEqual(date(2026, 8, 1), session_deadline.deadline)
+        self.assertAlmostEqual(100 / 23, session_deadline.daily_pages)
+        self.assertEqual(27, target)
+
+    def test_building_remaining_plan_does_not_change_baseline_schedule(self):
+        sections = self.make_sections([Book(1, "One", 1, 100)])
+        calculate_baseline_schedules(sections, date(2026, 7, 1), date(2026, 9, 30))
+        apply_deadline_override(
+            sections[0],
+            sections[0].books[0],
+            date(2026, 8, 1),
+            date(2026, 9, 30),
+            date(2026, 7, 10),
+        )
+        baseline = sections[0].books[0].baseline_schedule
+
+        build_remaining_section_plans(
+            sections, date(2026, 7, 1), date(2026, 9, 30), date(2026, 7, 20)
+        )
+
+        self.assertIs(baseline, sections[0].books[0].baseline_schedule)
 
     def test_deadline_override_round_trips_in_json(self):
         sections = self.make_sections([Book(1, "One", 1, 10)])
