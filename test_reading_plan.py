@@ -12,6 +12,7 @@ from reading_plan import (
     build_remaining_section_plans,
     calculate_baseline_schedules,
     load_json_plan,
+    recalculate_baseline_schedules,
     write_json_plan,
 )
 
@@ -158,6 +159,52 @@ class BaselineSchedulePersistenceTests(unittest.TestCase):
         self.assertEqual(90 / 83, plan.daily_pace)
 
 
+    def test_structural_changes_round_trip_without_rewriting_the_baseline(self):
+        section = BookSection(
+            "Physical books", [Book(1, "One", 1, 100)], [],
+        )
+        sections = [section, BookSection("Digital books", [], []), BookSection("Audiobooks", [], [])]
+        calculate_baseline_schedules(sections, date(2026, 7, 1), date(2026, 9, 30))
+        original_baseline = sections[0].books[0].baseline_schedule
+        sections[0].books.append(Book(2, "Two", 1, 20))
+        sections[0].baseline_needs_recalculation = True
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "plan.json"
+            write_json_plan(
+                str(path),
+                sections,
+                date(2026, 7, 1),
+                date(2026, 9, 30),
+                "Quarter end",
+                SummaryStatsOptions(True, True, True, True, True),
+            )
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            loaded_sections, *_ = load_json_plan(str(path))
+
+        self.assertEqual(original_baseline, sections[0].books[0].baseline_schedule)
+        self.assertIsNone(payload["sections"][0]["books"][1]["baseline_schedule"])
+        self.assertTrue(payload["sections"][0]["baseline_needs_recalculation"])
+        self.assertEqual(original_baseline, loaded_sections[0].books[0].baseline_schedule)
+        self.assertIsNone(loaded_sections[0].books[1].baseline_schedule)
+        self.assertTrue(loaded_sections[0].baseline_needs_recalculation)
+
+    def test_explicit_recalculation_uses_unfinished_work_and_preserves_sessions(self):
+        sections = [
+            BookSection("Physical books", [Book(1, "One", 1, 100)], []),
+            BookSection("Digital books", [], []),
+            BookSection("Audiobooks", [], []),
+        ]
+        add_reading_session(sections[0].books[0], date(2026, 7, 10), 10)
+        calculate_baseline_schedules(sections, date(2026, 7, 1), date(2026, 9, 30))
+
+        recalculate_baseline_schedules(sections, date(2026, 7, 1), date(2026, 9, 30))
+
+        book = sections[0].books[0]
+        self.assertAlmostEqual(90 / 92, book.baseline_schedule.daily_target)
+        self.assertEqual(10, book.current_page)
+        self.assertEqual(1, len(book.reading_sessions))
+        self.assertFalse(sections[0].baseline_needs_recalculation)
     def test_logging_progress_does_not_change_a_persisted_baseline_schedule(self):
         sections = [
             BookSection("Physical books", [Book(1, "One", 1, 100)], []),

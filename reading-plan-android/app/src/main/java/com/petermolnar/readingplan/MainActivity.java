@@ -639,9 +639,7 @@ public class MainActivity extends Activity {
                         readingPeriod.isChecked(),
                         paceDriver.isChecked()
                 );
-                for (BookSection section : sections) {
-                    invalidateBaselineSchedules(section);
-                }
+                recalculateBaselineSchedules(sections, startDate, endDate);
                 afterStateChange("Plan recalculated");
             } catch (IllegalArgumentException ex) {
                 showError(ex.getMessage());
@@ -763,7 +761,7 @@ public class MainActivity extends Activity {
             List<ReadingSession> sessions = oldBook.startPage == fields.startPage && oldBook.endPage == fields.endPage
                     ? oldBook.readingSessions
                     : new ArrayList<>();
-            section.books.set(selectedBookIndex, new Book(oldBook.number, fields.title, fields.startPage, fields.endPage, currentPage, sessions));
+            section.books.set(selectedBookIndex, new Book(oldBook.number, fields.title, fields.startPage, fields.endPage, currentPage, sessions, oldBook.baselineSchedule));
             invalidateBaselineSchedules(section);
             afterStateChange("Book replaced");
         }));
@@ -1331,7 +1329,9 @@ public class MainActivity extends Activity {
         for (String label : BOOK_SECTION_LABELS) {
             loadedSections.add(byLabel.get(label));
         }
-        ensureBaselineSchedules(loadedSections, loadedStart, loadedEnd);
+        if (payload.optInt("schema_version", 4) < 5) {
+            calculateBaselineSchedules(loadedSections, loadedStart, loadedEnd);
+        }
         return new CsvPlan(
                 loadedSections,
                 loadedStart,
@@ -1342,7 +1342,7 @@ public class MainActivity extends Activity {
     }
 
     private String jsonText() throws JSONException {
-        ensureBaselineSchedules(sections, startDate, endDate);
+        initializeMissingBaselineSchedules();
         JSONObject payload = new JSONObject();
         payload.put("schema_version", 5);
         payload.put("start_date", startDate.toString());
@@ -1363,9 +1363,23 @@ public class MainActivity extends Activity {
         return payload.toString(2) + "\n";
     }
 
+    private void initializeMissingBaselineSchedules() {
+        boolean dirty = false;
+        boolean missing = false;
+        for (BookSection section : sections) {
+            dirty = dirty || section.baselineNeedsRecalculation;
+            for (Book book : section.books) {
+                missing = missing || book.baselineSchedule == null;
+            }
+        }
+        if (!dirty && missing) {
+            calculateBaselineSchedules(sections, startDate, endDate);
+        }
+    }
     private JSONObject bookSectionToJson(BookSection section) throws JSONException {
         JSONObject object = new JSONObject();
         object.put("label", section.label);
+        object.put("baseline_needs_recalculation", section.baselineNeedsRecalculation);
         JSONArray books = new JSONArray();
         for (Book book : section.books) {
             books.put(bookToJson(book, section.label));
@@ -1430,6 +1444,7 @@ public class MainActivity extends Activity {
     private BookSection bookSectionFromJson(JSONObject object, String defaultLabel) throws JSONException {
         String label = canonicalSectionLabel(object.optString("label", defaultLabel), defaultLabel);
         BookSection section = new BookSection(label);
+        section.baselineNeedsRecalculation = object.optBoolean("baseline_needs_recalculation", false);
         if (!BOOK_SECTION_LABELS.contains(label)) {
             return section;
         }
@@ -2020,18 +2035,6 @@ public class MainActivity extends Activity {
         return text.toString();
     }
 
-    private void ensureBaselineSchedules(
-            List<BookSection> planSections, LocalDate planStart, LocalDate planEnd
-    ) {
-        for (BookSection section : planSections) {
-            for (Book book : section.books) {
-                if (book.baselineSchedule == null) {
-                    calculateBaselineSchedules(planSections, planStart, planEnd);
-                    return;
-                }
-            }
-        }
-    }
 
     private void calculateBaselineSchedules(
             List<BookSection> planSections, LocalDate planStart, LocalDate planEnd
@@ -2056,13 +2059,38 @@ public class MainActivity extends Activity {
                         deadline.startDate, deadline.deadline, deadline.dailyPages
                 );
             }
+            section.baselineNeedsRecalculation = false;
         }
     }
 
-    private void invalidateBaselineSchedules(BookSection section) {
-        for (Book book : section.books) {
-            book.baselineSchedule = null;
+    private void recalculateBaselineSchedules(
+            List<BookSection> planSections, LocalDate planStart, LocalDate planEnd
+    ) {
+        for (BookSection section : planSections) {
+            int sectionUnits = 0;
+            for (Book book : section.books) {
+                sectionUnits += unitsRemaining(book, section.label);
+            }
+            double dailyPace = section.books.isEmpty()
+                    ? 0.0
+                    : (double) sectionUnits / inclusiveDaysBetween(planStart, planEnd);
+            SectionPlan plan = buildPlan(
+                    section,
+                    planStart,
+                    planEnd,
+                    dailyPace,
+                    book -> unitsRemaining(book, section.label)
+            );
+            for (BookDeadline deadline : plan.deadlines) {
+                deadline.book.baselineSchedule = new BaselineSchedule(
+                        deadline.startDate, deadline.deadline, deadline.dailyPages
+                );
+            }
+            section.baselineNeedsRecalculation = false;
         }
+    }
+    private void invalidateBaselineSchedules(BookSection section) {
+        section.baselineNeedsRecalculation = true;
     }
 
     private PlanSummary buildRemainingPlans() {
@@ -2105,6 +2133,9 @@ public class MainActivity extends Activity {
     }
 
     private SectionPlan withPersistedBaselineDeadlines(SectionPlan plan, LocalDate end, LocalDate today) {
+        if (plan.section.baselineNeedsRecalculation) {
+            return plan;
+        }
         for (Book book : plan.section.books) {
             if (book.baselineSchedule == null) {
                 return plan;
@@ -3102,6 +3133,7 @@ public class MainActivity extends Activity {
         final String label;
         final List<Book> books = new ArrayList<>();
         List<List<Integer>> simultaneousGroups = new ArrayList<>();
+        boolean baselineNeedsRecalculation;
 
         BookSection(String label) {
             this.label = label;

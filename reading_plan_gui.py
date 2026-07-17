@@ -19,7 +19,7 @@ from reading_plan import (
     add_reading_session,
     build_remaining_section_plans,
     completed_units,
-    ensure_baseline_schedules,
+    recalculate_baseline_schedules,
     current_time_from_remaining,
     final_result_message,
     format_duration,
@@ -377,8 +377,8 @@ class ReadingPlanApp(tk.Tk):
         ttk.Label(dates, text="Start date").grid(row=0, column=0, sticky="w")
         start_entry = ttk.Entry(dates, textvariable=self.start_var, width=16)
         start_entry.grid(row=0, column=1, sticky="w", padx=(8, 24))
-        start_entry.bind("<Return>", lambda _event: self.refresh_and_autosave())
-        start_entry.bind("<FocusOut>", lambda _event: self.refresh_and_autosave())
+        start_entry.bind("<Return>", lambda _event: self.mark_dates_changed())
+        start_entry.bind("<FocusOut>", lambda _event: self.mark_dates_changed())
 
         ttk.Checkbutton(
             dates,
@@ -389,8 +389,8 @@ class ReadingPlanApp(tk.Tk):
         ttk.Label(dates, text="Finish date").grid(row=0, column=3, sticky="w")
         self.end_entry = ttk.Entry(dates, textvariable=self.end_var, width=16)
         self.end_entry.grid(row=0, column=4, sticky="w", padx=(8, 0))
-        self.end_entry.bind("<Return>", lambda _event: self.refresh_and_autosave())
-        self.end_entry.bind("<FocusOut>", lambda _event: self.refresh_and_autosave())
+        self.end_entry.bind("<Return>", lambda _event: self.mark_dates_changed())
+        self.end_entry.bind("<FocusOut>", lambda _event: self.mark_dates_changed())
 
         stats = ttk.LabelFrame(parent, text="Optional summary stats", padding=12)
         stats.grid(row=3, column=0, sticky="ew", pady=(12, 12))
@@ -714,7 +714,7 @@ class ReadingPlanApp(tk.Tk):
             except ValueError:
                 pass
         if refresh:
-            self.refresh_and_autosave()
+            self.mark_dates_changed()
 
     def current_dates(self) -> tuple[date, date, str, str]:
         start_date = parse_date(self.start_var.get().strip())
@@ -746,10 +746,18 @@ class ReadingPlanApp(tk.Tk):
         self.stat_vars["pace_driver"].set(options.pace_driver)
 
     def recalculate_plan(self) -> None:
-        for section in self.sections:
-            for book in section.books:
-                book.baseline_schedule = None
+        try:
+            start_date, end_date, _end_label, _end_name = self.current_dates()
+        except ValueError as error:
+            self.show_error(str(error))
+            return
+        recalculate_baseline_schedules(self.sections, start_date, end_date)
         self.refresh_all(autosave=True)
+
+    def mark_dates_changed(self) -> None:
+        for section in self.sections:
+            section.baseline_needs_recalculation = True
+        self.refresh_and_autosave()
 
     def refresh_and_autosave(self) -> None:
         self.refresh_all(autosave=True)
@@ -925,7 +933,6 @@ class ReadingPlanApp(tk.Tk):
             return
 
         try:
-            ensure_baseline_schedules(self.sections, start_date, end_date)
             section_plans, total_pages, highest_daily_pace, overall_status = (
                 build_remaining_section_plans(self.sections, start_date, end_date)
             )
@@ -1372,6 +1379,7 @@ class ReadingPlanApp(tk.Tk):
             end_page=end_page,
             current_page=current_page,
             reading_sessions=reading_sessions,
+            baseline_schedule=old_book.baseline_schedule,
         )
         self.after_book_edit(label, select_index=index)
 
@@ -1455,20 +1463,17 @@ class ReadingPlanApp(tk.Tk):
             self.show_error(str(error))
             return
         section.simultaneous_groups = groups
-        for book in section.books:
-            book.baseline_schedule = None
+        section.baseline_needs_recalculation = True
         self.after_state_change()
 
     def clear_groups(self, label: str) -> None:
         section = self.section_by_label(label)
         section.simultaneous_groups = []
-        for book in section.books:
-            book.baseline_schedule = None
+        section.baseline_needs_recalculation = True
         self.after_state_change()
 
     def after_book_edit(self, label: str, select_index: int | None = None) -> None:
-        for book in self.section_by_label(label).books:
-            book.baseline_schedule = None
+        self.section_by_label(label).baseline_needs_recalculation = True
         self.refresh_book_tables()
         self.refresh_group_entries()
         if select_index is not None:

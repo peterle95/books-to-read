@@ -89,6 +89,7 @@ class BookSection:
     label: str
     books: list[Book]
     simultaneous_groups: list[tuple[int, ...]]
+    baseline_needs_recalculation: bool = False
 
 
 @dataclass
@@ -552,17 +553,35 @@ def calculate_baseline_schedules(
             deadline.book.baseline_schedule = BaselineSchedule(
                 deadline.start_date, deadline.deadline, deadline.daily_pages
             )
+        section.baseline_needs_recalculation = False
 
 
-def ensure_baseline_schedules(
+def recalculate_baseline_schedules(
     sections: list[BookSection], start_date: date, end_date: date
 ) -> None:
-    if any(
-        book.baseline_schedule is None
-        for section in sections
-        for book in section.books
-    ):
-        calculate_baseline_schedules(sections, start_date, end_date)
+    """Replace every baseline with a schedule for the current unfinished work."""
+    for section in sections:
+        daily_pace = (
+            sum(remaining_units(book, section.label) for book in section.books)
+            / inclusive_days_between(start_date, end_date)
+            if section.books
+            else 0.0
+        )
+        deadlines, _total_units, _required_pace, _overall_status = build_plan(
+            section.books,
+            start_date,
+            end_date,
+            daily_pace,
+            section.simultaneous_groups,
+            lambda book: remaining_units(book, section.label),
+        )
+        for deadline in deadlines:
+            deadline.book.baseline_schedule = BaselineSchedule(
+                deadline.start_date, deadline.deadline, deadline.daily_pages
+            )
+        section.baseline_needs_recalculation = False
+
+
 
 
 def build_remaining_section_plan(
@@ -586,7 +605,10 @@ def build_remaining_section_plan(
         section.simultaneous_groups,
         lambda book: remaining_units(book, section.label),
     )
-    if all(book.baseline_schedule is not None for book in section.books):
+    if (
+        not section.baseline_needs_recalculation
+        and all(book.baseline_schedule is not None for book in section.books)
+    ):
         deadlines = [
             BookDeadline(
                 book=deadline.book,
@@ -1434,6 +1456,7 @@ def book_from_json(
 def book_section_to_json(section: BookSection) -> dict[str, object]:
     return {
         "label": section.label,
+        "baseline_needs_recalculation": section.baseline_needs_recalculation,
         "books": [book_to_json(book, section.label) for book in section.books],
         "simultaneous_groups": [
             list(group) for group in section.simultaneous_groups
@@ -1469,7 +1492,12 @@ def book_section_from_json(value: object, default_label: str) -> BookSection:
             raise ValueError(
                 f"{label} simultaneous group IDs must be whole numbers"
             ) from error
-    return BookSection(label, books, validate_simultaneous_groups(books, groups))
+    return BookSection(
+        label,
+        books,
+        validate_simultaneous_groups(books, groups),
+        bool(value.get("baseline_needs_recalculation", False)),
+    )
 
 
 def write_json_plan(
@@ -1480,7 +1508,15 @@ def write_json_plan(
     end_label: str,
     stats_options: SummaryStatsOptions,
 ) -> None:
-    ensure_baseline_schedules(sections, start_date, end_date)
+    if (
+        not any(section.baseline_needs_recalculation for section in sections)
+        and any(
+            book.baseline_schedule is None
+            for section in sections
+            for book in section.books
+        )
+    ):
+        calculate_baseline_schedules(sections, start_date, end_date)
     payload = {
         "schema_version": 5,
         "start_date": start_date.isoformat(),
@@ -1545,7 +1581,12 @@ def load_json_plan(
             sections_by_label[section.label] = section
 
     sections = [sections_by_label[label] for label in BOOK_SECTION_LABELS]
-    ensure_baseline_schedules(sections, start_date, end_date)
+    try:
+        schema_version = int(payload.get("schema_version", 4))
+    except (TypeError, ValueError) as error:
+        raise ValueError("invalid schema version") from error
+    if schema_version < 5:
+        calculate_baseline_schedules(sections, start_date, end_date)
     return (
         sections,
         start_date,
