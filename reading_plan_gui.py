@@ -58,6 +58,8 @@ PAGE_PLAN_COLUMNS = (
     "Book",
     "Title",
     "Daily pages",
+    "Current pace",
+    "Variance",
     "Remaining",
     "Start page",
     "End page",
@@ -72,6 +74,8 @@ AUDIO_PLAN_COLUMNS = (
     "Book",
     "Title",
     "Daily time",
+    "Current pace",
+    "Variance",
     "Remaining time",
     "Start time",
     "End time",
@@ -110,6 +114,8 @@ PLAN_COLUMN_WIDTHS = {
     "Title": 28,
     "Daily pages": 12,
     "Daily time": 12,
+    "Current pace": 14,
+    "Variance": 12,
     "Start page": 10,
     "End page": 10,
     "Current page": 12,
@@ -1146,6 +1152,14 @@ class ReadingPlanApp(tk.Tk):
                         "Book": book.number,
                         "Title": book.title,
                         "Daily time": format_duration(deadline.daily_pages),
+                        "Current pace": (
+                            "" if deadline.current_pace is None
+                            else format_duration(deadline.current_pace)
+                        ),
+                        "Variance": (
+                            "" if deadline.variance_status is None
+                            else deadline.variance_status
+                        ),
                         "Start time": format_duration(book.start_page),
                         "End time": format_duration(book.end_page),
                         "Duration": format_duration(total_units(book, section_plan.section.label)),
@@ -1160,6 +1174,14 @@ class ReadingPlanApp(tk.Tk):
                         "Book": book.number,
                         "Title": book.title,
                         "Daily pages": f"{deadline.daily_pages:.2f}",
+                        "Current pace": (
+                            "" if deadline.current_pace is None
+                            else f"{deadline.current_pace:.2f}"
+                        ),
+                        "Variance": (
+                            "" if deadline.variance_status is None
+                            else deadline.variance_status
+                        ),
                         "Start page": book.start_page,
                         "End page": book.end_page,
                         "Current page": (
@@ -1197,6 +1219,12 @@ class ReadingPlanApp(tk.Tk):
         if is_daily_pages:
             background = DAILY_PAGES_PURPLE_DARK if is_header else DAILY_PAGES_PURPLE
             foreground = "#ffffff"
+        is_variance = column_name == "Variance"
+        if is_variance and not is_header:
+            if text == "ahead":
+                foreground = "#16a34a"  # green
+            elif text == "behind":
+                foreground = "#dc2626"  # red
         cell = tk.Label(
             parent,
             text=text,

@@ -131,6 +131,8 @@ class BookDeadline:
     days_allocated: int
     daily_pages: float
     status: str
+    current_pace: float | None = None
+    variance_status: str | None = None
 
 
 @dataclass
@@ -805,6 +807,64 @@ def apply_persisted_deadline_overrides(
             )
 
 
+def _compute_variance_status(
+    current_pace: float, baseline_target: float
+) -> str:
+    """Compare current required pace against baseline target.
+
+    Returns "ahead", "on track", or "behind" using a 0.5% threshold
+    (minimum 0.01) to avoid noise from floating-point arithmetic.
+    """
+    threshold = max(0.01, abs(baseline_target) * 0.005)
+    diff = current_pace - baseline_target
+    if diff < -threshold:
+        return "ahead"
+    if diff > threshold:
+        return "behind"
+    return "on track"
+
+
+def _build_baseline_deadline(
+    deadline: BookDeadline,
+    section: BookSection,
+    end_date: date,
+    today: date | None = None,
+    rest_days: list[RestDayRange] | None = None,
+) -> BookDeadline:
+    """Rebuild a BookDeadline using persisted baseline schedule data
+    and compute the current required pace and variance status."""
+    book = deadline.book
+    baseline = book.baseline_schedule
+    current_pace = current_required_pace(
+        book, section.label, baseline, today, rest_days
+    )
+    variance_status = _compute_variance_status(
+        current_pace, baseline.daily_target
+    )
+    return BookDeadline(
+        book=book,
+        cumulative_pages=deadline.cumulative_pages,
+        start_date=baseline.start_date,
+        deadline=baseline.deadline,
+        days_allocated=inclusive_days_between(
+            baseline.start_date,
+            baseline.deadline,
+        ),
+        daily_pages=baseline.daily_target,
+        status=(
+            "before end"
+            if baseline.deadline < end_date
+            else (
+                "on end date"
+                if baseline.deadline == end_date
+                else "after end"
+            )
+        ),
+        current_pace=current_pace,
+        variance_status=variance_status,
+    )
+
+
 def build_remaining_section_plan(
     section: BookSection,
     start_date: date,
@@ -841,25 +901,8 @@ def build_remaining_section_plan(
         and all(book.baseline_schedule is not None for book in section.books)
     ):
         deadlines = [
-            BookDeadline(
-                book=deadline.book,
-                cumulative_pages=deadline.cumulative_pages,
-                start_date=deadline.book.baseline_schedule.start_date,
-                deadline=deadline.book.baseline_schedule.deadline,
-                days_allocated=inclusive_days_between(
-                    deadline.book.baseline_schedule.start_date,
-                    deadline.book.baseline_schedule.deadline,
-                ),
-                daily_pages=deadline.book.baseline_schedule.daily_target,
-                status=(
-                    "before end"
-                    if deadline.book.baseline_schedule.deadline < end_date
-                    else (
-                        "on end date"
-                        if deadline.book.baseline_schedule.deadline == end_date
-                        else "after end"
-                    )
-                ),
+            _build_baseline_deadline(
+                deadline, section, end_date, today, rest_days
             )
             for deadline in deadlines
         ]
