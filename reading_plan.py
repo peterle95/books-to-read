@@ -131,8 +131,6 @@ class BookDeadline:
     days_allocated: int
     daily_pages: float
     status: str
-    current_pace: float | None = None
-    variance_status: str | None = None
 
 
 @dataclass
@@ -289,26 +287,6 @@ def remaining_units(book: Book, section_label: str) -> int:
 
 def remaining_time_at_current(book: Book, current_time: int) -> int:
     return max(book.end_page - current_time, 0)
-
-
-def current_required_pace(
-    book: Book,
-    section_label: str,
-    baseline_schedule: BaselineSchedule,
-    today: date | None = None,
-    rest_days: list[RestDayRange] | None = None,
-) -> float:
-    remaining_start = effective_remaining_start_date(
-        baseline_schedule.start_date, baseline_schedule.deadline, today, rest_days
-    )
-    available_days = available_reading_days_count(
-        remaining_start, baseline_schedule.deadline, rest_days
-    )
-    return (
-        remaining_units(book, section_label) / available_days
-        if available_days
-        else 0.0
-    )
 
 
 def current_time_from_remaining_time(
@@ -633,38 +611,6 @@ def build_section_plans(
     return summarize_section_plans(section_plans)
 
 
-def current_required_section_pace(
-    section: BookSection,
-    today: date | None = None,
-    rest_days: list[RestDayRange] | None = None,
-) -> float:
-    simultaneous_groups = active_simultaneous_groups(section)
-    grouped_book_ids = {
-        book_id for group in simultaneous_groups for book_id in group
-    }
-    paces = [
-        sum(
-            current_required_pace(
-                section.books[book_id - 1],
-                section.label,
-                section.books[book_id - 1].baseline_schedule,
-                today,
-                rest_days,
-            )
-            for book_id in group
-        )
-        for group in simultaneous_groups
-    ]
-    paces.extend(
-        current_required_pace(
-            book, section.label, book.baseline_schedule, today, rest_days
-        )
-        for book in section.books
-        if book.number not in grouped_book_ids
-    )
-    return max(paces, default=0.0)
-
-
 def calculate_baseline_schedules(
     sections: list[BookSection],
     start_date: date,
@@ -807,63 +753,6 @@ def apply_persisted_deadline_overrides(
             )
 
 
-def _compute_variance_status(
-    current_pace: float, baseline_target: float
-) -> str:
-    """Compare current required pace against baseline target.
-
-    Returns "ahead", "on track", or "behind" using a 0.5% threshold
-    (minimum 0.01) to avoid noise from floating-point arithmetic.
-    """
-    threshold = max(0.01, abs(baseline_target) * 0.005)
-    diff = current_pace - baseline_target
-    if diff < -threshold:
-        return "ahead"
-    if diff > threshold:
-        return "behind"
-    return "on track"
-
-
-def _build_baseline_deadline(
-    deadline: BookDeadline,
-    section: BookSection,
-    end_date: date,
-    today: date | None = None,
-    rest_days: list[RestDayRange] | None = None,
-) -> BookDeadline:
-    """Rebuild a BookDeadline using persisted baseline schedule data
-    and compute the current required pace and variance status."""
-    book = deadline.book
-    baseline = book.baseline_schedule
-    current_pace = current_required_pace(
-        book, section.label, baseline, today, rest_days
-    )
-    variance_status = _compute_variance_status(
-        current_pace, baseline.daily_target
-    )
-    return BookDeadline(
-        book=book,
-        cumulative_pages=deadline.cumulative_pages,
-        start_date=baseline.start_date,
-        deadline=baseline.deadline,
-        days_allocated=inclusive_days_between(
-            baseline.start_date,
-            baseline.deadline,
-        ),
-        daily_pages=baseline.daily_target,
-        status=(
-            "before end"
-            if baseline.deadline < end_date
-            else (
-                "on end date"
-                if baseline.deadline == end_date
-                else "after end"
-            )
-        ),
-        current_pace=current_pace,
-        variance_status=variance_status,
-    )
-
 
 def build_remaining_section_plan(
     section: BookSection,
@@ -896,17 +785,6 @@ def build_remaining_section_plan(
         lambda book: remaining_units(book, section.label),
         rest_days,
     )
-    if (
-        not section.baseline_needs_recalculation
-        and all(book.baseline_schedule is not None for book in section.books)
-    ):
-        deadlines = [
-            _build_baseline_deadline(
-                deadline, section, end_date, today, rest_days
-            )
-            for deadline in deadlines
-        ]
-        daily_pace = current_required_section_pace(section, today, rest_days)
     return SectionPlan(
         section, deadlines, daily_pace, total_pages, required_pace, overall_status
     )

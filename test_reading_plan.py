@@ -117,7 +117,7 @@ class BaselineSchedulePersistenceTests(unittest.TestCase):
         )
 
         self.assertEqual(20 / 92, plans[0].daily_pace)
-    def test_current_required_pace_uses_each_book_baseline_deadline(self):
+    def test_daily_pace_covers_all_remaining_work(self):
         sections = [
             BookSection(
                 "Physical books",
@@ -133,8 +133,8 @@ class BaselineSchedulePersistenceTests(unittest.TestCase):
             sections, date(2026, 7, 1), date(2026, 9, 30), date(2026, 7, 5)
         )
 
-        self.assertEqual(10 / 6, plans[0].daily_pace)
-    def test_current_required_pace_uses_the_persisted_baseline_dates(self):
+        self.assertAlmostEqual(100 / 88, plans[0].daily_pace)
+    def test_remaining_plan_starts_from_today_and_adapts_pace(self):
         sections = [
             BookSection("Physical books", [Book(1, "One", 1, 100)], []),
             BookSection("Digital books", [], []),
@@ -158,10 +158,10 @@ class BaselineSchedulePersistenceTests(unittest.TestCase):
         )
         plan = plans[0]
 
-        self.assertEqual(date(2026, 7, 1), plan.deadlines[0].start_date)
+        self.assertEqual(date(2026, 7, 10), plan.deadlines[0].start_date)
         self.assertEqual(date(2026, 9, 30), plan.deadlines[0].deadline)
-        self.assertEqual(100 / 92, plan.deadlines[0].daily_pages)
-        self.assertEqual(90 / 83, plan.daily_pace)
+        self.assertAlmostEqual(90 / 83, plan.deadlines[0].daily_pages)
+        self.assertAlmostEqual(90 / 83, plan.daily_pace)
 
 
     def test_structural_changes_round_trip_without_rewriting_the_baseline(self):
@@ -407,57 +407,7 @@ class DeadlineOverrideTests(unittest.TestCase):
         self.assertEqual("2026-08-01", payload["sections"][0]["books"][0]["deadline_override"])
         self.assertEqual(date(2026, 8, 1), loaded_sections[0].books[0].deadline_override)
 
-class VarianceStatusTests(unittest.TestCase):
-    def make_sections(self, books, groups=()):
-        return [
-            BookSection("Physical books", books, list(groups)),
-            BookSection("Digital books", [], []),
-            BookSection("Audiobooks", [], []),
-        ]
 
-    def test_variance_on_track_when_pace_matches_baseline(self):
-        sections = self.make_sections([Book(1, "One", 1, 100)])
-        calculate_baseline_schedules(sections, date(2026, 7, 1), date(2026, 9, 30))
-        plans, *_ = build_remaining_section_plans(
-            sections, date(2026, 7, 1), date(2026, 9, 30), date(2026, 7, 1)
-        )
-        deadline = plans[0].deadlines[0]
-        self.assertIsNotNone(deadline.current_pace)
-        self.assertIsNotNone(deadline.variance_status)
-        self.assertAlmostEqual(deadline.daily_pages, deadline.current_pace, places=10)
-        self.assertEqual("on track", deadline.variance_status)
-
-    def test_variance_behind_when_progress_lags(self):
-        sections = self.make_sections([Book(1, "One", 1, 100)])
-        calculate_baseline_schedules(sections, date(2026, 7, 1), date(2026, 9, 30))
-        plans, *_ = build_remaining_section_plans(
-            sections, date(2026, 7, 1), date(2026, 9, 30), date(2026, 7, 10)
-        )
-        deadline = plans[0].deadlines[0]
-        self.assertIsNotNone(deadline.current_pace)
-        self.assertGreater(deadline.current_pace, deadline.daily_pages)
-        self.assertEqual("behind", deadline.variance_status)
-
-    def test_variance_ahead_when_progress_ahead(self):
-        sections = self.make_sections([Book(1, "One", 1, 100)])
-        calculate_baseline_schedules(sections, date(2026, 7, 1), date(2026, 9, 30))
-        add_reading_session(sections[0].books[0], date(2026, 7, 10), 90)
-        plans, *_ = build_remaining_section_plans(
-            sections, date(2026, 7, 1), date(2026, 9, 30), date(2026, 7, 10)
-        )
-        deadline = plans[0].deadlines[0]
-        self.assertIsNotNone(deadline.current_pace)
-        self.assertLess(deadline.current_pace, deadline.daily_pages)
-        self.assertEqual("ahead", deadline.variance_status)
-
-    def test_variance_none_when_no_baseline(self):
-        sections = self.make_sections([Book(1, "One", 1, 100)])
-        plans, *_ = build_remaining_section_plans(
-            sections, date(2026, 7, 1), date(2026, 9, 30), date(2026, 7, 1)
-        )
-        deadline = plans[0].deadlines[0]
-        self.assertIsNone(deadline.current_pace)
-        self.assertIsNone(deadline.variance_status)
 
 
 if __name__ == "__main__":

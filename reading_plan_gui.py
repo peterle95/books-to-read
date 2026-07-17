@@ -58,8 +58,6 @@ PAGE_PLAN_COLUMNS = (
     "Book",
     "Title",
     "Daily pages",
-    "Current pace",
-    "Variance",
     "Remaining",
     "Start page",
     "End page",
@@ -74,8 +72,6 @@ AUDIO_PLAN_COLUMNS = (
     "Book",
     "Title",
     "Daily time",
-    "Current pace",
-    "Variance",
     "Remaining time",
     "Start time",
     "End time",
@@ -114,8 +110,6 @@ PLAN_COLUMN_WIDTHS = {
     "Title": 28,
     "Daily pages": 12,
     "Daily time": 12,
-    "Current pace": 14,
-    "Variance": 12,
     "Start page": 10,
     "End page": 10,
     "Current page": 12,
@@ -264,6 +258,96 @@ class ReadingPlanApp(tk.Tk):
 
         self._build_layout()
         self.load_initial_plan()
+
+    def _pick_date(self, initial: str = "") -> str | None:
+        """Show a simple calendar dialog. Returns 'YYYY-MM-DD' or None."""
+        from datetime import date
+        import calendar as cal_mod
+
+        today = date.today()
+        try:
+            selected = parse_date(initial) if initial else today
+        except ValueError:
+            selected = today
+
+        result: list[str | None] = [None]
+        dialog = tk.Toplevel(self)
+        dialog.title("Pick a date")
+        dialog.transient(self)
+        dialog.grab_set()
+        dialog.resizable(False, False)
+
+        current = [selected.year, selected.month]
+
+        def rebuild():
+            for w in cal_frame.winfo_children():
+                w.destroy()
+            year, month = current
+            cal_frame.month_label.configure(text=f"{cal_mod.month_name[month]} {year}")
+            _, days_in_month = cal_mod.monthrange(year, month)
+            first_weekday = cal_mod.weekday(year, month, 1)
+
+            # Weekday headers
+            for col, name in enumerate(["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]):
+                tk.Label(cal_frame, text=name, font=("TkDefaultFont", 9, "bold"),
+                         width=4, anchor="center").grid(row=1, column=col, padx=1, pady=1)
+
+            row = 2
+            for _ in range(first_weekday):
+                tk.Label(cal_frame, text="", width=4).grid(row=row, column=first_weekday)
+            for day in range(1, days_in_month + 1):
+                col = (first_weekday + day - 1) % 7
+                r = row + (first_weekday + day - 1) // 7
+                is_today = day == today.day and month == today.month and year == today.year
+                is_sel = day == selected.day and month == selected.month and year == selected.year
+                bg = "#2563eb" if is_sel else "#dbeafe" if is_today else "#ffffff"
+                fg = "#ffffff" if is_sel else "#111827"
+                btn = tk.Button(cal_frame, text=str(day), width=4, height=1,
+                               bg=bg, fg=fg, bd=0,
+                               command=lambda d=day: pick(d))
+                btn.grid(row=r, column=col, padx=1, pady=1)
+
+        def pick(day: int):
+            result[0] = date(current[0], current[1], day).isoformat()
+            dialog.destroy()
+
+        def prev_month():
+            if current[1] == 1:
+                current[0] -= 1
+                current[1] = 12
+            else:
+                current[1] -= 1
+            rebuild()
+
+        def next_month():
+            if current[1] == 12:
+                current[0] += 1
+                current[1] = 1
+            else:
+                current[1] += 1
+            rebuild()
+
+        # Navigation
+        nav = ttk.Frame(dialog)
+        nav.pack(padx=8, pady=(8, 0))
+        ttk.Button(nav, text="◀", width=4, command=prev_month).pack(side="left")
+        month_label = ttk.Label(nav, text="", font=("TkDefaultFont", 11, "bold"))
+        month_label.pack(side="left", padx=12)
+        ttk.Button(nav, text="▶", width=4, command=next_month).pack(side="left")
+
+        cal_frame = ttk.Frame(dialog)
+        cal_frame.pack(padx=8, pady=8)
+        cal_frame.month_label = month_label
+        rebuild()
+
+        # Clear button
+        btn_frame = ttk.Frame(dialog)
+        btn_frame.pack(padx=8, pady=(0, 8))
+        ttk.Button(btn_frame, text="Clear", command=lambda: [result.__setitem__(0, ""), dialog.destroy()]).pack(side="left", padx=4)
+        ttk.Button(btn_frame, text="Cancel", command=dialog.destroy).pack(side="left", padx=4)
+
+        dialog.wait_window()
+        return result[0]
 
     def _build_layout(self) -> None:
         self.columnconfigure(0, weight=1)
@@ -417,13 +501,17 @@ class ReadingPlanApp(tk.Tk):
         rest_frame.grid(row=3, column=0, sticky="ew", pady=(12, 12))
         rest_frame.columnconfigure(2, weight=1)
         ttk.Label(rest_frame, text="Start").grid(row=0, column=0, sticky="w")
-        ttk.Entry(rest_frame, textvariable=self.rest_start_var, width=14).grid(
-            row=0, column=1, padx=(8, 16)
-        )
+        rest_start_frame = ttk.Frame(rest_frame)
+        rest_start_frame.grid(row=0, column=1, padx=(8, 16))
+        ttk.Entry(rest_start_frame, textvariable=self.rest_start_var, width=12).pack(side="left")
+        ttk.Button(rest_start_frame, text="📅", width=3,
+                   command=lambda: self._pick_rest_start()).pack(side="left", padx=(2, 0))
         ttk.Label(rest_frame, text="End").grid(row=0, column=2, sticky="w")
-        ttk.Entry(rest_frame, textvariable=self.rest_end_var, width=14).grid(
-            row=0, column=3, padx=(8, 16)
-        )
+        rest_end_frame = ttk.Frame(rest_frame)
+        rest_end_frame.grid(row=0, column=3, padx=(8, 16))
+        ttk.Entry(rest_end_frame, textvariable=self.rest_end_var, width=12).pack(side="left")
+        ttk.Button(rest_end_frame, text="📅", width=3,
+                   command=lambda: self._pick_rest_end()).pack(side="left", padx=(2, 0))
         ttk.Button(rest_frame, text="Add range", command=self.add_rest_day_range).grid(
             row=0, column=4, padx=(0, 8)
         )
@@ -533,7 +621,11 @@ class ReadingPlanApp(tk.Tk):
         )
 
         ttk.Label(editor, text="Deadline override").grid(row=2, column=0, sticky="w", pady=(10, 0))
-        ttk.Entry(editor, textvariable=self.deadline_override_vars[label], width=16).grid(row=2, column=1, sticky="w", padx=(8, 12), pady=(10, 0))
+        override_frame = ttk.Frame(editor)
+        override_frame.grid(row=2, column=1, sticky="w", padx=(8, 12), pady=(10, 0))
+        ttk.Entry(override_frame, textvariable=self.deadline_override_vars[label], width=14).pack(side="left")
+        ttk.Button(override_frame, text="📅", width=3,
+                   command=lambda lbl=label: self._pick_deadline(lbl)).pack(side="left", padx=(4, 0))
         ttk.Label(editor, text="YYYY-MM-DD; blank clears it").grid(row=2, column=2, columnspan=2, sticky="w", pady=(10, 0))
 
         buttons = ttk.Frame(editor)
@@ -1152,18 +1244,10 @@ class ReadingPlanApp(tk.Tk):
                         "Book": book.number,
                         "Title": book.title,
                         "Daily time": format_duration(deadline.daily_pages),
-                        "Current pace": (
-                            "" if deadline.current_pace is None
-                            else format_duration(deadline.current_pace)
-                        ),
-                        "Variance": (
-                            "" if deadline.variance_status is None
-                            else deadline.variance_status
-                        ),
+                        "Remaining time": format_duration(remaining_units(book, section_plan.section.label)),
                         "Start time": format_duration(book.start_page),
                         "End time": format_duration(book.end_page),
                         "Duration": format_duration(total_units(book, section_plan.section.label)),
-                        "Remaining time": format_duration(remaining_units(book, section_plan.section.label)),
                         "Start date": deadline.start_date.isoformat(),
                         "Deadline": deadline.deadline.isoformat(),
                         "Days allocated": deadline.days_allocated,
@@ -1174,21 +1258,13 @@ class ReadingPlanApp(tk.Tk):
                         "Book": book.number,
                         "Title": book.title,
                         "Daily pages": f"{deadline.daily_pages:.2f}",
-                        "Current pace": (
-                            "" if deadline.current_pace is None
-                            else f"{deadline.current_pace:.2f}"
-                        ),
-                        "Variance": (
-                            "" if deadline.variance_status is None
-                            else deadline.variance_status
-                        ),
+                        "Remaining": pages_remaining(book),
                         "Start page": book.start_page,
                         "End page": book.end_page,
                         "Current page": (
                             "" if book.current_page is None else book.current_page
                         ),
                         "Pages": book.pages,
-                        "Remaining": pages_remaining(book),
                         "Start date": deadline.start_date.isoformat(),
                         "Deadline": deadline.deadline.isoformat(),
                         "Days allocated": deadline.days_allocated,
@@ -1219,12 +1295,6 @@ class ReadingPlanApp(tk.Tk):
         if is_daily_pages:
             background = DAILY_PAGES_PURPLE_DARK if is_header else DAILY_PAGES_PURPLE
             foreground = "#ffffff"
-        is_variance = column_name == "Variance"
-        if is_variance and not is_header:
-            if text == "ahead":
-                foreground = "#16a34a"  # green
-            elif text == "behind":
-                foreground = "#dc2626"  # red
         cell = tk.Label(
             parent,
             text=text,
@@ -1504,6 +1574,25 @@ class ReadingPlanApp(tk.Tk):
             self.show_error(str(error))
             return
         self.after_state_change()
+
+    def _pick_deadline(self, label: str) -> None:
+        initial = self.deadline_override_vars[label].get().strip()
+        picked = self._pick_date(initial)
+        if picked is not None:
+            self.deadline_override_vars[label].set(picked)
+
+    def _pick_rest_start(self) -> None:
+        initial = self.rest_start_var.get().strip()
+        picked = self._pick_date(initial)
+        if picked is not None:
+            self.rest_start_var.set(picked)
+
+    def _pick_rest_end(self) -> None:
+        initial = self.rest_end_var.get().strip()
+        picked = self._pick_date(initial)
+        if picked is not None:
+            self.rest_end_var.set(picked)
+
     def replace_selected_book(self, label: str) -> None:
         section = self.section_by_label(label)
         index = self.selected_book_index(label)

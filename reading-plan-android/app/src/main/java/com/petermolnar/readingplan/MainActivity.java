@@ -2,6 +2,7 @@ package com.petermolnar.readingplan;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.DatePickerDialog;
 import android.app.Dialog;
 import android.content.ContentResolver;
 import android.content.Intent;
@@ -616,7 +617,21 @@ public class MainActivity extends Activity {
         renderRestDayRanges(restRangeList);
         box.addView(restRangeList);
         EditText restStartInput = editText("", InputType.TYPE_CLASS_TEXT);
+        restStartInput.setFocusable(false);
+        restStartInput.setOnClickListener(v -> {
+            DatePickerDialog picker = new DatePickerDialog(this, (view, y, m, d) -> {
+                restStartInput.setText(String.format(Locale.US, "%04d-%02d-%02d", y, m + 1, d));
+            }, LocalDate.now().getYear(), LocalDate.now().getMonthValue() - 1, LocalDate.now().getDayOfMonth());
+            picker.show();
+        });
         EditText restEndInput = editText("", InputType.TYPE_CLASS_TEXT);
+        restEndInput.setFocusable(false);
+        restEndInput.setOnClickListener(v -> {
+            DatePickerDialog picker = new DatePickerDialog(this, (view, y, m, d) -> {
+                restEndInput.setText(String.format(Locale.US, "%04d-%02d-%02d", y, m + 1, d));
+            }, LocalDate.now().getYear(), LocalDate.now().getMonthValue() - 1, LocalDate.now().getDayOfMonth());
+            picker.show();
+        });
         box.addView(label("Rest start date"));
         box.addView(restStartInput);
         box.addView(label("Rest end date"));
@@ -713,6 +728,23 @@ public class MainActivity extends Activity {
                 selected == null || selected.deadlineOverride == null ? "" : selected.deadlineOverride.toString(),
                 InputType.TYPE_CLASS_TEXT
         );
+        deadlineInput.setFocusable(false);
+        deadlineInput.setOnClickListener(v -> {
+            int year, month, day;
+            if (selected != null && selected.deadlineOverride != null) {
+                year = selected.deadlineOverride.getYear();
+                month = selected.deadlineOverride.getMonthValue() - 1;
+                day = selected.deadlineOverride.getDayOfMonth();
+            } else {
+                year = LocalDate.now().getYear();
+                month = LocalDate.now().getMonthValue() - 1;
+                day = LocalDate.now().getDayOfMonth();
+            }
+            DatePickerDialog picker = new DatePickerDialog(this, (view, y, m, d) -> {
+                deadlineInput.setText(String.format(Locale.US, "%04d-%02d-%02d", y, m + 1, d));
+            }, year, month, day);
+            picker.show();
+        });
 
         box.addView(label("Title"));
         box.addView(titleInput);
@@ -2012,7 +2044,8 @@ public class MainActivity extends Activity {
         }
         return Arrays.asList(
                 "Book", "Title", "Start page", "End page", "Current page", "Pages",
-                "Read pages", "Remaining pages", "Daily pages", "Cumulative remaining pages",
+                "Read pages", "Remaining pages", "Daily pages",
+                "Cumulative remaining pages",
                 "Start date", "Deadline", "Days allocated", "Status"
         );
     }
@@ -2357,20 +2390,26 @@ public class MainActivity extends Activity {
                     ? "before end"
                     : baseline.deadline.equals(end) ? "on end date" : "after end";
 
+            // Compute fresh daily pages from remaining work and remaining reading days
+            LocalDate paceStart = effectiveRemainingStartDate(baseline.startDate, baseline.deadline, today);
+            int availableDays = availableReadingDaysCount(paceStart, baseline.deadline);
+            int remaining = unitsRemaining(deadline.book, plan.section.label);
+            double dailyPages = remaining == 0 || availableDays == 0 ? 0.0 : (double) remaining / availableDays;
+
             deadlines.add(new BookDeadline(
                     deadline.book,
                     deadline.cumulativePages,
                     baseline.startDate,
                     baseline.deadline,
                     availableReadingDaysCount(baseline.startDate, baseline.deadline),
-                    baseline.dailyTarget,
+                    dailyPages,
                     status
             ));
         }
         return new SectionPlan(
                 plan.section,
                 deadlines,
-                currentRequiredSectionPace(plan.section, today),
+                plan.dailyPace,
                 plan.totalPages,
                 plan.requiredPace,
                 plan.overallStatus
@@ -2392,41 +2431,6 @@ public class MainActivity extends Activity {
         }
         return activeGroups;
     }
-    private double currentRequiredSectionPace(BookSection section, LocalDate today) {
-        Set<Integer> groupedBookIds = new HashSet<>();
-        double highestPace = 0.0;
-        for (List<Integer> group : activeSimultaneousGroups(section)) {
-            double groupPace = 0.0;
-            for (Integer bookId : group) {
-                Book book = section.books.get(bookId - 1);
-                groupPace += currentRequiredPace(book, section.label, book.baselineSchedule, today);
-                groupedBookIds.add(bookId);
-            }
-            highestPace = Math.max(highestPace, groupPace);
-        }
-        for (Book book : section.books) {
-            if (!groupedBookIds.contains(book.number)) {
-                highestPace = Math.max(
-                        highestPace,
-                        currentRequiredPace(book, section.label, book.baselineSchedule, today)
-                );
-            }
-        }
-        return highestPace;
-    }
-
-    private double currentRequiredPace(
-            Book book, String sectionLabel, BaselineSchedule baseline, LocalDate today
-    ) {
-        LocalDate requiredStart = effectiveRemainingStartDate(
-                baseline.startDate, baseline.deadline, today
-        );
-        int availableDays = availableReadingDaysCount(requiredStart, baseline.deadline);
-        return availableDays == 0
-                ? 0.0
-                : (double) unitsRemaining(book, sectionLabel) / availableDays;
-    }
-
     private SectionPlan buildPlan(BookSection section, LocalDate start, LocalDate end, double dailyPace, PageCounter counter) {
         int totalPages = 0;
         for (Book book : section.books) {
