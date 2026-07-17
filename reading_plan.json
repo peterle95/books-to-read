@@ -19,14 +19,19 @@
           "title": "capital",
           "start_page": 1,
           "end_page": 1041,
-          "current_page": 995,
+          "current_page": 1000,
           "pages": 1041,
-          "pages_read": 995,
+          "pages_read": 1000,
           "reading_sessions": [
             {
               "date": "2026-07-06",
               "current_page": 995,
               "pages_read": 995
+            },
+            {
+              "date": "2026-07-15",
+              "current_page": 1000,
+              "pages_read": 5
             }
           ]
         },
@@ -35,9 +40,9 @@
           "title": "wild swans",
           "start_page": 1,
           "end_page": 669,
-          "current_page": 265,
+          "current_page": 274,
           "pages": 669,
-          "pages_read": 265,
+          "pages_read": 274,
           "reading_sessions": [
             {
               "date": "2026-07-06",
@@ -68,6 +73,11 @@
               "date": "2026-07-13",
               "current_page": 265,
               "pages_read": 5
+            },
+            {
+              "date": "2026-07-15",
+              "current_page": 274,
+              "pages_read": 9
             }
           ]
         },
@@ -134,14 +144,19 @@
           "title": "react",
           "start_page": 1,
           "end_page": 350,
-          "current_page": 71,
+          "current_page": 76,
           "pages": 350,
-          "pages_read": 71,
+          "pages_read": 76,
           "reading_sessions": [
             {
               "date": "2026-07-06",
               "current_page": 71,
               "pages_read": 71
+            },
+            {
+              "date": "2026-07-16",
+              "current_page": 76,
+              "pages_read": 5
             }
           ]
         }
