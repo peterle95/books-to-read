@@ -886,17 +886,20 @@ def build_remaining_section_plan(
         cursor = remaining_start
         cumulative_pages = 0
         reflowing = False
+        last_override_deadline: date | None = None
         schedule_conflict = False
         for first_book, unit_books in scheduling_units:
             if first_book.number in overridden_books:
                 override_deadline = first_book.deadline_override
+                override_schedule_start = first_book.baseline_schedule.start_date
                 override_start = effective_remaining_start_date(
-                    remaining_start, override_deadline, today, rest_days
+                    override_schedule_start, override_deadline, today, rest_days
                 )
                 available_days = available_reading_days_count(
                     override_start, override_deadline, rest_days
                 )
                 remaining = page_count(first_book)
+                cumulative_pages += remaining
                 override_pace = (
                     remaining / available_days if remaining and available_days else 0.0
                 )
@@ -904,7 +907,7 @@ def build_remaining_section_plan(
                 deadlines.append(
                     BookDeadline(
                         book=first_book,
-                        cumulative_pages=remaining,
+                        cumulative_pages=cumulative_pages,
                         start_date=override_start,
                         deadline=override_deadline,
                         days_allocated=available_days,
@@ -913,8 +916,19 @@ def build_remaining_section_plan(
                     )
                 )
                 if remaining:
-                    if override_deadline < cursor:
+                    if (
+                        override_deadline < cursor
+                        or (
+                            reflowing
+                            and override_start < cursor
+                        )
+                        or (
+                            last_override_deadline is not None
+                            and override_start <= last_override_deadline
+                        )
+                    ):
                         schedule_conflict = True
+                    last_override_deadline = override_deadline
                     cursor = max(
                         cursor,
                         _next_reading_day_after(override_deadline, end_date, rest_days),
