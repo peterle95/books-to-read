@@ -63,6 +63,35 @@ class BaselineSchedule:
     daily_target: float
 
 
+@dataclass(frozen=True)
+class RestDayRange:
+    start_date: date
+    end_date: date
+
+
+def validate_rest_day_range(start_date: date, end_date: date) -> None:
+    if end_date < start_date:
+        raise ValueError("rest-day end date must be on or after the start date")
+
+
+def normalize_rest_day_ranges(
+    ranges: list[RestDayRange] | None,
+) -> list[RestDayRange]:
+    normalized = sorted(ranges or [], key=lambda item: item.start_date)
+    for item in normalized:
+        validate_rest_day_range(item.start_date, item.end_date)
+    merged: list[RestDayRange] = []
+    for item in normalized:
+        if not merged or item.start_date > merged[-1].end_date + timedelta(days=1):
+            merged.append(item)
+        else:
+            merged[-1] = RestDayRange(
+                merged[-1].start_date,
+                max(merged[-1].end_date, item.end_date),
+            )
+    return merged
+
+
 @dataclass
 class Book:
     number: int
@@ -152,6 +181,30 @@ def inclusive_days_between(start: date, end: date) -> int:
     return (end - start).days + 1
 
 
+def available_reading_days(
+    start: date, end: date, rest_days: list[RestDayRange] | None = None
+) -> list[date]:
+    if end < start:
+        return []
+    rest_days = normalize_rest_day_ranges(rest_days)
+    return [
+        start + timedelta(days=offset)
+        for offset in range(inclusive_days_between(start, end))
+        if not any(
+            rest.start_date
+            <= start + timedelta(days=offset)
+            <= rest.end_date
+            for rest in rest_days
+        )
+    ]
+
+
+def available_reading_days_count(
+    start: date, end: date, rest_days: list[RestDayRange] | None = None
+) -> int:
+    return len(available_reading_days(start, end, rest_days))
+
+
 def pages_remaining(book: Book) -> int:
     return max(book.pages - book.pages_read, 0)
 
@@ -216,12 +269,18 @@ def current_required_pace(
     section_label: str,
     baseline_schedule: BaselineSchedule,
     today: date | None = None,
+    rest_days: list[RestDayRange] | None = None,
 ) -> float:
     remaining_start = effective_remaining_start_date(
-        baseline_schedule.start_date, baseline_schedule.deadline, today
+        baseline_schedule.start_date, baseline_schedule.deadline, today, rest_days
     )
-    return remaining_units(book, section_label) / inclusive_days_between(
-        remaining_start, baseline_schedule.deadline
+    available_days = available_reading_days_count(
+        remaining_start, baseline_schedule.deadline, rest_days
+    )
+    return (
+        remaining_units(book, section_label) / available_days
+        if available_days
+        else 0.0
     )
 
 
@@ -260,10 +319,14 @@ def validate_book_range(section_label: str, start: int, end: int) -> None:
 
 
 def effective_remaining_start_date(
-    start_date: date, end_date: date, today: date | None = None
+    start_date: date,
+    end_date: date,
+    today: date | None = None,
+    rest_days: list[RestDayRange] | None = None,
 ) -> date:
     today = today or date.today()
-    return min(max(start_date, today), end_date)
+    candidate = min(max(start_date, today), end_date)
+    return next(iter(available_reading_days(candidate, end_date, rest_days)), end_date)
 
 
 def set_book_progress(
@@ -385,6 +448,7 @@ def calculate_deadlines(
     daily_pace: float,
     simultaneous_groups: list[tuple[int, ...]] | None = None,
     page_count: Callable[[Book], int] | None = None,
+    rest_days: list[RestDayRange] | None = None,
 ) -> list[BookDeadline]:
     simultaneous_groups = validate_simultaneous_groups(
         books, simultaneous_groups or []
@@ -393,6 +457,7 @@ def calculate_deadlines(
     group_by_first_book = {group[0]: group for group in simultaneous_groups}
     grouped_book_ids = {book_id for group in simultaneous_groups for book_id in group}
     deadlines: list[BookDeadline] = []
+    reading_dates = available_reading_days(start_date, end_date, rest_days)
     cumulative_pages = 0
     previous_cumulative_days = 0
     book_index = 0
@@ -414,12 +479,16 @@ def calculate_deadlines(
                 1, math.ceil(cumulative_pages / daily_pace - 1e-9)
             )
         days_allocated = cumulative_days - previous_cumulative_days
-        deadline = start_date + timedelta(days=max(cumulative_days - 1, 0))
-        group_start_date = (
-            deadline
-            if days_allocated == 0
-            else start_date + timedelta(days=previous_cumulative_days)
-        )
+        if reading_dates:
+            deadline = reading_dates[min(cumulative_days, len(reading_dates)) - 1]
+            group_start_date = (
+                deadline
+                if days_allocated == 0
+                else reading_dates[previous_cumulative_days]
+            )
+        else:
+            deadline = end_date
+            group_start_date = end_date
 
         if deadline < end_date:
             status = "before end"
@@ -465,11 +534,12 @@ def build_plan(
     daily_pace: float,
     simultaneous_groups: list[tuple[int, ...]] | None = None,
     page_count: Callable[[Book], int] | None = None,
+    rest_days: list[RestDayRange] | None = None,
 ) -> tuple[list[BookDeadline], int, float, str]:
     page_count = page_count or (lambda book: book.pages)
     total_pages = sum(page_count(book) for book in books)
-    period_days = inclusive_days_between(start_date, end_date)
-    required_pace = total_pages / period_days
+    period_days = available_reading_days_count(start_date, end_date, rest_days)
+    required_pace = total_pages / period_days if period_days else 0.0
     deadlines = calculate_deadlines(
         books,
         start_date,
@@ -477,24 +547,36 @@ def build_plan(
         daily_pace,
         simultaneous_groups,
         page_count,
+        rest_days,
     )
     overall_status = (
         "achievable"
-        if not deadlines or deadlines[-1].deadline <= end_date
+        if (
+            not total_pages
+            or (
+                period_days
+                and (not deadlines or deadlines[-1].deadline <= end_date)
+            )
+        )
         else "not achievable"
     )
     return deadlines, total_pages, required_pace, overall_status
 
 
 def build_section_plan(
-    section: BookSection, start_date: date, end_date: date
+    section: BookSection,
+    start_date: date,
+    end_date: date,
+    rest_days: list[RestDayRange] | None = None,
 ) -> SectionPlan:
     if not section.books:
         return SectionPlan(section, [], 0.0, 0, 0.0, "achievable")
 
-    period_days = inclusive_days_between(start_date, end_date)
+    period_days = available_reading_days_count(start_date, end_date, rest_days)
     daily_pace = (
         sum(total_units(book, section.label) for book in section.books) / period_days
+        if period_days
+        else 0.0
     )
     deadlines, total_pages, required_pace, overall_status = build_plan(
         section.books,
@@ -503,6 +585,7 @@ def build_section_plan(
         daily_pace,
         section.simultaneous_groups,
         lambda book: total_units(book, section.label),
+        rest_days,
     )
     return SectionPlan(
         section, deadlines, daily_pace, total_pages, required_pace, overall_status
@@ -510,17 +593,22 @@ def build_section_plan(
 
 
 def build_section_plans(
-    sections: list[BookSection], start_date: date, end_date: date
+    sections: list[BookSection],
+    start_date: date,
+    end_date: date,
+    rest_days: list[RestDayRange] | None = None,
 ) -> tuple[list[SectionPlan], int, float, str]:
     section_plans = [
-        build_section_plan(section, start_date, end_date)
+        build_section_plan(section, start_date, end_date, rest_days)
         for section in sections
     ]
     return summarize_section_plans(section_plans)
 
 
 def current_required_section_pace(
-    section: BookSection, today: date | None = None
+    section: BookSection,
+    today: date | None = None,
+    rest_days: list[RestDayRange] | None = None,
 ) -> float:
     grouped_book_ids = {
         book_id for group in section.simultaneous_groups for book_id in group
@@ -532,13 +620,16 @@ def current_required_section_pace(
                 section.label,
                 section.books[book_id - 1].baseline_schedule,
                 today,
+                rest_days,
             )
             for book_id in group
         )
         for group in section.simultaneous_groups
     ]
     paces.extend(
-        current_required_pace(book, section.label, book.baseline_schedule, today)
+        current_required_pace(
+            book, section.label, book.baseline_schedule, today, rest_days
+        )
         for book in section.books
         if book.number not in grouped_book_ids
     )
@@ -546,10 +637,15 @@ def current_required_section_pace(
 
 
 def calculate_baseline_schedules(
-    sections: list[BookSection], start_date: date, end_date: date
+    sections: list[BookSection],
+    start_date: date,
+    end_date: date,
+    rest_days: list[RestDayRange] | None = None,
 ) -> None:
     for section in sections:
-        for deadline in build_section_plan(section, start_date, end_date).deadlines:
+        for deadline in build_section_plan(
+            section, start_date, end_date, rest_days
+        ).deadlines:
             deadline.book.baseline_schedule = BaselineSchedule(
                 deadline.start_date, deadline.deadline, deadline.daily_pages
             )
@@ -557,14 +653,18 @@ def calculate_baseline_schedules(
 
 
 def recalculate_baseline_schedules(
-    sections: list[BookSection], start_date: date, end_date: date
+    sections: list[BookSection],
+    start_date: date,
+    end_date: date,
+    rest_days: list[RestDayRange] | None = None,
 ) -> None:
     """Replace every baseline with a schedule for the current unfinished work."""
     for section in sections:
         daily_pace = (
             sum(remaining_units(book, section.label) for book in section.books)
-            / inclusive_days_between(start_date, end_date)
+            / available_reading_days_count(start_date, end_date, rest_days)
             if section.books
+            and available_reading_days_count(start_date, end_date, rest_days)
             else 0.0
         )
         deadlines, _total_units, _required_pace, _overall_status = build_plan(
@@ -574,6 +674,7 @@ def recalculate_baseline_schedules(
             daily_pace,
             section.simultaneous_groups,
             lambda book: remaining_units(book, section.label),
+            rest_days,
         )
         for deadline in deadlines:
             deadline.book.baseline_schedule = BaselineSchedule(
@@ -589,14 +690,23 @@ def build_remaining_section_plan(
     start_date: date,
     end_date: date,
     today: date | None = None,
+    rest_days: list[RestDayRange] | None = None,
 ) -> SectionPlan:
     if not section.books:
         return SectionPlan(section, [], 0.0, 0, 0.0, "achievable")
 
-    remaining_start = effective_remaining_start_date(start_date, end_date, today)
-    period_days = inclusive_days_between(remaining_start, end_date)
+    remaining_start = effective_remaining_start_date(
+        start_date, end_date, today, rest_days
+    )
+    period_days = available_reading_days_count(
+        remaining_start, end_date, rest_days
+    )
     remaining_total = sum(remaining_units(book, section.label) for book in section.books)
-    daily_pace = 0.0 if remaining_total == 0 else remaining_total / period_days
+    daily_pace = (
+        0.0
+        if remaining_total == 0 or period_days == 0
+        else remaining_total / period_days
+    )
     deadlines, total_pages, required_pace, overall_status = build_plan(
         section.books,
         remaining_start,
@@ -604,6 +714,7 @@ def build_remaining_section_plan(
         daily_pace,
         section.simultaneous_groups,
         lambda book: remaining_units(book, section.label),
+        rest_days,
     )
     if (
         not section.baseline_needs_recalculation
@@ -632,7 +743,7 @@ def build_remaining_section_plan(
             )
             for deadline in deadlines
         ]
-        daily_pace = current_required_section_pace(section, today)
+        daily_pace = current_required_section_pace(section, today, rest_days)
     return SectionPlan(
         section, deadlines, daily_pace, total_pages, required_pace, overall_status
     )
@@ -643,9 +754,12 @@ def build_remaining_section_plans(
     start_date: date,
     end_date: date,
     today: date | None = None,
+    rest_days: list[RestDayRange] | None = None,
 ) -> tuple[list[SectionPlan], int, float, str]:
     section_plans = [
-        build_remaining_section_plan(section, start_date, end_date, today)
+        build_remaining_section_plan(
+            section, start_date, end_date, today, rest_days
+        )
         for section in sections
     ]
     return summarize_section_plans(section_plans)
@@ -713,6 +827,7 @@ def optional_summary_stat_rows(
     end_date: date,
     highest_daily_pace: float,
     stats_options: SummaryStatsOptions,
+    rest_days: list[RestDayRange] | None = None,
 ) -> list[tuple[str, str]]:
     physical_plan = section_plan_by_label(section_plans, PHYSICAL_BOOKS_LABEL)
     digital_plan = section_plan_by_label(section_plans, DIGITAL_BOOKS_LABEL)
@@ -760,7 +875,10 @@ def optional_summary_stat_rows(
         )
     if stats_options.reading_period:
         rows.append(
-            ("Reading period", f"{inclusive_days_between(start_date, end_date)} days")
+            (
+                "Reading period",
+                f"{available_reading_days_count(start_date, end_date, rest_days)} days",
+            )
         )
     if stats_options.pace_driver:
         pace_drivers = [
@@ -870,6 +988,7 @@ def write_csv(
     overall_status: str,
     end_label: str,
     stats_options: SummaryStatsOptions,
+    rest_days: list[RestDayRange] | None = None,
 ) -> None:
     path = Path(filename)
     with path.open("w", newline="", encoding="utf-8") as csv_file:
@@ -877,6 +996,14 @@ def write_csv(
         writer.writerow(["Reading plan"])
         writer.writerow(["Start date", start_date.isoformat()])
         writer.writerow([end_label, end_date.isoformat()])
+        if rest_days:
+            writer.writerow([
+                "Rest days",
+                ";".join(
+                    f"{item.start_date.isoformat()}/{item.end_date.isoformat()}"
+                    for item in normalize_rest_day_ranges(rest_days)
+                ),
+            ])
         physical_plan = section_plan_by_label(section_plans, PHYSICAL_BOOKS_LABEL)
         digital_plan = section_plan_by_label(section_plans, DIGITAL_BOOKS_LABEL)
         audiobook_plan = section_plan_by_label(section_plans, AUDIOBOOKS_LABEL)
@@ -892,7 +1019,12 @@ def write_csv(
         )
         writer.writerow(["Status", overall_status])
         for label, value in optional_summary_stat_rows(
-            section_plans, start_date, end_date, highest_daily_pace, stats_options
+            section_plans,
+            start_date,
+            end_date,
+            highest_daily_pace,
+            stats_options,
+            rest_days,
         ):
             writer.writerow([label, value])
 
@@ -1063,7 +1195,7 @@ def parse_csv_simultaneous_groups(
 
 def load_csv_plan(
     filename: str,
-) -> tuple[list[BookSection], date, date, str, str]:
+) -> tuple[list[BookSection], date, date, str, str, list[RestDayRange]]:
     with Path(filename).open(newline="", encoding="utf-8") as csv_file:
         rows = list(csv.reader(csv_file))
 
@@ -1105,6 +1237,17 @@ def load_csv_plan(
         raise ValueError("invalid date") from error
     if end_date < start_date:
         raise ValueError("finish date must be on or after the start date")
+
+    rest_days: list[RestDayRange] = []
+    for raw_range in metadata.get("Rest days", "").split(";"):
+        if not raw_range.strip():
+            continue
+        try:
+            start_text, end_text = raw_range.split("/", 1)
+            rest_days.append(RestDayRange(parse_date(start_text), parse_date(end_text)))
+        except (ValueError, TypeError) as error:
+            raise ValueError("invalid rest-day range") from error
+    rest_days = normalize_rest_day_ranges(rest_days)
 
     has_section_labels = any(row and row[0] in BOOK_SECTION_LABELS for row in rows)
     if has_section_labels:
@@ -1178,7 +1321,7 @@ def load_csv_plan(
 
     if not any(section.books for section in sections):
         raise ValueError("no books found")
-    return sections, start_date, end_date, end_label, end_name
+    return sections, start_date, end_date, end_label, end_name, rest_days
 
 
 def summary_stats_options_to_json(options: SummaryStatsOptions) -> dict[str, bool]:
@@ -1500,6 +1643,37 @@ def book_section_from_json(value: object, default_label: str) -> BookSection:
     )
 
 
+def rest_day_ranges_to_json(
+    rest_days: list[RestDayRange] | None,
+) -> list[dict[str, str]]:
+    return [
+        {
+            "start_date": item.start_date.isoformat(),
+            "end_date": item.end_date.isoformat(),
+        }
+        for item in normalize_rest_day_ranges(rest_days)
+    ]
+
+
+def rest_day_ranges_from_json(value: object) -> list[RestDayRange]:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise ValueError("rest_days must be a list")
+    ranges: list[RestDayRange] = []
+    for raw_range in value:
+        if not isinstance(raw_range, dict):
+            raise ValueError("each rest-day range must be a JSON object")
+        try:
+            start_date = parse_date(str(raw_range["start_date"]))
+            end_date = parse_date(str(raw_range["end_date"]))
+        except (KeyError, ValueError) as error:
+            raise ValueError("invalid rest-day range") from error
+        validate_rest_day_range(start_date, end_date)
+        ranges.append(RestDayRange(start_date, end_date))
+    return normalize_rest_day_ranges(ranges)
+
+
 def write_json_plan(
     filename: str,
     sections: list[BookSection],
@@ -1507,6 +1681,7 @@ def write_json_plan(
     end_date: date,
     end_label: str,
     stats_options: SummaryStatsOptions,
+    rest_days: list[RestDayRange] | None = None,
 ) -> None:
     if (
         not any(section.baseline_needs_recalculation for section in sections)
@@ -1516,13 +1691,14 @@ def write_json_plan(
             for book in section.books
         )
     ):
-        calculate_baseline_schedules(sections, start_date, end_date)
+        calculate_baseline_schedules(sections, start_date, end_date, rest_days)
     payload = {
-        "schema_version": 5,
+        "schema_version": 6,
         "start_date": start_date.isoformat(),
         "end_date": end_date.isoformat(),
         "end_label": end_label,
         "stats_options": summary_stats_options_to_json(stats_options),
+        "rest_days": rest_day_ranges_to_json(rest_days),
         "sections": [book_section_to_json(section) for section in sections],
     }
     Path(filename).write_text(
@@ -1533,7 +1709,15 @@ def write_json_plan(
 
 def load_json_plan(
     filename: str,
-) -> tuple[list[BookSection], date, date, str, str, SummaryStatsOptions]:
+) -> tuple[
+    list[BookSection],
+    date,
+    date,
+    str,
+    str,
+    SummaryStatsOptions,
+    list[RestDayRange],
+]:
     try:
         payload = json.loads(Path(filename).read_text(encoding="utf-8"))
     except json.JSONDecodeError as error:
@@ -1563,6 +1747,7 @@ def load_json_plan(
         if end_label == "Target finish date"
         else "quarter end date"
     )
+    rest_days = rest_day_ranges_from_json(payload.get("rest_days"))
 
     raw_sections = payload.get("sections", [])
     if not isinstance(raw_sections, list):
@@ -1586,7 +1771,7 @@ def load_json_plan(
     except (TypeError, ValueError) as error:
         raise ValueError("invalid schema version") from error
     if schema_version < 5:
-        calculate_baseline_schedules(sections, start_date, end_date)
+        calculate_baseline_schedules(sections, start_date, end_date, rest_days)
     return (
         sections,
         start_date,
@@ -1594,4 +1779,5 @@ def load_json_plan(
         end_label,
         end_name,
         summary_stats_options_from_json(payload.get("stats_options")),
+        rest_days,
     )

@@ -94,6 +94,7 @@ public class MainActivity extends Activity {
     private LocalDate startDate;
     private LocalDate endDate;
     private String endLabel = "Quarter end";
+    private final List<RestDayRange> restDays = new ArrayList<>();
     private Uri jsonUri;
     private String currentTab = "Session";
     private String previousTabBeforeSettings = "Session";
@@ -609,6 +610,34 @@ public class MainActivity extends Activity {
         box.addView(customTarget);
         box.addView(label("Finish date"));
         box.addView(endInput);
+
+        box.addView(sectionTitle("Rest-day ranges"));
+        LinearLayout restRangeList = verticalBox();
+        renderRestDayRanges(restRangeList);
+        box.addView(restRangeList);
+        EditText restStartInput = editText("", InputType.TYPE_CLASS_TEXT);
+        EditText restEndInput = editText("", InputType.TYPE_CLASS_TEXT);
+        box.addView(label("Rest start date"));
+        box.addView(restStartInput);
+        box.addView(label("Rest end date"));
+        box.addView(restEndInput);
+        box.addView(actionButton("Add rest-day range", v -> {
+            try {
+                RestDayRange range = new RestDayRange(
+                        parseDate(restStartInput.getText().toString().trim()),
+                        parseDate(restEndInput.getText().toString().trim())
+                );
+                if (range.endDate.isBefore(range.startDate)) {
+                    throw new IllegalArgumentException("rest-day end date must be on or after the start date");
+                }
+                restDays.add(range);
+                normalizeRestDayRanges();
+                invalidateAllBaselineSchedules();
+                afterStateChange("Rest-day range added");
+            } catch (IllegalArgumentException ex) {
+                showError(ex.getMessage());
+            }
+        }));
 
         box.addView(sectionTitle("Optional summary stats"));
         CheckBox bookCounts = checkBox("Book counts", statsOptions.bookCounts);
@@ -1142,6 +1171,7 @@ public class MainActivity extends Activity {
                     startDate = nextQuarterStart(LocalDate.now());
                     endDate = periodEndFromStart(startDate);
                     endLabel = "Quarter end";
+                    restDays.clear();
                     statsOptions = new StatsOptions(true, true, true, true, true);
                     sections.clear();
                     sections.addAll(blankSections());
@@ -1291,6 +1321,8 @@ public class MainActivity extends Activity {
             startDate = plan.startDate;
             endDate = plan.endDate;
             endLabel = plan.endLabel;
+            restDays.clear();
+            restDays.addAll(plan.restDays);
             statsOptions = plan.statsOptions;
             selectedBookIndex = -1;
             selectedBookSection = PHYSICAL_BOOKS_LABEL;
@@ -1325,11 +1357,14 @@ public class MainActivity extends Activity {
                 }
             }
         }
+        List<RestDayRange> loadedRestDays = restDayRangesFromJson(payload.optJSONArray("rest_days"));
         List<BookSection> loadedSections = new ArrayList<>();
         for (String label : BOOK_SECTION_LABELS) {
             loadedSections.add(byLabel.get(label));
         }
         if (payload.optInt("schema_version", 4) < 5) {
+            restDays.clear();
+            restDays.addAll(loadedRestDays);
             calculateBaselineSchedules(loadedSections, loadedStart, loadedEnd);
         }
         return new CsvPlan(
@@ -1337,14 +1372,15 @@ public class MainActivity extends Activity {
                 loadedStart,
                 loadedEnd,
                 loadedEndLabel,
-                statsOptionsFromJson(payload.optJSONObject("stats_options"))
+                statsOptionsFromJson(payload.optJSONObject("stats_options")),
+                loadedRestDays
         );
     }
 
     private String jsonText() throws JSONException {
         initializeMissingBaselineSchedules();
         JSONObject payload = new JSONObject();
-        payload.put("schema_version", 5);
+        payload.put("schema_version", 6);
         payload.put("start_date", startDate.toString());
         payload.put("end_date", endDate.toString());
         payload.put("end_label", endLabel);
@@ -1355,6 +1391,14 @@ public class MainActivity extends Activity {
         stats.put("reading_period", statsOptions.readingPeriod);
         stats.put("pace_driver", statsOptions.paceDriver);
         payload.put("stats_options", stats);
+        JSONArray jsonRestDays = new JSONArray();
+        for (RestDayRange range : restDays) {
+            JSONObject object = new JSONObject();
+            object.put("start_date", range.startDate.toString());
+            object.put("end_date", range.endDate.toString());
+            jsonRestDays.put(object);
+        }
+        payload.put("rest_days", jsonRestDays);
         JSONArray jsonSections = new JSONArray();
         for (BookSection section : sections) {
             jsonSections.put(bookSectionToJson(section));
@@ -1610,6 +1654,43 @@ public class MainActivity extends Activity {
         }
     }
 
+    private static List<RestDayRange> restDayRangesFromCsv(String raw) {
+        List<RestDayRange> ranges = new ArrayList<>();
+        if (raw == null || raw.trim().isEmpty()) {
+            return ranges;
+        }
+        for (String value : raw.split(";")) {
+            String[] dates = value.trim().split("/", 2);
+            if (dates.length != 2) {
+                throw new IllegalArgumentException("invalid rest-day range");
+            }
+            LocalDate start = parseDate(dates[0]);
+            LocalDate end = parseDate(dates[1]);
+            if (end.isBefore(start)) {
+                throw new IllegalArgumentException("rest-day end date must be on or after the start date");
+            }
+            ranges.add(new RestDayRange(start, end));
+        }
+        return ranges;
+    }
+
+    private static List<RestDayRange> restDayRangesFromJson(JSONArray raw) throws JSONException {
+        List<RestDayRange> ranges = new ArrayList<>();
+        if (raw == null) {
+            return ranges;
+        }
+        for (int index = 0; index < raw.length(); index++) {
+            JSONObject object = raw.getJSONObject(index);
+            LocalDate start = parseDate(object.getString("start_date"));
+            LocalDate end = parseDate(object.getString("end_date"));
+            if (end.isBefore(start)) {
+                throw new IllegalArgumentException("rest-day end date must be on or after the start date");
+            }
+            ranges.add(new RestDayRange(start, end));
+        }
+        return ranges;
+    }
+
     private StatsOptions statsOptionsFromJson(JSONObject object) {
         if (object == null) {
             return new StatsOptions(true, true, true, true, true);
@@ -1739,7 +1820,14 @@ public class MainActivity extends Activity {
         if (!anyBooks) {
             throw new IllegalArgumentException("no books found");
         }
-        return new CsvPlan(loadedSections, loadedStart, loadedEnd, loadedEndLabel, statsOptions);
+        return new CsvPlan(
+                loadedSections,
+                loadedStart,
+                loadedEnd,
+                loadedEndLabel,
+                statsOptions,
+                restDayRangesFromCsv(metadata.getOrDefault("Rest days", ""))
+        );
     }
 
     private ParseTableResult parseCsvBookTable(List<List<String>> rows, int headerIndex, boolean stopAtBlank, String sectionLabel) {
@@ -1844,6 +1932,16 @@ public class MainActivity extends Activity {
         writeCsvRow(out, Collections.singletonList("Reading plan"));
         writeCsvRow(out, Arrays.asList("Start date", startDate.toString()));
         writeCsvRow(out, Arrays.asList(endLabel, endDate.toString()));
+        if (!restDays.isEmpty()) {
+            StringBuilder rawRestDays = new StringBuilder();
+            for (RestDayRange range : restDays) {
+                if (rawRestDays.length() > 0) {
+                    rawRestDays.append(';');
+                }
+                rawRestDays.append(range.startDate).append('/').append(range.endDate);
+            }
+            writeCsvRow(out, Arrays.asList("Rest days", rawRestDays.toString()));
+        }
         SectionPlan physical = sectionPlanByLabel(summary.sectionPlans, PHYSICAL_BOOKS_LABEL);
         SectionPlan digital = sectionPlanByLabel(summary.sectionPlans, DIGITAL_BOOKS_LABEL);
         SectionPlan audiobook = sectionPlanByLabel(summary.sectionPlans, AUDIOBOOKS_LABEL);
@@ -1961,7 +2059,7 @@ public class MainActivity extends Activity {
         return null;
     }
 
-    private static int targetUnitsForDate(Book book, String sectionLabel, BookDeadline deadline, LocalDate targetDate) {
+    private int targetUnitsForDate(Book book, String sectionLabel, BookDeadline deadline, LocalDate targetDate) {
         int total = totalUnits(book, sectionLabel);
         int completed = completedUnits(book, sectionLabel);
         if (unitsRemaining(book, sectionLabel) <= 0 || targetDate.isAfter(deadline.deadline)) {
@@ -1972,7 +2070,7 @@ public class MainActivity extends Activity {
         }
 
         LocalDate activeDate = targetDate.isAfter(deadline.deadline) ? deadline.deadline : targetDate;
-        long elapsedDays = ChronoUnit.DAYS.between(deadline.startDate, activeDate) + 1;
+        int elapsedDays = availableReadingDaysCount(deadline.startDate, activeDate);
         int scheduledUnits = (int) Math.ceil(deadline.dailyPages * elapsedDays - 1e-9);
         return Math.min(Math.max(completed + scheduledUnits, completed), total);
     }
@@ -2046,7 +2144,9 @@ public class MainActivity extends Activity {
             }
             double dailyPace = section.books.isEmpty()
                     ? 0.0
-                    : (double) sectionUnits / inclusiveDaysBetween(planStart, planEnd);
+                    : availableReadingDaysCount(planStart, planEnd) == 0
+                    ? 0.0
+                    : (double) sectionUnits / availableReadingDaysCount(planStart, planEnd);
             SectionPlan plan = buildPlan(
                     section,
                     planStart,
@@ -2073,7 +2173,9 @@ public class MainActivity extends Activity {
             }
             double dailyPace = section.books.isEmpty()
                     ? 0.0
-                    : (double) sectionUnits / inclusiveDaysBetween(planStart, planEnd);
+                    : availableReadingDaysCount(planStart, planEnd) == 0
+                    ? 0.0
+                    : (double) sectionUnits / availableReadingDaysCount(planStart, planEnd);
             SectionPlan plan = buildPlan(
                     section,
                     planStart,
@@ -2091,6 +2193,12 @@ public class MainActivity extends Activity {
     }
     private void invalidateBaselineSchedules(BookSection section) {
         section.baselineNeedsRecalculation = true;
+    }
+
+    private void invalidateAllBaselineSchedules() {
+        for (BookSection section : sections) {
+            section.baselineNeedsRecalculation = true;
+        }
     }
 
     private PlanSummary buildRemainingPlans() {
@@ -2116,12 +2224,12 @@ public class MainActivity extends Activity {
             return new SectionPlan(section, new ArrayList<>(), 0.0, 0, 0.0, "achievable");
         }
         LocalDate remainingStart = effectiveRemainingStartDate(start, end, today);
-        int periodDays = inclusiveDaysBetween(remainingStart, end);
+        int periodDays = availableReadingDaysCount(remainingStart, end);
         int remainingPages = 0;
         for (Book book : section.books) {
             remainingPages += unitsRemaining(book, section.label);
         }
-        double dailyPace = remainingPages == 0 ? 0.0 : (double) remainingPages / periodDays;
+        double dailyPace = remainingPages == 0 || periodDays == 0 ? 0.0 : (double) remainingPages / periodDays;
         SectionPlan plan = buildPlan(
                 section,
                 remainingStart,
@@ -2153,7 +2261,7 @@ public class MainActivity extends Activity {
                     deadline.cumulativePages,
                     baseline.startDate,
                     baseline.deadline,
-                    inclusiveDaysBetween(baseline.startDate, baseline.deadline),
+                    availableReadingDaysCount(baseline.startDate, baseline.deadline),
                     baseline.dailyTarget,
                     status
             ));
@@ -2191,14 +2299,16 @@ public class MainActivity extends Activity {
         return highestPace;
     }
 
-    private static double currentRequiredPace(
+    private double currentRequiredPace(
             Book book, String sectionLabel, BaselineSchedule baseline, LocalDate today
     ) {
         LocalDate requiredStart = effectiveRemainingStartDate(
                 baseline.startDate, baseline.deadline, today
         );
-        return (double) unitsRemaining(book, sectionLabel)
-                / inclusiveDaysBetween(requiredStart, baseline.deadline);
+        int availableDays = availableReadingDaysCount(requiredStart, baseline.deadline);
+        return availableDays == 0
+                ? 0.0
+                : (double) unitsRemaining(book, sectionLabel) / availableDays;
     }
 
     private SectionPlan buildPlan(BookSection section, LocalDate start, LocalDate end, double dailyPace, PageCounter counter) {
@@ -2206,10 +2316,12 @@ public class MainActivity extends Activity {
         for (Book book : section.books) {
             totalPages += counter.pages(book);
         }
-        int periodDays = inclusiveDaysBetween(start, end);
+        int periodDays = availableReadingDaysCount(start, end);
         double requiredPace = periodDays == 0 ? 0.0 : (double) totalPages / periodDays;
         List<BookDeadline> deadlines = calculateDeadlines(section.books, start, end, dailyPace, section.simultaneousGroups, counter);
-        String overallStatus = deadlines.isEmpty() || !deadlines.get(deadlines.size() - 1).deadline.isAfter(end)
+        String overallStatus = totalPages == 0
+                || (periodDays > 0
+                && (deadlines.isEmpty() || !deadlines.get(deadlines.size() - 1).deadline.isAfter(end)))
                 ? "achievable"
                 : "not achievable";
         return new SectionPlan(section, deadlines, dailyPace, totalPages, requiredPace, overallStatus);
@@ -2232,6 +2344,7 @@ public class MainActivity extends Activity {
         }
 
         List<BookDeadline> deadlines = new ArrayList<>();
+        List<LocalDate> readingDates = availableReadingDays(start, end);
         int cumulativePages = 0;
         int previousCumulativeDays = 0;
         int bookIndex = 0;
@@ -2257,8 +2370,15 @@ public class MainActivity extends Activity {
                 cumulativeDays = Math.max(1, (int) Math.ceil(cumulativePages / dailyPace - 1e-9));
             }
             int daysAllocated = cumulativeDays - previousCumulativeDays;
-            LocalDate deadline = start.plusDays(Math.max(cumulativeDays - 1, 0));
-            LocalDate groupStart = daysAllocated == 0 ? deadline : start.plusDays(previousCumulativeDays);
+            LocalDate deadline;
+            LocalDate groupStart;
+            if (readingDates.isEmpty()) {
+                deadline = end;
+                groupStart = end;
+            } else {
+                deadline = readingDates.get(Math.min(cumulativeDays, readingDates.size()) - 1);
+                groupStart = daysAllocated == 0 ? deadline : readingDates.get(previousCumulativeDays);
+            }
             String status;
             if (deadline.isBefore(end)) {
                 status = "before end";
@@ -2320,7 +2440,7 @@ public class MainActivity extends Activity {
             rows.add(new String[]{"Audiobook average duration", formatDuration(averagePages(audiobook))});
         }
         if (statsOptions.readingPeriod) {
-            rows.add(new String[]{"Reading period", inclusiveDaysBetween(startDate, endDate) + " days"});
+            rows.add(new String[]{"Reading period", availableReadingDaysCount(startDate, endDate) + " days"});
         }
         if (statsOptions.paceDriver) {
             List<String> drivers = new ArrayList<>();
@@ -2794,18 +2914,82 @@ public class MainActivity extends Activity {
         return start.plusMonths(3).minusDays(1);
     }
 
+    private boolean isRestDay(LocalDate value) {
+        for (RestDayRange range : restDays) {
+            if (!value.isBefore(range.startDate) && !value.isAfter(range.endDate)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private List<LocalDate> availableReadingDays(LocalDate start, LocalDate end) {
+        List<LocalDate> dates = new ArrayList<>();
+        for (LocalDate current = start; !current.isAfter(end); current = current.plusDays(1)) {
+            if (!isRestDay(current)) {
+                dates.add(current);
+            }
+        }
+        return dates;
+    }
+
+    private int availableReadingDaysCount(LocalDate start, LocalDate end) {
+        return availableReadingDays(start, end).size();
+    }
+
+    private void normalizeRestDayRanges() {
+        restDays.sort((left, right) -> left.startDate.compareTo(right.startDate));
+        List<RestDayRange> merged = new ArrayList<>();
+        for (RestDayRange range : restDays) {
+            if (merged.isEmpty()
+                    || range.startDate.isAfter(merged.get(merged.size() - 1).endDate.plusDays(1))) {
+                merged.add(range);
+            } else {
+                RestDayRange previous = merged.remove(merged.size() - 1);
+                merged.add(new RestDayRange(
+                        previous.startDate,
+                        previous.endDate.isAfter(range.endDate) ? previous.endDate : range.endDate
+                ));
+            }
+        }
+        restDays.clear();
+        restDays.addAll(merged);
+    }
+
+    private void renderRestDayRanges(LinearLayout container) {
+        container.removeAllViews();
+        for (int index = 0; index < restDays.size(); index++) {
+            final int rangeIndex = index;
+            RestDayRange range = restDays.get(index);
+            LinearLayout row = row();
+            row.addView(label(range.startDate + " ? " + range.endDate),
+                    new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+            row.addView(secondaryButton("Remove", v -> {
+                restDays.remove(rangeIndex);
+                invalidateAllBaselineSchedules();
+                afterStateChange("Rest-day range removed");
+            }));
+            container.addView(row);
+        }
+    }
+
     private static int inclusiveDaysBetween(LocalDate start, LocalDate end) {
         return (int) ChronoUnit.DAYS.between(start, end) + 1;
     }
 
-    private static LocalDate effectiveRemainingStartDate(LocalDate start, LocalDate end, LocalDate today) {
+    private LocalDate effectiveRemainingStartDate(LocalDate start, LocalDate end, LocalDate today) {
+        LocalDate candidate;
         if (today.isBefore(start)) {
-            return start;
+            candidate = start;
+        } else if (today.isAfter(end)) {
+            candidate = end;
+        } else {
+            candidate = today;
         }
-        if (today.isAfter(end)) {
-            return end;
+        for (LocalDate readingDay : availableReadingDays(candidate, end)) {
+            return readingDay;
         }
-        return today;
+        return end;
     }
 
     private static void validatePageRange(int startPage, int endPage) {
@@ -3070,6 +3254,16 @@ public class MainActivity extends Activity {
         }
     }
 
+    private static class RestDayRange {
+        final LocalDate startDate;
+        final LocalDate endDate;
+
+        RestDayRange(LocalDate startDate, LocalDate endDate) {
+            this.startDate = startDate;
+            this.endDate = endDate;
+        }
+    }
+
     private static class BaselineSchedule {
         final LocalDate startDate;
         final LocalDate deadline;
@@ -3214,13 +3408,15 @@ public class MainActivity extends Activity {
         final LocalDate endDate;
         final String endLabel;
         final StatsOptions statsOptions;
+        final List<RestDayRange> restDays;
 
-        CsvPlan(List<BookSection> sections, LocalDate startDate, LocalDate endDate, String endLabel, StatsOptions statsOptions) {
+        CsvPlan(List<BookSection> sections, LocalDate startDate, LocalDate endDate, String endLabel, StatsOptions statsOptions, List<RestDayRange> restDays) {
             this.sections = sections;
             this.startDate = startDate;
             this.endDate = endDate;
             this.endLabel = endLabel;
             this.statsOptions = statsOptions;
+            this.restDays = restDays;
         }
     }
 

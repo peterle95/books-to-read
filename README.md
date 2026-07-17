@@ -14,11 +14,12 @@ Use the tabs to:
 - Log reading sessions by book, current page reached, or audiobook time left
 - Quarter start date (defaults to next quarter start)
 - Set an optional custom target finish date
+- Add and remove plan-wide rest-day date ranges
 - Add, replace, delete, reorder, and group physical or digital books using start and end page
 - Add, replace, delete, reorder, and group audiobooks using `HH:MM` start/end times
 - Import a CSV plan or export the current plan to CSV
 
-The output shows physical and digital remaining page totals, audiobook remaining time, then separate tables for physical books, digital books, and audiobooks. Each format is planned as a parallel stream with its own recalculated daily pace or daily listening time.
+The output shows physical and digital remaining page totals, audiobook remaining time, then separate tables for physical books, digital books, and audiobooks. Each format is planned as a parallel stream with its own recalculated daily pace or daily listening time. Rest days are excluded from available reading days for every format and simultaneous group.
 
 You can choose consecutive Book IDs within each table to read simultaneously. The books start and finish together, their daily page allocation is split according to their remaining page counts, and the table is recalculated. Simultaneous groups are saved in JSON and CSV exports.
 

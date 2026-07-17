@@ -7,7 +7,10 @@ from pathlib import Path
 from reading_plan import (
     Book,
     BookSection,
+    RestDayRange,
     SummaryStatsOptions,
+    available_reading_days,
+    available_reading_days_count,
     add_reading_session,
     build_remaining_section_plans,
     calculate_baseline_schedules,
@@ -37,7 +40,7 @@ class BaselineSchedulePersistenceTests(unittest.TestCase):
             )
             payload = json.loads(path.read_text(encoding="utf-8"))
 
-        self.assertEqual(5, payload["schema_version"])
+        self.assertEqual(6, payload["schema_version"])
         self.assertEqual(
             {
                 "start_date": "2026-07-01",
@@ -234,6 +237,91 @@ class BaselineSchedulePersistenceTests(unittest.TestCase):
             )
 
         self.assertEqual(baseline, sections[0].books[0].baseline_schedule)
+
+
+class RestDayScheduleTests(unittest.TestCase):
+    def test_rest_days_are_excluded_from_deadlines_and_pace(self):
+        rest_days = [RestDayRange(date(2026, 7, 3), date(2026, 7, 4))]
+        sections = [
+            BookSection("Physical books", [Book(1, "One", 1, 10)], []),
+            BookSection("Digital books", [], []),
+            BookSection("Audiobooks", [], []),
+        ]
+
+        calculate_baseline_schedules(
+            sections, date(2026, 7, 1), date(2026, 7, 7), rest_days
+        )
+
+        self.assertEqual(
+            [
+                date(2026, 7, 1),
+                date(2026, 7, 2),
+                date(2026, 7, 5),
+                date(2026, 7, 6),
+                date(2026, 7, 7),
+            ],
+            available_reading_days(date(2026, 7, 1), date(2026, 7, 7), rest_days),
+        )
+        self.assertEqual(5, available_reading_days_count(
+            date(2026, 7, 1), date(2026, 7, 7), rest_days
+        ))
+        baseline = sections[0].books[0].baseline_schedule
+        self.assertEqual(date(2026, 7, 7), baseline.deadline)
+        self.assertEqual(2, baseline.daily_target)
+
+    def test_rest_days_round_trip_in_json(self):
+        rest_days = [RestDayRange(date(2026, 7, 3), date(2026, 7, 4))]
+        sections = [
+            BookSection("Physical books", [Book(1, "One", 1, 10)], []),
+            BookSection("Digital books", [], []),
+            BookSection("Audiobooks", [], []),
+        ]
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "plan.json"
+            write_json_plan(
+                str(path),
+                sections,
+                date(2026, 7, 1),
+                date(2026, 7, 7),
+                "Target finish date",
+                SummaryStatsOptions(True, True, True, True, True),
+                rest_days,
+            )
+            loaded = load_json_plan(str(path))
+
+        self.assertEqual(rest_days, loaded[-1])
+
+    def test_editing_rest_days_does_not_rewrite_baseline_until_recalculation(self):
+        sections = [
+            BookSection("Physical books", [Book(1, "One", 1, 10)], []),
+            BookSection("Digital books", [], []),
+            BookSection("Audiobooks", [], []),
+        ]
+        calculate_baseline_schedules(
+            sections, date(2026, 7, 1), date(2026, 7, 7)
+        )
+        original_baseline = sections[0].books[0].baseline_schedule
+        sections[0].baseline_needs_recalculation = True
+        rest_days = [RestDayRange(date(2026, 7, 3), date(2026, 7, 4))]
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "plan.json"
+            write_json_plan(
+                str(path),
+                sections,
+                date(2026, 7, 1),
+                date(2026, 7, 7),
+                "Target finish date",
+                SummaryStatsOptions(True, True, True, True, True),
+                rest_days,
+            )
+
+        self.assertEqual(original_baseline, sections[0].books[0].baseline_schedule)
+        recalculate_baseline_schedules(
+            sections, date(2026, 7, 1), date(2026, 7, 7), rest_days
+        )
+        self.assertEqual(date(2026, 7, 7), sections[0].books[0].baseline_schedule.deadline)
 
 
 if __name__ == "__main__":

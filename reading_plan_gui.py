@@ -15,8 +15,10 @@ from reading_plan import (
     Book,
     BookDeadline,
     BookSection,
+    RestDayRange,
     SummaryStatsOptions,
     add_reading_session,
+    available_reading_days_count,
     build_remaining_section_plans,
     completed_units,
     recalculate_baseline_schedules,
@@ -28,6 +30,7 @@ from reading_plan import (
     load_csv_plan,
     load_json_plan,
     next_quarter_start,
+    normalize_rest_day_ranges,
     optional_summary_stat_rows,
     pages_remaining,
     parse_date,
@@ -145,7 +148,11 @@ def display_value(label: str, value: int | float | None) -> str:
 
 
 def target_units_for_date(
-    book: Book, section_label: str, deadline: BookDeadline, target_date: date
+    book: Book,
+    section_label: str,
+    deadline: BookDeadline,
+    target_date: date,
+    rest_days: list[RestDayRange] | None = None,
 ) -> int:
     total = total_units(book, section_label)
     completed = completed_units(book, section_label)
@@ -155,7 +162,9 @@ def target_units_for_date(
         return completed
 
     active_date = min(target_date, deadline.deadline)
-    elapsed_days = (active_date - deadline.start_date).days + 1
+    elapsed_days = available_reading_days_count(
+        deadline.start_date, active_date, rest_days
+    )
     scheduled_units = ceil(deadline.daily_pages * elapsed_days - 1e-9)
     return min(max(completed + scheduled_units, completed), total)
 
@@ -211,6 +220,7 @@ class ReadingPlanApp(tk.Tk):
         self.minsize(1020, 640)
 
         self.sections = blank_sections()
+        self.rest_days: list[RestDayRange] = []
         self.file_path = DEFAULT_JSON_FILE
         self.cached_plan: tuple[object, ...] | None = None
         self.suspend_autosave = False
@@ -226,6 +236,9 @@ class ReadingPlanApp(tk.Tk):
         self.session_date_var = tk.StringVar(value=date.today().isoformat())
         self.session_current_page_var = tk.StringVar()
         self.session_remaining_var = tk.StringVar(value="")
+        self.rest_start_var = tk.StringVar()
+        self.rest_end_var = tk.StringVar()
+        self.rest_tree: ttk.Treeview | None = None
 
         self.book_trees: dict[str, ttk.Treeview] = {}
         self.plan_tables: dict[str, tk.Frame] = {}
@@ -345,7 +358,7 @@ class ReadingPlanApp(tk.Tk):
 
     def _build_plan_tab(self, parent: ttk.Frame) -> None:
         parent.columnconfigure(0, weight=1)
-        parent.rowconfigure(4, weight=1)
+        parent.rowconfigure(5, weight=1)
 
         toolbar = ttk.Frame(parent)
         toolbar.grid(row=0, column=0, sticky="ew", pady=(0, 12))
@@ -392,8 +405,34 @@ class ReadingPlanApp(tk.Tk):
         self.end_entry.bind("<Return>", lambda _event: self.mark_dates_changed())
         self.end_entry.bind("<FocusOut>", lambda _event: self.mark_dates_changed())
 
+        rest_frame = ttk.LabelFrame(parent, text="Rest-day ranges", padding=12)
+        rest_frame.grid(row=3, column=0, sticky="ew", pady=(12, 12))
+        rest_frame.columnconfigure(2, weight=1)
+        ttk.Label(rest_frame, text="Start").grid(row=0, column=0, sticky="w")
+        ttk.Entry(rest_frame, textvariable=self.rest_start_var, width=14).grid(
+            row=0, column=1, padx=(8, 16)
+        )
+        ttk.Label(rest_frame, text="End").grid(row=0, column=2, sticky="w")
+        ttk.Entry(rest_frame, textvariable=self.rest_end_var, width=14).grid(
+            row=0, column=3, padx=(8, 16)
+        )
+        ttk.Button(rest_frame, text="Add range", command=self.add_rest_day_range).grid(
+            row=0, column=4, padx=(0, 8)
+        )
+        ttk.Button(
+            rest_frame, text="Remove selected", command=self.remove_rest_day_range
+        ).grid(row=0, column=5)
+        self.rest_tree = ttk.Treeview(
+            rest_frame, columns=("Start", "End"), show="headings", height=3
+        )
+        self.rest_tree.heading("Start", text="Start")
+        self.rest_tree.heading("End", text="End")
+        self.rest_tree.column("Start", width=120, anchor="w")
+        self.rest_tree.column("End", width=120, anchor="w")
+        self.rest_tree.grid(row=1, column=0, columnspan=6, sticky="ew", pady=(8, 0))
+
         stats = ttk.LabelFrame(parent, text="Optional summary stats", padding=12)
-        stats.grid(row=3, column=0, sticky="ew", pady=(12, 12))
+        stats.grid(row=4, column=0, sticky="ew", pady=(0, 12))
         labels = [
             ("book_counts", "Book counts"),
             ("page_share", "Page share"),
@@ -410,7 +449,7 @@ class ReadingPlanApp(tk.Tk):
             ).grid(row=0, column=index, sticky="w", padx=(0, 16))
 
         self.plan_text = tk.Text(parent, height=18, wrap="word", state="disabled")
-        self.plan_text.grid(row=4, column=0, sticky="nsew")
+        self.plan_text.grid(row=5, column=0, sticky="nsew")
 
     def _build_books_tab(self, parent: ttk.Frame) -> None:
         parent.columnconfigure(0, weight=1)
@@ -580,6 +619,7 @@ class ReadingPlanApp(tk.Tk):
     def reset_to_blank_plan(self, autosave: bool) -> None:
         start_date = next_quarter_start()
         self.sections = blank_sections()
+        self.rest_days = []
         self.start_var.set(start_date.isoformat())
         self.end_var.set(period_end_from_start(start_date).isoformat())
         self.custom_target_var.set(False)
@@ -601,10 +641,12 @@ class ReadingPlanApp(tk.Tk):
             end_label,
             _end_name,
             stats_options,
+            rest_days,
         ) = load_json_plan(str(path))
         self.suspend_autosave = True
         try:
             self.sections = sections
+            self.rest_days = rest_days
             self.file_path = path
             self.file_var.set(str(path))
             self.start_var.set(start_date.isoformat())
@@ -640,7 +682,7 @@ class ReadingPlanApp(tk.Tk):
         if not filename:
             return
         try:
-            sections, start_date, end_date, end_label, _end_name = load_csv_plan(filename)
+            sections, start_date, end_date, end_label, _end_name, rest_days = load_csv_plan(filename)
         except (OSError, csv.Error, ValueError) as error:
             self.show_error(f"Could not import CSV: {error}")
             return
@@ -648,6 +690,7 @@ class ReadingPlanApp(tk.Tk):
         self.suspend_autosave = True
         try:
             self.sections = sections
+            self.rest_days = rest_days
             self.file_path = Path(filename).with_suffix(".json")
             self.file_var.set(str(self.file_path))
             self.start_var.set(start_date.isoformat())
@@ -697,6 +740,7 @@ class ReadingPlanApp(tk.Tk):
                 overall_status,
                 end_label,
                 stats_options,
+                self.rest_days,
             )
         except OSError as error:
             self.show_error(f"Could not export CSV: {error}")
@@ -751,8 +795,45 @@ class ReadingPlanApp(tk.Tk):
         except ValueError as error:
             self.show_error(str(error))
             return
-        recalculate_baseline_schedules(self.sections, start_date, end_date)
+        recalculate_baseline_schedules(
+            self.sections, start_date, end_date, self.rest_days
+        )
         self.refresh_all(autosave=True)
+
+    def add_rest_day_range(self) -> None:
+        try:
+            item = RestDayRange(
+                parse_date(self.rest_start_var.get().strip()),
+                parse_date(self.rest_end_var.get().strip()),
+            )
+            if item.end_date < item.start_date:
+                raise ValueError("rest-day end date must be on or after the start date")
+        except ValueError as error:
+            self.show_error(str(error))
+            return
+        self.rest_days = normalize_rest_day_ranges(self.rest_days + [item])
+        self.mark_dates_changed()
+
+    def remove_rest_day_range(self) -> None:
+        if self.rest_tree is None:
+            return
+        selection = self.rest_tree.selection()
+        if not selection:
+            self.show_error("Select a rest-day range first")
+            return
+        index = int(selection[0])
+        del self.rest_days[index]
+        self.mark_dates_changed()
+
+    def refresh_rest_days(self) -> None:
+        if self.rest_tree is None:
+            return
+        self.rest_tree.delete(*self.rest_tree.get_children())
+        for index, item in enumerate(self.rest_days):
+            self.rest_tree.insert(
+                "", "end", iid=str(index),
+                values=(item.start_date.isoformat(), item.end_date.isoformat())
+            )
 
     def mark_dates_changed(self) -> None:
         for section in self.sections:
@@ -764,6 +845,7 @@ class ReadingPlanApp(tk.Tk):
 
     def refresh_all(self, autosave: bool) -> None:
         self.refresh_book_tables()
+        self.refresh_rest_days()
         self.refresh_group_entries()
         self.refresh_session_books()
         self.refresh_session_table()
@@ -845,7 +927,9 @@ class ReadingPlanApp(tk.Tk):
     ) -> BookDeadline | None:
         start_date, end_date, _end_label, _end_name = self.current_dates()
         section_plans, _total_pages, _highest_daily_pace, _overall_status = (
-            build_remaining_section_plans(self.sections, start_date, end_date)
+            build_remaining_section_plans(
+                self.sections, start_date, end_date, rest_days=self.rest_days
+            )
         )
         section_plan = section_plan_by_label(section_plans, section.label)
         for deadline in section_plan.deadlines:
@@ -874,7 +958,9 @@ class ReadingPlanApp(tk.Tk):
             first_target = target_display_value(
                 book,
                 section.label,
-                target_units_for_date(book, section.label, deadline, deadline.start_date),
+                target_units_for_date(
+                    book, section.label, deadline, deadline.start_date, self.rest_days
+                ),
             )
             return (
                 f"{book.title}: target starts {deadline.start_date.isoformat()}; "
@@ -884,7 +970,9 @@ class ReadingPlanApp(tk.Tk):
         target = target_display_value(
             book,
             section.label,
-            target_units_for_date(book, section.label, deadline, target_date),
+            target_units_for_date(
+                book, section.label, deadline, target_date, self.rest_days
+            ),
         )
         daily_pace = target_daily_pace_text(section.label, deadline.daily_pages)
         if audiobook:
@@ -934,7 +1022,9 @@ class ReadingPlanApp(tk.Tk):
 
         try:
             section_plans, total_pages, highest_daily_pace, overall_status = (
-                build_remaining_section_plans(self.sections, start_date, end_date)
+                build_remaining_section_plans(
+                    self.sections, start_date, end_date, rest_days=self.rest_days
+                )
             )
         except ValueError as error:
             self.cached_plan = None
@@ -999,7 +1089,12 @@ class ReadingPlanApp(tk.Tk):
             f"Status: {overall_status}",
         ]
         for label, value in optional_summary_stat_rows(
-            section_plans, start_date, end_date, highest_daily_pace, stats_options
+            section_plans,
+            start_date,
+            end_date,
+            highest_daily_pace,
+            stats_options,
+            self.rest_days,
         ):
             lines.append(f"{label}: {value}")
 
@@ -1126,6 +1221,7 @@ class ReadingPlanApp(tk.Tk):
                 end_date,
                 end_label,
                 self.current_stats_options(),
+                self.rest_days,
             )
         except (OSError, ValueError) as error:
             self.set_status(f"Autosave failed: {error}", error=True)
