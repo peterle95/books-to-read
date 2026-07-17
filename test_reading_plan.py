@@ -437,6 +437,90 @@ class DeadlineOverrideTests(unittest.TestCase):
         self.assertEqual(date(2026, 9, 3), deadlines[1].deadline)
         self.assertAlmostEqual(15 / 83, deadlines[1].daily_pages)
         self.assertAlmostEqual(45 / 83, deadlines[3].daily_pages)
+    def test_remaining_plan_reflows_later_books_after_an_overlapping_override(self):
+        sections = self.make_sections(
+            [
+                Book(1, "Before", 1, 20),
+                Book(2, "Fixed", 1, 100),
+                Book(3, "After", 1, 20),
+            ]
+        )
+        calculate_baseline_schedules(sections, date(2026, 7, 1), date(2026, 8, 31))
+        apply_deadline_override(
+            sections[0],
+            sections[0].books[1],
+            date(2026, 8, 1),
+            date(2026, 8, 31),
+            date(2026, 7, 1),
+        )
+
+        plans, *_ = build_remaining_section_plans(
+            sections, date(2026, 7, 1), date(2026, 8, 31), date(2026, 7, 1)
+        )
+        deadlines = {item.book.number: item for item in plans[0].deadlines}
+
+        self.assertEqual(date(2026, 7, 9), deadlines[1].deadline)
+        self.assertEqual(date(2026, 8, 1), deadlines[2].deadline)
+        self.assertEqual(date(2026, 8, 10), deadlines[3].deadline)
+        self.assertAlmostEqual(140 / 62, deadlines[3].daily_pages)
+
+    def test_remaining_plan_reflow_excludes_rest_days(self):
+        sections = self.make_sections(
+            [
+                Book(1, "Before", 1, 20),
+                Book(2, "Fixed", 1, 100),
+                Book(3, "After", 1, 20),
+            ]
+        )
+        rest_days = [RestDayRange(date(2026, 8, 2), date(2026, 8, 3))]
+        calculate_baseline_schedules(
+            sections, date(2026, 7, 1), date(2026, 8, 31), rest_days
+        )
+        apply_deadline_override(
+            sections[0],
+            sections[0].books[1],
+            date(2026, 8, 1),
+            date(2026, 8, 31),
+            date(2026, 7, 1),
+            rest_days,
+        )
+
+        plans, *_ = build_remaining_section_plans(
+            sections,
+            date(2026, 7, 1),
+            date(2026, 8, 31),
+            date(2026, 7, 1),
+            rest_days,
+        )
+        deadlines = {item.book.number: item for item in plans[0].deadlines}
+
+        self.assertEqual(date(2026, 8, 4), deadlines[3].start_date)
+        self.assertEqual(date(2026, 8, 12), deadlines[3].deadline)
+        self.assertEqual(9, deadlines[3].days_allocated)
+
+    def test_remaining_plan_reports_not_achievable_when_reflow_runs_past_plan_end(self):
+        sections = self.make_sections(
+            [
+                Book(1, "Before", 1, 20),
+                Book(2, "Fixed", 1, 100),
+                Book(3, "After", 1, 40),
+            ]
+        )
+        calculate_baseline_schedules(sections, date(2026, 7, 1), date(2026, 8, 10))
+        apply_deadline_override(
+            sections[0],
+            sections[0].books[1],
+            date(2026, 8, 1),
+            date(2026, 8, 10),
+            date(2026, 7, 1),
+        )
+
+        plans, *_ = build_remaining_section_plans(
+            sections, date(2026, 7, 1), date(2026, 8, 10), date(2026, 7, 1)
+        )
+
+        self.assertEqual("not achievable", plans[0].overall_status)
+        self.assertGreater(plans[0].deadlines[-1].deadline, date(2026, 8, 10))
 
     def test_session_target_uses_the_persisted_override_schedule(self):
         sections = self.make_sections([Book(1, "One", 1, 100)])

@@ -1240,10 +1240,9 @@ class ReadingPlanApp(tk.Tk):
                 )
             for row_index, deadline in enumerate(section_plan.deadlines, start=1):
                 book = deadline.book
-                bl = book.baseline_schedule
-                start_date = deadline.start_date if bl is None else bl.start_date
-                deadline_date = deadline.deadline if bl is None else bl.deadline
-                daily_target = deadline.daily_pages if bl is None else bl.daily_target
+                start_date = deadline.start_date
+                deadline_date = deadline.deadline
+                daily_target = deadline.daily_pages
                 if is_audiobook_section(section_plan.section.label):
                     values = {
                         "Book": book.number,

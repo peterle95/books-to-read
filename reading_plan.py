@@ -446,6 +446,13 @@ def insertion_splits_simultaneous_group(
     return None
 
 
+def _deadline_status(deadline: date, end_date: date) -> str:
+    if deadline < end_date:
+        return "before end"
+    if deadline == end_date:
+        return "on end date"
+    return "after end"
+
 def calculate_deadlines(
     books: list[Book],
     start_date: date,
@@ -496,12 +503,7 @@ def calculate_deadlines(
             deadline = end_date
             group_start_date = end_date
 
-        if deadline < end_date:
-            status = "before end"
-        elif deadline == end_date:
-            status = "on end date"
-        else:
-            status = "after end"
+        status = _deadline_status(deadline, end_date)
 
         individual_cumulative_pages = cumulative_pages - group_pages
         for group_book in group_books:
@@ -754,6 +756,71 @@ def apply_persisted_deadline_overrides(
 
 
 
+def _next_reading_day_after(
+    day: date, end_date: date, rest_days: list[RestDayRange] | None
+) -> date:
+    reading_dates = available_reading_days(day + timedelta(days=1), end_date, rest_days)
+    return reading_dates[0] if reading_dates else end_date + timedelta(days=1)
+
+
+def _reflow_deadlines_for_books(
+    books: list[Book],
+    start_date: date,
+    end_date: date,
+    daily_pace: float,
+    page_count: Callable[[Book], int],
+    rest_days: list[RestDayRange] | None,
+    cumulative_pages: int,
+) -> tuple[list[BookDeadline], date, int]:
+    group_pages = sum(page_count(book) for book in books)
+    cumulative_pages += group_pages
+    if group_pages and daily_pace > 0:
+        days_allocated = max(1, math.ceil(group_pages / daily_pace - 1e-9))
+    else:
+        days_allocated = 0
+
+    reading_dates = available_reading_days(start_date, end_date, rest_days)
+    fits = not group_pages or (
+        daily_pace > 0 and len(reading_dates) >= days_allocated
+    )
+    if not group_pages:
+        deadline = start_date if reading_dates else end_date
+        group_start = deadline
+    elif fits:
+        group_start = reading_dates[0]
+        deadline = reading_dates[days_allocated - 1]
+    else:
+        group_start = reading_dates[0] if reading_dates else end_date + timedelta(days=1)
+        deadline = end_date + timedelta(days=1)
+
+    status = _deadline_status(deadline, end_date)
+
+    deadlines: list[BookDeadline] = []
+    individual_cumulative_pages = cumulative_pages - group_pages
+    for book in books:
+        book_pages = page_count(book)
+        individual_cumulative_pages += book_pages
+        if book_pages == 0:
+            daily_pages = 0.0
+        elif len(books) == 1:
+            daily_pages = daily_pace
+        elif group_pages == 0:
+            daily_pages = 0.0
+        else:
+            daily_pages = daily_pace * book_pages / group_pages
+        deadlines.append(
+            BookDeadline(
+                book=book,
+                cumulative_pages=individual_cumulative_pages,
+                start_date=group_start,
+                deadline=deadline,
+                days_allocated=days_allocated,
+                daily_pages=daily_pages,
+                status=status,
+            )
+        )
+    return deadlines, deadline, cumulative_pages
+
 def build_remaining_section_plan(
     section: BookSection,
     start_date: date,
@@ -785,6 +852,7 @@ def build_remaining_section_plan(
     }
 
     if overridden_books:
+        page_count = lambda book: remaining_units(book, section.label)
         scheduled_deadlines, _scheduled_total, _scheduled_required, _scheduled_status = (
             build_plan(
                 section.books,
@@ -792,75 +860,128 @@ def build_remaining_section_plan(
                 end_date,
                 daily_pace,
                 active_simultaneous_groups(section),
-                lambda book: (
-                    0
-                    if book.number in overridden_books
-                    else remaining_units(book, section.label)
-                ),
+                lambda book: 0 if book.number in overridden_books else page_count(book),
                 rest_days,
             )
         )
-        deadlines = [
-            deadline
+        ordinary_by_number = {
+            deadline.book.number: deadline
             for deadline in scheduled_deadlines
             if deadline.book.number not in overridden_books
-        ]
-        for book in overridden_books.values():
-            override_deadline = book.deadline_override
-            override_start = effective_remaining_start_date(
-                remaining_start, override_deadline, today, rest_days
+        }
+        active_groups = active_simultaneous_groups(section)
+        group_by_first = {group[0]: group for group in active_groups}
+        grouped_book_ids = {book_id for group in active_groups for book_id in group}
+        books_by_number = {book.number: book for book in section.books}
+        scheduling_units: list[tuple[Book, list[Book]]] = []
+        for book in section.books:
+            if book.number in grouped_book_ids and book.number not in group_by_first:
+                continue
+            group_ids = group_by_first.get(book.number, (book.number,))
+            scheduling_units.append(
+                (book, [books_by_number[book_id] for book_id in group_ids])
             )
-            available_days = available_reading_days_count(
-                override_start, override_deadline, rest_days
-            )
-            remaining = remaining_units(book, section.label)
-            override_pace = (
-                remaining / available_days if remaining and available_days else 0.0
-            )
-            if override_deadline < end_date:
-                status = "before end"
-            elif override_deadline == end_date:
-                status = "on end date"
-            else:
-                status = "after end"
-            deadlines.append(
-                BookDeadline(
-                    book=book,
-                    cumulative_pages=remaining,
-                    start_date=override_start,
-                    deadline=override_deadline,
-                    days_allocated=available_days,
-                    daily_pages=override_pace,
-                    status=status,
+
+        deadlines: list[BookDeadline] = []
+        cursor = remaining_start
+        cumulative_pages = 0
+        reflowing = False
+        schedule_conflict = False
+        for first_book, unit_books in scheduling_units:
+            if first_book.number in overridden_books:
+                override_deadline = first_book.deadline_override
+                override_start = effective_remaining_start_date(
+                    remaining_start, override_deadline, today, rest_days
                 )
+                available_days = available_reading_days_count(
+                    override_start, override_deadline, rest_days
+                )
+                remaining = page_count(first_book)
+                override_pace = (
+                    remaining / available_days if remaining and available_days else 0.0
+                )
+                status = _deadline_status(override_deadline, end_date)
+                deadlines.append(
+                    BookDeadline(
+                        book=first_book,
+                        cumulative_pages=remaining,
+                        start_date=override_start,
+                        deadline=override_deadline,
+                        days_allocated=available_days,
+                        daily_pages=override_pace,
+                        status=status,
+                    )
+                )
+                if remaining:
+                    if override_deadline < cursor:
+                        schedule_conflict = True
+                    cursor = max(
+                        cursor,
+                        _next_reading_day_after(override_deadline, end_date, rest_days),
+                    )
+                continue
+
+            unit_work = sum(page_count(book) for book in unit_books)
+            ordinary = ordinary_by_number[first_book.number]
+            if not unit_work:
+                deadlines.extend(
+                    ordinary_by_number[book.number] for book in unit_books
+                )
+                continue
+            if not reflowing and ordinary.start_date >= cursor:
+                deadlines.extend(
+                    ordinary_by_number[book.number] for book in unit_books
+                )
+                cursor = _next_reading_day_after(ordinary.deadline, end_date, rest_days)
+                cumulative_pages = max(
+                    cumulative_pages,
+                    max(
+                        ordinary_by_number[book.number].cumulative_pages
+                        for book in unit_books
+                    ),
+                )
+                continue
+
+            reflowing = True
+            reflowed, reflow_deadline, cumulative_pages = _reflow_deadlines_for_books(
+                unit_books,
+                cursor,
+                end_date,
+                daily_pace,
+                page_count,
+                rest_days,
+                cumulative_pages,
             )
+            deadlines.extend(reflowed)
+            cursor = _next_reading_day_after(reflow_deadline, end_date, rest_days)
+
         deadlines.sort(key=lambda deadline: deadline.book.number)
-    else:
-        deadlines, _total_pages, required_pace, overall_status = build_plan(
-            section.books,
-            remaining_start,
-            end_date,
-            daily_pace,
-            active_simultaneous_groups(section),
-            lambda book: remaining_units(book, section.label),
-            rest_days,
+        overall_status = (
+            "achievable"
+            if not remaining_total
+            or (
+                period_days
+                and not schedule_conflict
+                and all(deadline.deadline <= end_date for deadline in deadlines)
+            )
+            else "not achievable"
         )
         return SectionPlan(
-            section, deadlines, daily_pace, _total_pages, required_pace, overall_status
+            section, deadlines, daily_pace, remaining_total, required_pace, overall_status
         )
 
-    overall_status = (
-        "achievable"
-        if not remaining_total
-        or (period_days and (not deadlines or max(
-            deadline.deadline for deadline in deadlines
-        ) <= end_date))
-        else "not achievable"
+    deadlines, _total_pages, required_pace, overall_status = build_plan(
+        section.books,
+        remaining_start,
+        end_date,
+        daily_pace,
+        active_simultaneous_groups(section),
+        lambda book: remaining_units(book, section.label),
+        rest_days,
     )
     return SectionPlan(
-        section, deadlines, daily_pace, remaining_total, required_pace, overall_status
+        section, deadlines, daily_pace, _total_pages, required_pace, overall_status
     )
-
 def build_remaining_section_plans(
     sections: list[BookSection],
     start_date: date,
