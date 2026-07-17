@@ -18,6 +18,7 @@ from reading_plan import (
     RestDayRange,
     SummaryStatsOptions,
     add_reading_session,
+    apply_deadline_override,
     available_reading_days_count,
     build_remaining_section_plans,
     completed_units,
@@ -245,6 +246,7 @@ class ReadingPlanApp(tk.Tk):
         self.title_vars: dict[str, tk.StringVar] = {}
         self.start_page_vars: dict[str, tk.StringVar] = {}
         self.end_page_vars: dict[str, tk.StringVar] = {}
+        self.deadline_override_vars: dict[str, tk.StringVar] = {}
         self.group_vars: dict[str, tk.StringVar] = {}
         self.stat_vars = {
             "book_counts": tk.BooleanVar(value=True),
@@ -508,6 +510,7 @@ class ReadingPlanApp(tk.Tk):
         self.title_vars[label] = tk.StringVar()
         self.start_page_vars[label] = tk.StringVar()
         self.end_page_vars[label] = tk.StringVar()
+        self.deadline_override_vars[label] = tk.StringVar()
         ttk.Label(editor, text="Title").grid(row=0, column=0, sticky="w")
         ttk.Entry(editor, textvariable=self.title_vars[label]).grid(
             row=0, column=1, sticky="ew", padx=(8, 12), columnspan=3
@@ -523,8 +526,12 @@ class ReadingPlanApp(tk.Tk):
             row=1, column=3, sticky="w", padx=(8, 0), pady=(10, 0)
         )
 
+        ttk.Label(editor, text="Deadline override").grid(row=2, column=0, sticky="w", pady=(10, 0))
+        ttk.Entry(editor, textvariable=self.deadline_override_vars[label], width=16).grid(row=2, column=1, sticky="w", padx=(8, 12), pady=(10, 0))
+        ttk.Label(editor, text="YYYY-MM-DD; blank clears it").grid(row=2, column=2, columnspan=2, sticky="w", pady=(10, 0))
+
         buttons = ttk.Frame(editor)
-        buttons.grid(row=2, column=0, columnspan=4, sticky="ew", pady=(10, 0))
+        buttons.grid(row=3, column=0, columnspan=4, sticky="ew", pady=(10, 0))
         actions = [
             ("Add", lambda section_label=label: self.add_book(section_label)),
             (
@@ -534,6 +541,9 @@ class ReadingPlanApp(tk.Tk):
             (
                 "Replace Selected",
                 lambda section_label=label: self.replace_selected_book(section_label),
+            ),
+            ("Set Deadline",
+                lambda section_label=label: self.set_selected_deadline_override(section_label),
             ),
             (
                 "Delete Selected",
@@ -1329,6 +1339,9 @@ class ReadingPlanApp(tk.Tk):
         self.title_vars[label].set(book.title)
         self.start_page_vars[label].set(display_value(label, book.start_page))
         self.end_page_vars[label].set(display_value(label, book.end_page))
+        self.deadline_override_vars[label].set(
+            "" if book.deadline_override is None else book.deadline_override.isoformat()
+        )
 
     def read_book_fields(
         self,
@@ -1441,6 +1454,28 @@ class ReadingPlanApp(tk.Tk):
         )
         self.after_book_edit(label, select_index=index)
 
+    def set_selected_deadline_override(self, label: str) -> None:
+        section = self.section_by_label(label)
+        index = self.selected_book_index(label)
+        if index is None:
+            self.show_error("Select a book first")
+            return
+        try:
+            _start_date, end_date, _end_label, _end_name = self.current_dates()
+            raw_deadline = self.deadline_override_vars[label].get().strip()
+            deadline = None if not raw_deadline else parse_date(raw_deadline)
+            apply_deadline_override(
+                section,
+                section.books[index],
+                deadline,
+                end_date,
+                date.today(),
+                self.rest_days,
+            )
+        except ValueError as error:
+            self.show_error(str(error))
+            return
+        self.after_state_change()
     def replace_selected_book(self, label: str) -> None:
         section = self.section_by_label(label)
         index = self.selected_book_index(label)
@@ -1476,6 +1511,7 @@ class ReadingPlanApp(tk.Tk):
             current_page=current_page,
             reading_sessions=reading_sessions,
             baseline_schedule=old_book.baseline_schedule,
+            deadline_override=old_book.deadline_override,
         )
         self.after_book_edit(label, select_index=index)
 

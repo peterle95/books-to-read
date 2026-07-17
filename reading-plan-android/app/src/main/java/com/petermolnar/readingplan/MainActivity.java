@@ -709,6 +709,10 @@ public class MainActivity extends Activity {
                 selected == null ? "" : displayValue(section.label, selected.endPage),
                 audiobookSection ? InputType.TYPE_CLASS_TEXT : InputType.TYPE_CLASS_NUMBER
         );
+        EditText deadlineInput = editText(
+                selected == null || selected.deadlineOverride == null ? "" : selected.deadlineOverride.toString(),
+                InputType.TYPE_CLASS_TEXT
+        );
 
         box.addView(label("Title"));
         box.addView(titleInput);
@@ -716,6 +720,21 @@ public class MainActivity extends Activity {
         box.addView(startPageInput);
         box.addView(label(audiobookSection ? "End time" : "End page"));
         box.addView(endPageInput);
+        box.addView(label("Deadline override (YYYY-MM-DD; blank clears it)"));
+        box.addView(deadlineInput);
+        box.addView(actionButton("Set deadline", v -> {
+            try {
+                if (selected == null) {
+                    throw new IllegalArgumentException("Select a book first");
+                }
+                String raw = deadlineInput.getText().toString().trim();
+                LocalDate override = raw.isEmpty() ? null : parseDate(raw);
+                applyDeadlineOverride(section, selected, override, endDate);
+                afterStateChange("Deadline override updated");
+            } catch (IllegalArgumentException ex) {
+                showError(ex.getMessage());
+            }
+        }));
 
         LinearLayout buttons1 = row();
         buttons1.addView(actionButton("Add", v -> {
@@ -790,7 +809,7 @@ public class MainActivity extends Activity {
             List<ReadingSession> sessions = oldBook.startPage == fields.startPage && oldBook.endPage == fields.endPage
                     ? oldBook.readingSessions
                     : new ArrayList<>();
-            section.books.set(selectedBookIndex, new Book(oldBook.number, fields.title, fields.startPage, fields.endPage, currentPage, sessions, oldBook.baselineSchedule));
+            section.books.set(selectedBookIndex, new Book(oldBook.number, fields.title, fields.startPage, fields.endPage, currentPage, sessions, oldBook.baselineSchedule, oldBook.deadlineOverride));
             invalidateBaselineSchedules(section);
             afterStateChange("Book replaced");
         }));
@@ -1380,7 +1399,7 @@ public class MainActivity extends Activity {
     private String jsonText() throws JSONException {
         initializeMissingBaselineSchedules();
         JSONObject payload = new JSONObject();
-        payload.put("schema_version", 6);
+        payload.put("schema_version", 7);
         payload.put("start_date", startDate.toString());
         payload.put("end_date", endDate.toString());
         payload.put("end_label", endLabel);
@@ -1446,6 +1465,7 @@ public class MainActivity extends Activity {
         object.put("number", book.number);
         object.put("title", book.title);
         object.put("baseline_schedule", baselineScheduleToJson(book.baselineSchedule));
+        object.put("deadline_override", book.deadlineOverride == null ? JSONObject.NULL : book.deadlineOverride.toString());
         if (isAudiobookSection(sectionLabel)) {
             object.put("start_time_seconds", book.startPage);
             object.put("end_time_seconds", book.endPage);
@@ -1628,7 +1648,11 @@ public class MainActivity extends Activity {
         if (object.has("baseline_schedule") && !object.isNull("baseline_schedule")) {
             baselineSchedule = baselineScheduleFromJson(object.getJSONObject("baseline_schedule"));
         }
-        return new Book(fallbackNumber, title, startPage, endPage, currentPage, sessions, baselineSchedule);
+        LocalDate deadlineOverride = null;
+        if (object.has("deadline_override") && !object.isNull("deadline_override")) {
+            deadlineOverride = parseDate(object.getString("deadline_override"));
+        }
+        return new Book(fallbackNumber, title, startPage, endPage, currentPage, sessions, baselineSchedule, deadlineOverride);
     }
 
     private static Object baselineScheduleToJson(BaselineSchedule schedule) throws JSONException {
@@ -2159,6 +2183,7 @@ public class MainActivity extends Activity {
                         deadline.startDate, deadline.deadline, deadline.dailyPages
                 );
             }
+            applyPersistedDeadlineOverrides(section, planEnd);
             section.baselineNeedsRecalculation = false;
         }
     }
@@ -2188,7 +2213,83 @@ public class MainActivity extends Activity {
                         deadline.startDate, deadline.deadline, deadline.dailyPages
                 );
             }
+            applyPersistedDeadlineOverrides(section, planEnd);
             section.baselineNeedsRecalculation = false;
+        }
+    }
+    private void applyDeadlineOverride(BookSection section, Book book, LocalDate override, LocalDate planEnd) {
+        if (book.baselineSchedule == null) {
+            throw new IllegalArgumentException("calculate the plan before setting a deadline override");
+        }
+        if (override != null) {
+            if (override.isBefore(LocalDate.now())) {
+                throw new IllegalArgumentException("deadline override cannot be before today");
+            }
+            if (override.isAfter(planEnd)) {
+                throw new IllegalArgumentException("deadline override cannot be after the plan finish date");
+            }
+        }
+        List<Integer> containingGroup = null;
+        for (List<Integer> group : section.simultaneousGroups) {
+            if (group.contains(book.number)) {
+                containingGroup = group;
+                break;
+            }
+        }
+        book.deadlineOverride = override;
+        LocalDate deadline = override == null ? planEnd : override;
+        if (override == null && containingGroup != null) {
+            for (Integer bookId : containingGroup) {
+                Book other = section.books.get(bookId - 1);
+                if (bookId != book.number && other.baselineSchedule != null) {
+                    deadline = other.baselineSchedule.deadline;
+                    break;
+                }
+            }
+        }
+        LocalDate start = book.baselineSchedule.startDate;
+        int remaining = unitsRemaining(book, section.label);
+        LocalDate paceStart = effectiveRemainingStartDate(start, deadline, LocalDate.now());
+        int availableDays = availableReadingDaysCount(paceStart, deadline);
+        double dailyTarget = remaining == 0 || availableDays == 0 ? 0.0 : (double) remaining / availableDays;
+        book.baselineSchedule = new BaselineSchedule(start, deadline, dailyTarget);
+
+        if (containingGroup != null) {
+            List<Integer> activeGroup = new ArrayList<>();
+            for (Integer bookId : containingGroup) {
+                if (section.books.get(bookId - 1).deadlineOverride == null) {
+                    activeGroup.add(bookId);
+                }
+            }
+            if (activeGroup.size() >= 2) {
+                BaselineSchedule reference = section.books.get(activeGroup.get(0) - 1).baselineSchedule;
+                int groupRemaining = 0;
+                for (Integer bookId : activeGroup) {
+                    groupRemaining += unitsRemaining(section.books.get(bookId - 1), section.label);
+                }
+                LocalDate groupStart = effectiveRemainingStartDate(reference.startDate, reference.deadline, LocalDate.now());
+                int groupDays = availableReadingDaysCount(groupStart, reference.deadline);
+                double groupPace = groupRemaining == 0 || groupDays == 0 ? 0.0 : (double) groupRemaining / groupDays;
+                for (Integer bookId : activeGroup) {
+                    Book groupBook = section.books.get(bookId - 1);
+                    int bookRemaining = unitsRemaining(groupBook, section.label);
+                    double bookTarget = groupRemaining == 0 || bookRemaining == 0
+                            ? 0.0
+                            : groupPace * bookRemaining / groupRemaining;
+                    groupBook.baselineSchedule = new BaselineSchedule(
+                            reference.startDate, reference.deadline, bookTarget
+                    );
+                }
+            }
+        }
+        section.baselineNeedsRecalculation = false;
+    }
+
+    private void applyPersistedDeadlineOverrides(BookSection section, LocalDate planEnd) {
+        for (Book book : section.books) {
+            if (book.deadlineOverride != null) {
+                applyDeadlineOverride(section, book, book.deadlineOverride, planEnd);
+            }
         }
     }
     private void invalidateBaselineSchedules(BookSection section) {
@@ -2276,10 +2377,25 @@ public class MainActivity extends Activity {
         );
     }
 
+    private List<List<Integer>> activeSimultaneousGroups(BookSection section) {
+        List<List<Integer>> activeGroups = new ArrayList<>();
+        for (List<Integer> group : section.simultaneousGroups) {
+            List<Integer> active = new ArrayList<>();
+            for (Integer bookId : group) {
+                if (section.books.get(bookId - 1).deadlineOverride == null) {
+                    active.add(bookId);
+                }
+            }
+            if (active.size() >= 2) {
+                activeGroups.add(active);
+            }
+        }
+        return activeGroups;
+    }
     private double currentRequiredSectionPace(BookSection section, LocalDate today) {
         Set<Integer> groupedBookIds = new HashSet<>();
         double highestPace = 0.0;
-        for (List<Integer> group : section.simultaneousGroups) {
+        for (List<Integer> group : activeSimultaneousGroups(section)) {
             double groupPace = 0.0;
             for (Integer bookId : group) {
                 Book book = section.books.get(bookId - 1);
@@ -2318,7 +2434,7 @@ public class MainActivity extends Activity {
         }
         int periodDays = availableReadingDaysCount(start, end);
         double requiredPace = periodDays == 0 ? 0.0 : (double) totalPages / periodDays;
-        List<BookDeadline> deadlines = calculateDeadlines(section.books, start, end, dailyPace, section.simultaneousGroups, counter);
+        List<BookDeadline> deadlines = calculateDeadlines(section.books, start, end, dailyPace, activeSimultaneousGroups(section), counter);
         String overallStatus = totalPages == 0
                 || (periodDays > 0
                 && (deadlines.isEmpty() || !deadlines.get(deadlines.size() - 1).deadline.isAfter(end)))
@@ -2335,7 +2451,7 @@ public class MainActivity extends Activity {
             List<List<Integer>> simultaneousGroups,
             PageCounter counter
     ) {
-        List<List<Integer>> groups = validateSimultaneousGroups(books, simultaneousGroups);
+        List<List<Integer>> groups = validateSimultaneousGroups(books, simultaneousGroups, false);
         Map<Integer, List<Integer>> groupByFirst = new HashMap<>();
         Set<Integer> groupedIds = new HashSet<>();
         for (List<Integer> group : groups) {
@@ -2343,6 +2459,10 @@ public class MainActivity extends Activity {
             groupedIds.addAll(group);
         }
 
+        Map<Integer, Book> booksByNumber = new HashMap<>();
+        for (Book book : books) {
+            booksByNumber.put(book.number, book);
+        }
         List<BookDeadline> deadlines = new ArrayList<>();
         List<LocalDate> readingDates = availableReadingDays(start, end);
         int cumulativePages = 0;
@@ -2357,7 +2477,10 @@ public class MainActivity extends Activity {
             List<Integer> groupIds = groupByFirst.containsKey(book.number)
                     ? groupByFirst.get(book.number)
                     : Collections.singletonList(book.number);
-            List<Book> groupBooks = books.subList(bookIndex, Math.min(bookIndex + groupIds.size(), books.size()));
+            List<Book> groupBooks = new ArrayList<>();
+            for (Integer groupId : groupIds) {
+                groupBooks.add(booksByNumber.get(groupId));
+            }
             int groupPages = 0;
             for (Book groupBook : groupBooks) {
                 groupPages += counter.pages(groupBook);
@@ -2412,7 +2535,7 @@ public class MainActivity extends Activity {
                 ));
             }
             previousCumulativeDays = cumulativeDays;
-            bookIndex += groupBooks.size();
+            bookIndex++;
         }
         return deadlines;
     }
@@ -2570,6 +2693,10 @@ public class MainActivity extends Activity {
     }
 
     private static List<List<Integer>> validateSimultaneousGroups(List<Book> books, List<List<Integer>> groups) {
+        return validateSimultaneousGroups(books, groups, true);
+    }
+
+    private static List<List<Integer>> validateSimultaneousGroups(List<Book> books, List<List<Integer>> groups, boolean requireConsecutive) {
         Set<Integer> usedIds = new HashSet<>();
         List<List<Integer>> valid = new ArrayList<>();
         for (List<Integer> rawGroup : groups) {
@@ -2586,7 +2713,7 @@ public class MainActivity extends Activity {
                 throw new IllegalArgumentException("Book IDs must be from 1 to " + books.size());
             }
             for (int i = 0; i < group.size(); i++) {
-                if (group.get(i) != group.get(0) + i) {
+                if (requireConsecutive && group.get(i) != group.get(0) + i) {
                     throw new IllegalArgumentException("Book IDs read together must be consecutive");
                 }
             }
@@ -3284,6 +3411,7 @@ public class MainActivity extends Activity {
         Integer currentPage;
         final List<ReadingSession> readingSessions;
         BaselineSchedule baselineSchedule;
+        LocalDate deadlineOverride;
 
         Book(int number, String title, int startPage, int endPage) {
             this(number, title, startPage, endPage, null, new ArrayList<>(), null);
@@ -3309,8 +3437,28 @@ public class MainActivity extends Activity {
             this.currentPage = currentPage;
             this.readingSessions = readingSessions;
             this.baselineSchedule = baselineSchedule;
+            this.deadlineOverride = null;
         }
 
+        Book(
+                int number,
+                String title,
+                int startPage,
+                int endPage,
+                Integer currentPage,
+                List<ReadingSession> readingSessions,
+                BaselineSchedule baselineSchedule,
+                LocalDate deadlineOverride
+        ) {
+            this.number = number;
+            this.title = title;
+            this.startPage = startPage;
+            this.endPage = endPage;
+            this.currentPage = currentPage;
+            this.readingSessions = readingSessions;
+            this.baselineSchedule = baselineSchedule;
+            this.deadlineOverride = deadlineOverride;
+        }
         int pages() {
             return endPage - startPage + 1;
         }
