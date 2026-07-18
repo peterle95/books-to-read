@@ -647,7 +647,6 @@ public class MainActivity extends Activity {
                 }
                 restDays.add(range);
                 normalizeRestDayRanges();
-                invalidateAllBaselineSchedules();
                 afterStateChange("Rest-day range added");
             } catch (IllegalArgumentException ex) {
                 showError(ex.getMessage());
@@ -724,34 +723,53 @@ public class MainActivity extends Activity {
                 selected == null ? "" : displayValue(section.label, selected.endPage),
                 audiobookSection ? InputType.TYPE_CLASS_TEXT : InputType.TYPE_CLASS_NUMBER
         );
+        EditText startDateInput = editText(
+                selected == null || selected.startDateOverride == null ? "" : selected.startDateOverride.toString(),
+                InputType.TYPE_CLASS_TEXT
+        );
+        startDateInput.setFocusable(false);
+        startDateInput.setOnClickListener(v -> {
+            LocalDate initial = selected != null && selected.startDateOverride != null
+                    ? selected.startDateOverride : LocalDate.now();
+            DatePickerDialog picker = new DatePickerDialog(this, (view, y, m, d) -> {
+                startDateInput.setText(String.format(Locale.US, "%04d-%02d-%02d", y, m + 1, d));
+            }, initial.getYear(), initial.getMonthValue() - 1, initial.getDayOfMonth());
+            picker.show();
+        });
         EditText deadlineInput = editText(
                 selected == null || selected.deadlineOverride == null ? "" : selected.deadlineOverride.toString(),
                 InputType.TYPE_CLASS_TEXT
         );
         deadlineInput.setFocusable(false);
         deadlineInput.setOnClickListener(v -> {
-            int year, month, day;
-            if (selected != null && selected.deadlineOverride != null) {
-                year = selected.deadlineOverride.getYear();
-                month = selected.deadlineOverride.getMonthValue() - 1;
-                day = selected.deadlineOverride.getDayOfMonth();
-            } else {
-                year = LocalDate.now().getYear();
-                month = LocalDate.now().getMonthValue() - 1;
-                day = LocalDate.now().getDayOfMonth();
-            }
+            LocalDate initial = selected != null && selected.deadlineOverride != null
+                    ? selected.deadlineOverride : LocalDate.now();
             DatePickerDialog picker = new DatePickerDialog(this, (view, y, m, d) -> {
                 deadlineInput.setText(String.format(Locale.US, "%04d-%02d-%02d", y, m + 1, d));
-            }, year, month, day);
+            }, initial.getYear(), initial.getMonthValue() - 1, initial.getDayOfMonth());
             picker.show();
         });
-
         box.addView(label("Title"));
         box.addView(titleInput);
         box.addView(label(audiobookSection ? "Start time" : "Start page"));
         box.addView(startPageInput);
         box.addView(label(audiobookSection ? "End time" : "End page"));
         box.addView(endPageInput);
+        box.addView(label("Start date override (YYYY-MM-DD; blank clears it)"));
+        box.addView(startDateInput);
+        box.addView(actionButton("Set start date", v -> {
+            try {
+                if (selected == null) {
+                    throw new IllegalArgumentException("Select a book first");
+                }
+                String raw = startDateInput.getText().toString().trim();
+                LocalDate override = raw.isEmpty() ? null : parseDate(raw);
+                applyStartDateOverride(section, selected, override, startDate);
+                afterStateChange("Start date override updated");
+            } catch (IllegalArgumentException ex) {
+                showError(ex.getMessage());
+            }
+        }));
         box.addView(label("Deadline override (YYYY-MM-DD; blank clears it)"));
         box.addView(deadlineInput);
         box.addView(actionButton("Set deadline", v -> {
@@ -841,7 +859,7 @@ public class MainActivity extends Activity {
             List<ReadingSession> sessions = oldBook.startPage == fields.startPage && oldBook.endPage == fields.endPage
                     ? oldBook.readingSessions
                     : new ArrayList<>();
-            section.books.set(selectedBookIndex, new Book(oldBook.number, fields.title, fields.startPage, fields.endPage, currentPage, sessions, oldBook.baselineSchedule, oldBook.deadlineOverride));
+            section.books.set(selectedBookIndex, new Book(oldBook.number, fields.title, fields.startPage, fields.endPage, currentPage, sessions, oldBook.baselineSchedule, oldBook.deadlineOverride, oldBook.startDateOverride));
             invalidateBaselineSchedules(section);
             afterStateChange("Book replaced");
         }));
@@ -1498,6 +1516,7 @@ public class MainActivity extends Activity {
         object.put("title", book.title);
         object.put("baseline_schedule", baselineScheduleToJson(book.baselineSchedule));
         object.put("deadline_override", book.deadlineOverride == null ? JSONObject.NULL : book.deadlineOverride.toString());
+        object.put("start_date_override", book.startDateOverride == null ? JSONObject.NULL : book.startDateOverride.toString());
         if (isAudiobookSection(sectionLabel)) {
             object.put("start_time_seconds", book.startPage);
             object.put("end_time_seconds", book.endPage);
@@ -1684,7 +1703,11 @@ public class MainActivity extends Activity {
         if (object.has("deadline_override") && !object.isNull("deadline_override")) {
             deadlineOverride = parseDate(object.getString("deadline_override"));
         }
-        return new Book(fallbackNumber, title, startPage, endPage, currentPage, sessions, baselineSchedule, deadlineOverride);
+        LocalDate startDateOverride = null;
+        if (object.has("start_date_override") && !object.isNull("start_date_override")) {
+            startDateOverride = parseDate(object.getString("start_date_override"));
+        }
+        return new Book(fallbackNumber, title, startPage, endPage, currentPage, sessions, baselineSchedule, deadlineOverride, startDateOverride);
     }
 
     private static Object baselineScheduleToJson(BaselineSchedule schedule) throws JSONException {
@@ -2126,8 +2149,16 @@ public class MainActivity extends Activity {
             return completed;
         }
 
+        LocalDate paceStart = deadline.startDate;
+        if (book.currentPage != null && LocalDate.now().isAfter(paceStart)) {
+            paceStart = LocalDate.now();
+        }
+        if (targetDate.isBefore(paceStart)) {
+            return completed;
+        }
+
         LocalDate activeDate = targetDate.isAfter(deadline.deadline) ? deadline.deadline : targetDate;
-        int elapsedDays = availableReadingDaysCount(deadline.startDate, activeDate);
+        int elapsedDays = availableReadingDaysCount(paceStart, activeDate);
         int scheduledUnits = (int) Math.ceil(deadline.dailyPages * elapsedDays - 1e-9);
         return Math.min(Math.max(completed + scheduledUnits, completed), total);
     }
@@ -2290,7 +2321,7 @@ public class MainActivity extends Activity {
         if (containingGroup != null) {
             List<Integer> activeGroup = new ArrayList<>();
             for (Integer bookId : containingGroup) {
-                if (section.books.get(bookId - 1).deadlineOverride == null) {
+                if (section.books.get(bookId - 1).deadlineOverride == null && section.books.get(bookId - 1).startDateOverride == null) {
                     activeGroup.add(bookId);
                 }
             }
@@ -2318,10 +2349,35 @@ public class MainActivity extends Activity {
         section.baselineNeedsRecalculation = false;
     }
 
+    private void applyStartDateOverride(BookSection section, Book book, LocalDate override, LocalDate planStart) {
+        if (book.baselineSchedule == null) {
+            throw new IllegalArgumentException("calculate the plan before setting a start date override");
+        }
+        LocalDate deadline = book.baselineSchedule.deadline;
+        if (override != null && override.isAfter(deadline)) {
+            throw new IllegalArgumentException("start date override cannot be after the deadline");
+        }
+        book.startDateOverride = override;
+        LocalDate start = override == null
+                ? (planStart == null ? book.baselineSchedule.startDate : planStart)
+                : override;
+        int remaining = unitsRemaining(book, section.label);
+        LocalDate paceStart = effectiveRemainingStartDate(start, deadline, LocalDate.now());
+        int availableDays = availableReadingDaysCount(paceStart, deadline);
+        double dailyTarget = remaining == 0 || availableDays == 0 ? 0.0 : (double) remaining / availableDays;
+        book.baselineSchedule = new BaselineSchedule(start, deadline, dailyTarget);
+        section.baselineNeedsRecalculation = false;
+    }
+
     private void applyPersistedDeadlineOverrides(BookSection section, LocalDate planEnd) {
         for (Book book : section.books) {
             if (book.deadlineOverride != null) {
                 applyDeadlineOverride(section, book, book.deadlineOverride, planEnd);
+            }
+        }
+        for (Book book : section.books) {
+            if (book.startDateOverride != null) {
+                applyStartDateOverride(section, book, book.startDateOverride, null);
             }
         }
     }
@@ -2421,7 +2477,7 @@ public class MainActivity extends Activity {
         for (List<Integer> group : section.simultaneousGroups) {
             List<Integer> active = new ArrayList<>();
             for (Integer bookId : group) {
-                if (section.books.get(bookId - 1).deadlineOverride == null) {
+                if (section.books.get(bookId - 1).deadlineOverride == null && section.books.get(bookId - 1).startDateOverride == null) {
                     active.add(bookId);
                 }
             }
@@ -3097,7 +3153,6 @@ public class MainActivity extends Activity {
                     new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
             row.addView(secondaryButton("Remove", v -> {
                 restDays.remove(rangeIndex);
-                invalidateAllBaselineSchedules();
                 afterStateChange("Rest-day range removed");
             }));
             container.addView(row);
@@ -3416,13 +3471,14 @@ public class MainActivity extends Activity {
         final List<ReadingSession> readingSessions;
         BaselineSchedule baselineSchedule;
         LocalDate deadlineOverride;
+        LocalDate startDateOverride;
 
         Book(int number, String title, int startPage, int endPage) {
-            this(number, title, startPage, endPage, null, new ArrayList<>(), null);
+            this(number, title, startPage, endPage, null, new ArrayList<>(), null, null, null);
         }
 
         Book(int number, String title, int startPage, int endPage, Integer currentPage, List<ReadingSession> readingSessions) {
-            this(number, title, startPage, endPage, currentPage, readingSessions, null);
+            this(number, title, startPage, endPage, currentPage, readingSessions, null, null, null);
         }
 
         Book(
@@ -3434,14 +3490,7 @@ public class MainActivity extends Activity {
                 List<ReadingSession> readingSessions,
                 BaselineSchedule baselineSchedule
         ) {
-            this.number = number;
-            this.title = title;
-            this.startPage = startPage;
-            this.endPage = endPage;
-            this.currentPage = currentPage;
-            this.readingSessions = readingSessions;
-            this.baselineSchedule = baselineSchedule;
-            this.deadlineOverride = null;
+            this(number, title, startPage, endPage, currentPage, readingSessions, baselineSchedule, null, null);
         }
 
         Book(
@@ -3454,6 +3503,20 @@ public class MainActivity extends Activity {
                 BaselineSchedule baselineSchedule,
                 LocalDate deadlineOverride
         ) {
+            this(number, title, startPage, endPage, currentPage, readingSessions, baselineSchedule, deadlineOverride, null);
+        }
+
+        Book(
+                int number,
+                String title,
+                int startPage,
+                int endPage,
+                Integer currentPage,
+                List<ReadingSession> readingSessions,
+                BaselineSchedule baselineSchedule,
+                LocalDate deadlineOverride,
+                LocalDate startDateOverride
+        ) {
             this.number = number;
             this.title = title;
             this.startPage = startPage;
@@ -3462,6 +3525,7 @@ public class MainActivity extends Activity {
             this.readingSessions = readingSessions;
             this.baselineSchedule = baselineSchedule;
             this.deadlineOverride = deadlineOverride;
+            this.startDateOverride = startDateOverride;
         }
         int pages() {
             return endPage - startPage + 1;
@@ -3474,7 +3538,6 @@ public class MainActivity extends Activity {
             return Math.min(Math.max(currentPage - startPage + 1, 0), pages());
         }
     }
-
     private static class BookSection {
         final String label;
         final List<Book> books = new ArrayList<>();

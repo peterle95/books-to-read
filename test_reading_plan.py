@@ -15,6 +15,7 @@ from reading_plan import (
     add_reading_session,
     apply_persisted_deadline_overrides,
     apply_deadline_override,
+    apply_start_date_override,
     validate_deadline_override,
     build_remaining_section_plans,
     calculate_baseline_schedules,
@@ -330,6 +331,51 @@ class RestDayScheduleTests(unittest.TestCase):
 
 
 
+class StartDateOverrideTests(unittest.TestCase):
+    def make_sections(self):
+        return [
+            BookSection("Physical books", [Book(1, "One", 1, 100)], []),
+            BookSection("Digital books", [], []),
+            BookSection("Audiobooks", [], []),
+        ]
+
+    def test_future_start_date_changes_remaining_daily_pages(self):
+        sections = self.make_sections()
+        calculate_baseline_schedules(sections, date(2026, 7, 1), date(2026, 7, 31))
+        apply_start_date_override(
+            sections[0], sections[0].books[0], date(2026, 7, 25), date(2026, 7, 31), date(2026, 7, 10)
+        )
+
+        book = sections[0].books[0]
+        self.assertEqual(date(2026, 7, 25), book.baseline_schedule.start_date)
+        self.assertAlmostEqual(100 / 7, book.baseline_schedule.daily_target)
+
+    def test_past_start_date_uses_today_for_daily_pages(self):
+        sections = self.make_sections()
+        calculate_baseline_schedules(sections, date(2026, 7, 1), date(2026, 7, 31))
+        apply_start_date_override(
+            sections[0], sections[0].books[0], date(2026, 7, 1), date(2026, 7, 31), date(2026, 7, 10)
+        )
+
+        book = sections[0].books[0]
+        self.assertEqual(date(2026, 7, 1), book.baseline_schedule.start_date)
+        self.assertAlmostEqual(100 / 22, book.baseline_schedule.daily_target)
+
+    def test_rest_days_recalculate_pace_without_changing_book_dates(self):
+        sections = self.make_sections()
+        calculate_baseline_schedules(sections, date(2026, 7, 1), date(2026, 7, 7))
+        baseline = sections[0].books[0].baseline_schedule
+        rest_days = [RestDayRange(date(2026, 7, 3), date(2026, 7, 4))]
+
+        plans, *_ = build_remaining_section_plans(
+            sections, date(2026, 7, 1), date(2026, 7, 7), date(2026, 7, 1), rest_days
+        )
+
+        deadline = plans[0].deadlines[0]
+        self.assertEqual(baseline.start_date, deadline.start_date)
+        self.assertEqual(baseline.deadline, deadline.deadline)
+        self.assertAlmostEqual(20, deadline.daily_pages)
+
 class DeadlineOverrideTests(unittest.TestCase):
     def make_sections(self, books, groups=()):
         return [
@@ -600,9 +646,9 @@ class DeadlineOverrideTests(unittest.TestCase):
         )
         deadlines = {item.book.number: item for item in plans[0].deadlines}
 
-        self.assertEqual(date(2026, 8, 4), deadlines[3].start_date)
-        self.assertEqual(date(2026, 8, 12), deadlines[3].deadline)
-        self.assertEqual(9, deadlines[3].days_allocated)
+        self.assertEqual(date(2026, 8, 24), deadlines[3].start_date)
+        self.assertEqual(date(2026, 8, 31), deadlines[3].deadline)
+        self.assertEqual(8, deadlines[3].days_allocated)
 
     def test_remaining_plan_reports_not_achievable_when_reflow_runs_past_plan_end(self):
         sections = self.make_sections(
@@ -730,6 +776,25 @@ class DeadlineOverrideTests(unittest.TestCase):
         self.assertEqual(date(2026, 8, 1), session_deadline.deadline)
         self.assertAlmostEqual(100 / 23, session_deadline.daily_pages)
         self.assertEqual(27, target)
+
+    def test_session_target_starts_from_today_current_page(self):
+        book = Book(1, "capital", 1, 1041)
+        add_reading_session(book, date(2026, 7, 15), 1000)
+        deadline = BookDeadline(
+            book=book,
+            cumulative_pages=0,
+            start_date=date(2026, 7, 5),
+            deadline=date(2026, 7, 31),
+            days_allocated=0,
+            daily_pages=2.93,
+            status="",
+        )
+
+        target = target_units_for_date(
+            book, "Physical books", deadline, date(2026, 7, 17)
+        )
+
+        self.assertEqual(1003, target)
 
     def test_building_remaining_plan_does_not_change_baseline_schedule(self):
         sections = self.make_sections([Book(1, "One", 1, 100)])

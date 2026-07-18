@@ -102,6 +102,7 @@ class Book:
     reading_sessions: list[ReadingSession] = field(default_factory=list)
     baseline_schedule: BaselineSchedule | None = None
     deadline_override: date | None = None
+    start_date_override: date | None = None
 
     @property
     def pages(self) -> int:
@@ -162,6 +163,11 @@ def validate_deadline_override(
         raise ValueError("deadline override cannot be after the plan finish date")
 
 
+def validate_start_date_override(start_date: date, deadline: date) -> None:
+    if start_date > deadline:
+        raise ValueError("start date override cannot be after the deadline")
+
+
 def active_simultaneous_groups(section: BookSection) -> list[tuple[int, ...]]:
     """Return groups after independently scheduled books are excluded."""
     active_groups: list[tuple[int, ...]] = []
@@ -169,7 +175,10 @@ def active_simultaneous_groups(section: BookSection) -> list[tuple[int, ...]]:
         active_ids = tuple(
             book_id
             for book_id in group
-            if section.books[book_id - 1].deadline_override is None
+            if (
+                section.books[book_id - 1].deadline_override is None
+                and section.books[book_id - 1].start_date_override is None
+            )
         )
         if len(active_ids) >= 2:
             active_groups.append(active_ids)
@@ -613,6 +622,50 @@ def build_section_plans(
     return summarize_section_plans(section_plans)
 
 
+def _rest_adjusted_daily_targets(
+    section: BookSection,
+    deadlines: list[BookDeadline],
+    page_count: Callable[[Book], int],
+    rest_days: list[RestDayRange] | None,
+) -> dict[int, float]:
+    """Return targets for fixed schedule dates, excluding rest days from pace."""
+    groups = {
+        book_id: group
+        for group in active_simultaneous_groups(section)
+        for book_id in group
+    }
+    by_number = {book.number: book for book in section.books}
+    targets: dict[int, float] = {}
+    for deadline in deadlines:
+        group = groups.get(deadline.book.number, (deadline.book.number,))
+        group_books = [by_number[book_id] for book_id in group]
+        group_work = sum(page_count(book) for book in group_books)
+        group_days = available_reading_days_count(
+            deadline.start_date, deadline.deadline, rest_days
+        )
+        group_pace = group_work / group_days if group_work and group_days else 0.0
+        book_work = page_count(deadline.book)
+        targets[deadline.book.number] = (
+            group_pace * book_work / group_work if group_work and book_work else 0.0
+        )
+    return targets
+
+
+def _store_baseline_schedules(
+    section: BookSection,
+    deadlines: list[BookDeadline],
+    page_count: Callable[[Book], int],
+    rest_days: list[RestDayRange] | None,
+) -> None:
+    targets = _rest_adjusted_daily_targets(section, deadlines, page_count, rest_days)
+    for deadline in deadlines:
+        deadline.book.baseline_schedule = BaselineSchedule(
+            deadline.start_date,
+            deadline.deadline,
+            targets[deadline.book.number],
+        )
+
+
 def calculate_baseline_schedules(
     sections: list[BookSection],
     start_date: date,
@@ -620,13 +673,14 @@ def calculate_baseline_schedules(
     rest_days: list[RestDayRange] | None = None,
 ) -> None:
     for section in sections:
-        for deadline in build_section_plan(
-            section, start_date, end_date, rest_days
-        ).deadlines:
-            deadline.book.baseline_schedule = BaselineSchedule(
-                deadline.start_date, deadline.deadline, deadline.daily_pages
-            )
-        apply_persisted_deadline_overrides(section, end_date, rest_days=rest_days)
+        # Rest days alter pace, not the dates assigned by the baseline plan.
+        plan = build_section_plan(section, start_date, end_date).deadlines
+        _store_baseline_schedules(
+            section, plan, lambda book: total_units(book, section.label), rest_days
+        )
+        apply_persisted_deadline_overrides(
+            section, end_date, rest_days=rest_days, plan_start=start_date
+        )
         section.baseline_needs_recalculation = False
 
 
@@ -638,31 +692,26 @@ def recalculate_baseline_schedules(
 ) -> None:
     """Replace every baseline with a schedule for the current unfinished work."""
     for section in sections:
-        daily_pace = (
-            sum(remaining_units(book, section.label) for book in section.books)
-            / available_reading_days_count(start_date, end_date, rest_days)
-            if section.books
-            and available_reading_days_count(start_date, end_date, rest_days)
-            else 0.0
-        )
-        deadlines, _total_units, _required_pace, _overall_status = build_plan(
+        plan = build_plan(
             section.books,
             start_date,
             end_date,
-            daily_pace,
+            (
+                sum(remaining_units(book, section.label) for book in section.books)
+                / available_reading_days_count(start_date, end_date)
+                if section.books and available_reading_days_count(start_date, end_date)
+                else 0.0
+            ),
             active_simultaneous_groups(section),
             lambda book: remaining_units(book, section.label),
-            rest_days,
+        )[0]
+        _store_baseline_schedules(
+            section, plan, lambda book: remaining_units(book, section.label), rest_days
         )
-        for deadline in deadlines:
-            deadline.book.baseline_schedule = BaselineSchedule(
-                deadline.start_date, deadline.deadline, deadline.daily_pages
-            )
-        apply_persisted_deadline_overrides(section, end_date, rest_days=rest_days)
+        apply_persisted_deadline_overrides(
+            section, end_date, rest_days=rest_days, plan_start=start_date
+        )
         section.baseline_needs_recalculation = False
-
-
-
 
 def apply_deadline_override(
     section: BookSection,
@@ -709,7 +758,10 @@ def apply_deadline_override(
         active_group = tuple(
             book_id
             for book_id in containing_group
-            if section.books[book_id - 1].deadline_override is None
+            if (
+                section.books[book_id - 1].deadline_override is None
+                and section.books[book_id - 1].start_date_override is None
+            )
         )
         if len(active_group) >= 2:
             reference = section.books[active_group[0] - 1].baseline_schedule
@@ -742,19 +794,112 @@ def apply_deadline_override(
     section.baseline_needs_recalculation = False
 
 
+def apply_start_date_override(
+    section: BookSection,
+    book: Book,
+    start_date_override: date | None,
+    plan_end: date,
+    today: date | None = None,
+    rest_days: list[RestDayRange] | None = None,
+    plan_start: date | None = None,
+) -> None:
+    """Apply one book start date without changing unrelated baseline schedules."""
+    today = today or date.today()
+    if book.baseline_schedule is None:
+        raise ValueError("calculate the plan before setting a start date override")
+    deadline = book.baseline_schedule.deadline
+    if start_date_override is not None:
+        validate_start_date_override(start_date_override, deadline)
+
+    containing_group = next(
+        (group for group in section.simultaneous_groups if book.number in group), None
+    )
+    book.start_date_override = start_date_override
+    if start_date_override is None:
+        if containing_group:
+            other_books = [
+                section.books[book_id - 1]
+                for book_id in containing_group
+                if book_id != book.number
+                and section.books[book_id - 1].start_date_override is None
+                and section.books[book_id - 1].baseline_schedule is not None
+            ]
+            start = other_books[0].baseline_schedule.start_date if other_books else (
+                plan_start or book.baseline_schedule.start_date
+            )
+        else:
+            start = plan_start or book.baseline_schedule.start_date
+    else:
+        start = start_date_override
+
+    remaining = remaining_units(book, section.label)
+    pace_start = effective_remaining_start_date(start, deadline, today, rest_days)
+    available_days = available_reading_days_count(pace_start, deadline, rest_days)
+    daily_target = remaining / available_days if remaining and available_days else 0.0
+    book.baseline_schedule = BaselineSchedule(start, deadline, daily_target)
+
+    if containing_group:
+        active_group = tuple(
+            book_id
+            for book_id in containing_group
+            if (
+                section.books[book_id - 1].deadline_override is None
+                and section.books[book_id - 1].start_date_override is None
+            )
+        )
+        if len(active_group) >= 2:
+            reference = section.books[active_group[0] - 1].baseline_schedule
+            shared_start = reference.start_date
+            shared_deadline = reference.deadline
+            group_books = [section.books[book_id - 1] for book_id in active_group]
+            group_remaining = sum(
+                remaining_units(group_book, section.label) for group_book in group_books
+            )
+            group_start = effective_remaining_start_date(
+                shared_start, shared_deadline, today, rest_days
+            )
+            group_days = available_reading_days_count(
+                group_start, shared_deadline, rest_days
+            )
+            group_pace = (
+                group_remaining / group_days if group_remaining and group_days else 0.0
+            )
+            for group_book in group_books:
+                book_remaining = remaining_units(group_book, section.label)
+                group_book.baseline_schedule = BaselineSchedule(
+                    shared_start,
+                    shared_deadline,
+                    group_pace * book_remaining / group_remaining
+                    if group_remaining and book_remaining
+                    else 0.0,
+                )
+
+    section.baseline_needs_recalculation = False
+
+
 def apply_persisted_deadline_overrides(
     section: BookSection,
     plan_end: date,
     today: date | None = None,
     rest_days: list[RestDayRange] | None = None,
+    plan_start: date | None = None,
 ) -> None:
     for book in section.books:
         if book.deadline_override is not None:
             apply_deadline_override(
                 section, book, book.deadline_override, plan_end, today, rest_days
             )
-
-
+    for book in section.books:
+        if book.start_date_override is not None:
+            apply_start_date_override(
+                section,
+                book,
+                book.start_date_override,
+                plan_end,
+                today,
+                rest_days,
+                plan_start,
+            )
 
 def _next_reading_day_after(
     day: date, end_date: date, rest_days: list[RestDayRange] | None
@@ -821,6 +966,59 @@ def _reflow_deadlines_for_books(
         )
     return deadlines, deadline, cumulative_pages
 
+def _build_remaining_from_baselines(
+    section: BookSection,
+    start_date: date,
+    end_date: date,
+    today: date,
+    rest_days: list[RestDayRange] | None,
+) -> SectionPlan:
+    remaining_start = effective_remaining_start_date(
+        start_date, end_date, today, rest_days
+    )
+    remaining_total = sum(remaining_units(book, section.label) for book in section.books)
+    period_days = available_reading_days_count(remaining_start, end_date, rest_days)
+    daily_pace = remaining_total / period_days if remaining_total and period_days else 0.0
+    deadlines: list[BookDeadline] = []
+    cumulative = 0
+    for book in section.books:
+        baseline = book.baseline_schedule
+        if baseline is None:
+            continue
+        remaining = remaining_units(book, section.label)
+        pace_start = effective_remaining_start_date(
+            baseline.start_date, baseline.deadline, today, rest_days
+        )
+        available_days = available_reading_days_count(
+            pace_start, baseline.deadline, rest_days
+        )
+        cumulative += remaining
+        deadlines.append(
+            BookDeadline(
+                book=book,
+                cumulative_pages=cumulative,
+                start_date=baseline.start_date,
+                deadline=baseline.deadline,
+                days_allocated=available_days,
+                daily_pages=remaining / available_days
+                if remaining and available_days
+                else 0.0,
+                status=_deadline_status(baseline.deadline, end_date),
+            )
+        )
+    overall_status = (
+        "achievable"
+        if not remaining_total
+        or (
+            period_days
+            and all(deadline.deadline <= end_date for deadline in deadlines)
+        )
+        else "not achievable"
+    )
+    return SectionPlan(
+        section, deadlines, daily_pace, remaining_total, daily_pace, overall_status
+    )
+
 def build_remaining_section_plan(
     section: BookSection,
     start_date: date,
@@ -845,6 +1043,16 @@ def build_remaining_section_plan(
         else remaining_total / period_days
     )
     required_pace = daily_pace
+    has_complete_baselines = (
+        not section.baseline_needs_recalculation
+        and all(book.baseline_schedule is not None for book in section.books)
+    )
+    if has_complete_baselines and (
+        rest_days or any(book.start_date_override is not None for book in section.books)
+    ):
+        return _build_remaining_from_baselines(
+            section, start_date, end_date, today, rest_days
+        )
     overridden_books = {
         book.number: book
         for book in section.books
@@ -1638,6 +1846,11 @@ def book_to_json(book: Book, section_label: str) -> dict[str, object]:
     deadline_override = (
         None if book.deadline_override is None else book.deadline_override.isoformat()
     )
+    start_date_override = (
+        None
+        if book.start_date_override is None
+        else book.start_date_override.isoformat()
+    )
     if is_audiobook_section(section_label):
         return {
             "number": book.number,
@@ -1654,6 +1867,7 @@ def book_to_json(book: Book, section_label: str) -> dict[str, object]:
             ),
             "baseline_schedule": baseline_schedule,
             "deadline_override": deadline_override,
+            "start_date_override": start_date_override,
             "reading_sessions": [
                 reading_session_to_json(session, section_label, book)
                 for session in book.reading_sessions
@@ -1669,12 +1883,12 @@ def book_to_json(book: Book, section_label: str) -> dict[str, object]:
         "pages_read": book.pages_read,
         "baseline_schedule": baseline_schedule,
         "deadline_override": deadline_override,
+        "start_date_override": start_date_override,
         "reading_sessions": [
             reading_session_to_json(session, section_label)
             for session in book.reading_sessions
         ],
     }
-
 
 def book_from_json(
     value: object, fallback_number: int, section_label: str
@@ -1845,6 +2059,14 @@ def book_from_json(
         except ValueError as error:
             raise ValueError("invalid deadline_override") from error
 
+    raw_start_date_override = value.get("start_date_override")
+    start_date_override: date | None = None
+    if raw_start_date_override not in (None, ""):
+        try:
+            start_date_override = parse_date(str(raw_start_date_override))
+        except ValueError as error:
+            raise ValueError("invalid start_date_override") from error
+
     return Book(
         number=fallback_number,
         title=title,
@@ -1854,6 +2076,7 @@ def book_from_json(
         reading_sessions=reading_sessions,
         baseline_schedule=baseline_schedule,
         deadline_override=deadline_override,
+        start_date_override=start_date_override,
     )
 
 
