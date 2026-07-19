@@ -83,6 +83,8 @@ public class MainActivity extends Activity {
     private static final int SUCCESS_DARK = 0xff28513a;
     private static final int ERROR = 0xff9f3a2b;
     private static final int ERROR_DARK = 0xff6f231a;
+    private static final int VIOLET = 0xff7c3aed;
+    private static final int VIOLET_DARK = 0xff5b21b6;
 
     private LinearLayout root;
     private LinearLayout tabBar;
@@ -102,7 +104,10 @@ public class MainActivity extends Activity {
     private String selectedBookSection = PHYSICAL_BOOKS_LABEL;
     private int selectedBookIndex = -1;
     private int selectedSessionBookNumber = -1;
-    private boolean summaryGenerated = false;
+    private boolean showPlanDateFields = false;
+    private boolean showMetricBreakdown = false;
+    private boolean showMetricSchedule = false;
+    private boolean showMetricBookDetails = false;
     private boolean restoring = false;
 
     @Override
@@ -147,6 +152,7 @@ public class MainActivity extends Activity {
         jsonStatusButton.setTextSize(13);
         jsonStatusButton.setMinHeight(dp(44));
         jsonStatusButton.setOnClickListener(v -> openSettings());
+        attachButtonAnimation(jsonStatusButton, SUCCESS, SUCCESS_DARK);
         LinearLayout.LayoutParams jsonParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 dp(48)
@@ -161,6 +167,7 @@ public class MainActivity extends Activity {
         settings.setBackground(roundedBackground(CARAMEL, CARAMEL_DARK));
         settings.setContentDescription("Settings");
         settings.setOnClickListener(v -> openSettings());
+        attachButtonAnimation(settings, CARAMEL, CARAMEL_DARK);
         header.addView(settings, new LinearLayout.LayoutParams(dp(48), dp(48)));
 
         content = new FrameLayout(this);
@@ -211,6 +218,7 @@ public class MainActivity extends Activity {
         );
         params.setMargins(0, 0, dp(8), dp(4));
         button.setLayoutParams(params);
+        attachButtonAnimation(button, CARAMEL, CARAMEL_DARK);
         return button;
     }
 
@@ -223,6 +231,7 @@ public class MainActivity extends Activity {
         button.setBackground(roundedBackground(LIGHT_CREAM, BORDER));
         button.setMinHeight(dp(44));
         button.setOnClickListener(listener);
+        attachButtonAnimation(button, LIGHT_CREAM, BORDER);
         return button;
     }
 
@@ -236,7 +245,31 @@ public class MainActivity extends Activity {
         button.setSingleLine(false);
         button.setMinHeight(dp(48));
         button.setBackground(roundedBackground(selected ? MOCHA : LIGHT_CREAM, selected ? MOCHA : BORDER));
+        attachButtonAnimation(button, selected ? MOCHA : LIGHT_CREAM, selected ? MOCHA : BORDER);
         return button;
+    }
+
+    private void attachButtonAnimation(View view, int normalFill, int normalBorder) {
+        view.setOnTouchListener((pressedView, event) -> {
+            if (event.getAction() == android.view.MotionEvent.ACTION_DOWN) {
+                pressedView.setBackground(roundedBackground(VIOLET, VIOLET_DARK));
+                pressedView.setTranslationY(dp(2));
+                pressedView.postDelayed(() -> {
+                    if (pressedView.isPressed()) {
+                        pressedView.animate().translationY(-dp(2)).setDuration(90).start();
+                    }
+                }, 70);
+            } else if (event.getAction() == android.view.MotionEvent.ACTION_UP
+                    || event.getAction() == android.view.MotionEvent.ACTION_CANCEL) {
+                if (pressedView == jsonStatusButton) {
+                    updateJsonStatus();
+                } else {
+                    pressedView.setBackground(roundedBackground(normalFill, normalBorder));
+                }
+                pressedView.animate().translationY(0).setDuration(90).start();
+            }
+            return false;
+        });
     }
 
     private LinearLayout metricColumn(String label, TextView value) {
@@ -285,7 +318,7 @@ public class MainActivity extends Activity {
     }
     private void renderTabBar() {
         tabBar.removeAllViews();
-        for (String tab : Arrays.asList("Session", "Plan", "Books", "Summary")) {
+        for (String tab : Arrays.asList("Session", "Plan", "Books", "Metrics")) {
             boolean selected = tab.equals(currentTab);
             Button button = new Button(this);
             button.setText(tab);
@@ -297,6 +330,7 @@ public class MainActivity extends Activity {
                 currentTab = tab;
                 showCurrentTab();
             });
+            attachButtonAnimation(button, selected ? ESPRESSO : CREAM, selected ? ESPRESSO : BORDER);
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(46), 1);
             params.setMargins(dp(3), 0, dp(3), 0);
             tabBar.addView(button, params);
@@ -312,10 +346,10 @@ public class MainActivity extends Activity {
             content.addView(buildPlanView());
         } else if ("Books".equals(currentTab)) {
             content.addView(buildBooksView());
+        } else if ("Metrics".equals(currentTab)) {
+            content.addView(buildMetricsView());
         } else if ("Settings".equals(currentTab)) {
             content.addView(buildSettingsView());
-        } else {
-            content.addView(buildSummaryView());
         }
     }
 
@@ -339,7 +373,6 @@ public class MainActivity extends Activity {
 
         LinearLayout header = row();
         header.addView(heading("Reading session"), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
-        header.addView(secondaryButton("New plan", v -> confirmNewPlan()));
         header.addView(actionButton("Entries", v -> showEntriesSheet()));
         box.addView(header);
 
@@ -601,16 +634,45 @@ public class MainActivity extends Activity {
         LinearLayout box = verticalBox();
         scroll.addView(box);
 
-        box.addView(heading("Plan"));
-        EditText startInput = editText(startDate.toString(), InputType.TYPE_CLASS_TEXT);
-        CheckBox customTarget = checkBox("Custom finish date", "Target finish date".equals(endLabel));
-        EditText endInput = editText(endDate.toString(), InputType.TYPE_CLASS_TEXT);
+        LinearLayout header = row();
+        header.addView(heading("Plan"), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        header.addView(secondaryButton("New plan", v -> confirmNewPlan()));
+        box.addView(header);
 
-        box.addView(label("Start date"));
-        box.addView(startInput);
-        box.addView(customTarget);
-        box.addView(label("Finish date"));
-        box.addView(endInput);
+        if (showPlanDateFields) {
+            EditText startInput = editText(startDate.toString(), InputType.TYPE_CLASS_TEXT);
+            CheckBox customTarget = checkBox("Custom finish date", "Target finish date".equals(endLabel));
+            EditText endInput = editText(endDate.toString(), InputType.TYPE_CLASS_TEXT);
+            box.addView(label("Start date"));
+            box.addView(startInput);
+            box.addView(customTarget);
+            box.addView(label("Finish date"));
+            box.addView(endInput);
+            box.addView(actionButton("Create plan", v -> {
+                try {
+                    LocalDate parsedStart = parseDate(startInput.getText().toString().trim());
+                    LocalDate parsedEnd = parseDate(endInput.getText().toString().trim());
+                    if (parsedEnd.isBefore(parsedStart)) {
+                        throw new IllegalArgumentException("finish date must be on or after the start date");
+                    }
+                    startDate = parsedStart;
+                    endDate = customTarget.isChecked() ? parsedEnd : periodEndFromStart(startDate);
+                    endLabel = customTarget.isChecked() ? "Target finish date" : "Quarter end";
+                    recalculateBaselineSchedules(sections, startDate, endDate);
+                    afterStateChange("Plan recalculated");
+                } catch (IllegalArgumentException ex) {
+                    showError(ex.getMessage());
+                }
+            }));
+        } else {
+            TextView hint = label("Your current plan is active. Press New plan to choose start and finish dates.");
+            hint.setTextColor(MOCHA);
+            box.addView(hint);
+            box.addView(actionButton("Recalculate current plan", v -> {
+                recalculateBaselineSchedules(sections, startDate, endDate);
+                afterStateChange("Plan recalculated");
+            }));
+        }
 
         box.addView(sectionTitle("Rest-day ranges"));
         LinearLayout restRangeList = verticalBox();
@@ -652,50 +714,8 @@ public class MainActivity extends Activity {
                 showError(ex.getMessage());
             }
         }));
-
-        box.addView(sectionTitle("Optional summary stats"));
-        CheckBox bookCounts = checkBox("Book counts", statsOptions.bookCounts);
-        CheckBox pageShare = checkBox("Page share", statsOptions.pageShare);
-        CheckBox averagePages = checkBox("Average pages/time", statsOptions.averagePages);
-        CheckBox readingPeriod = checkBox("Reading period", statsOptions.readingPeriod);
-        CheckBox paceDriver = checkBox("Pace driver", statsOptions.paceDriver);
-        box.addView(bookCounts);
-        box.addView(pageShare);
-        box.addView(averagePages);
-        box.addView(readingPeriod);
-        box.addView(paceDriver);
-
-        Button recalculate = actionButton("Recalculate", v -> {
-            try {
-                LocalDate parsedStart = parseDate(startInput.getText().toString().trim());
-                LocalDate parsedEnd = parseDate(endInput.getText().toString().trim());
-                if (parsedEnd.isBefore(parsedStart)) {
-                    throw new IllegalArgumentException("finish date must be on or after the start date");
-                }
-                startDate = parsedStart;
-                endDate = customTarget.isChecked() ? parsedEnd : periodEndFromStart(startDate);
-                endLabel = customTarget.isChecked() ? "Target finish date" : "Quarter end";
-                statsOptions = new StatsOptions(
-                        bookCounts.isChecked(),
-                        pageShare.isChecked(),
-                        averagePages.isChecked(),
-                        readingPeriod.isChecked(),
-                        paceDriver.isChecked()
-                );
-                recalculateBaselineSchedules(sections, startDate, endDate);
-                afterStateChange("Plan recalculated");
-            } catch (IllegalArgumentException ex) {
-                showError(ex.getMessage());
-            }
-        });
-        box.addView(recalculate);
-
-        PlanSummary summary = buildRemainingPlans();
-        box.addView(sectionTitle("Current summary"));
-        box.addView(monoText(summaryText(summary, false)));
         return scroll;
     }
-
     private View buildBooksView() {
         ScrollView scroll = new ScrollView(this);
         LinearLayout box = verticalBox();
@@ -712,6 +732,7 @@ public class MainActivity extends Activity {
         }));
 
         BookSection section = sectionByLabel(selectedBookSection);
+        box.addView(actionButton("Choose book to edit", v -> showBookPicker(section)));
         Book selected = selectedBook(section);
         boolean audiobookSection = isAudiobookSection(section.label);
         EditText titleInput = editText(selected == null ? "" : selected.title, InputType.TYPE_CLASS_TEXT);
@@ -755,7 +776,7 @@ public class MainActivity extends Activity {
         box.addView(startPageInput);
         box.addView(label(audiobookSection ? "End time" : "End page"));
         box.addView(endPageInput);
-        box.addView(label("Start date override (YYYY-MM-DD; blank clears it)"));
+        box.addView(label("Start date override"));
         box.addView(startDateInput);
         box.addView(actionButton("Set start date", v -> {
             try {
@@ -770,7 +791,7 @@ public class MainActivity extends Activity {
                 showError(ex.getMessage());
             }
         }));
-        box.addView(label("Deadline override (YYYY-MM-DD; blank clears it)"));
+        box.addView(label("Deadline override"));
         box.addView(deadlineInput);
         box.addView(actionButton("Set deadline", v -> {
             try {
@@ -888,108 +909,204 @@ public class MainActivity extends Activity {
         buttons3.addView(actionButton("Move Down", v -> moveSelectedBook(section, 1)));
         box.addView(buttons3);
 
-        EditText groupsInput = editText(groupsToText(section.simultaneousGroups), InputType.TYPE_CLASS_TEXT);
         box.addView(sectionTitle("Simultaneous groups"));
-        box.addView(groupsInput);
         LinearLayout groupButtons = row();
-        groupButtons.addView(actionButton("Apply", v -> {
-            try {
-                section.simultaneousGroups = validateSimultaneousGroups(section.books, parseGroupText(groupsInput.getText().toString()));
-                invalidateBaselineSchedules(section);
-                afterStateChange("Groups updated");
-            } catch (IllegalArgumentException ex) {
-                showError(ex.getMessage());
-            }
-        }));
-        groupButtons.addView(actionButton("Clear", v -> {
+        groupButtons.addView(actionButton("Select simultaneous books", v -> showSimultaneousBookPicker(section)));
+        groupButtons.addView(secondaryButton("Clear groups", v -> {
             section.simultaneousGroups = new ArrayList<>();
             invalidateBaselineSchedules(section);
             afterStateChange("Groups cleared");
         }));
         box.addView(groupButtons);
 
-        box.addView(sectionTitle(selectedBookSection));
-        box.addView(bookTable(section));
+        box.addView(sectionTitle("Today's reading"));
+        PlanSummary summary = buildRemainingPlans();
+        for (String sectionLabel : BOOK_SECTION_LABELS) {
+            SectionPlan todayPlan = sectionPlanByLabel(summary.sectionPlans, sectionLabel);
+            box.addView(sectionTitle(sectionLabel));
+            if (todayPlan.deadlines.isEmpty()) {
+                box.addView(label("No books in this format."));
+                continue;
+            }
+            HorizontalScrollView todayTableScroll = new HorizontalScrollView(this);
+            TableLayout todayTable = new TableLayout(this);
+            addTableRow(todayTable, true, Arrays.asList("Name", "Pages/time today", "Start", "Deadline"), -1);
+            for (BookDeadline deadline : todayPlan.deadlines) {
+                addTableRow(todayTable, false, Arrays.asList(
+                        deadline.book.title,
+                        todayTargetValue(sectionLabel, deadline),
+                        deadline.startDate.toString(),
+                        deadline.deadline.toString()
+                ), -1);
+            }
+            todayTableScroll.addView(todayTable);
+            box.addView(todayTableScroll);
+        }
+
         return scroll;
     }
 
-    private View buildSummaryView() {
+    private View buildMetricsView() {
         ScrollView scroll = new ScrollView(this);
         LinearLayout box = verticalBox();
         scroll.addView(box);
 
-        PlanSummary summary = buildRemainingPlans();
-        box.addView(heading("Summary"));
-        LinearLayout summaryCard = surfaceCard();
-        TextView helper = label(summaryGenerated
-                ? "Your current reading-plan summary is shown below. Generate again after reviewing changes."
-                : "Generate a clear overview when you are ready to review your reading plan.");
-        helper.setTextColor(MOCHA);
-        summaryCard.addView(helper);
-        summaryCard.addView(actionButton(summaryGenerated ? "Regenerate summary" : "Generate summary", v -> {
-            summaryGenerated = true;
+        LinearLayout header = row();
+        header.addView(heading("Metrics"), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        header.addView(secondaryButton("Reset view", v -> {
+            showMetricBreakdown = false;
+            showMetricSchedule = false;
+            showMetricBookDetails = false;
             showCurrentTab();
         }));
-        if (summaryGenerated) {
-            summaryCard.addView(monoText(summaryText(summary, true)));
-        }
-        box.addView(summaryCard);
+        box.addView(header);
+        TextView helper = label("Start with five key metrics, then add the details you want to explore.");
+        helper.setTextColor(MOCHA);
+        box.addView(helper);
+        box.addView(secondaryButton(showMetricBreakdown ? "Hide summary metrics" : "Add summary metrics", v -> {
+            showMetricBreakdown = !showMetricBreakdown;
+            showCurrentTab();
+        }));
+        box.addView(secondaryButton(showMetricSchedule ? "Hide schedule information" : "Add schedule information", v -> {
+            showMetricSchedule = !showMetricSchedule;
+            showCurrentTab();
+        }));
+        box.addView(secondaryButton(showMetricBookDetails ? "Hide book schedules" : "Add book schedules", v -> {
+            showMetricBookDetails = !showMetricBookDetails;
+            showCurrentTab();
+        }));
 
-        for (SectionPlan sectionPlan : summary.sectionPlans) {
-            box.addView(sectionTitle(sectionPlan.section.label));
-            if (sectionPlan.deadlines.isEmpty()) {
-                LinearLayout emptyCard = surfaceCard();
-                TextView empty = label("No books yet. Add one in the Books tab to create a reading plan.");
-                empty.setTextColor(MOCHA);
-                emptyCard.addView(empty);
-                box.addView(emptyCard);
-            } else {
-                box.addView(planTable(sectionPlan));
+        PlanSummary summary = buildRemainingPlans();
+        SectionPlan audiobook = sectionPlanByLabel(summary.sectionPlans, AUDIOBOOKS_LABEL);
+        TableLayout table = new TableLayout(this);
+        addTableRow(table, true, Arrays.asList("Area", "Metric", "Value", "Details"), -1);
+        addMetricRow(table, "Overview", "Remaining pages", String.valueOf(summary.totalPages), "Physical + digital");
+        addMetricRow(table, "Overview", "Audiobook remaining time", formatDuration(audiobook.totalPages), "All audiobook titles");
+        addMetricRow(table, "Plan", "Reading days", String.valueOf(availableReadingDaysCount(startDate, endDate)), "Rest days excluded");
+        addMetricRow(table, "Plan", "Highest daily pace", format2(summary.highestDailyPace) + " pages/day", "Physical and digital");
+        addMetricRow(table, "Plan", "Status", summary.overallStatus, "Current plan");
+
+        if (showMetricBreakdown) {
+            for (String[] metric : allOptionalSummaryRows(summary.sectionPlans, summary.highestDailyPace)) {
+                addMetricRow(table, "Summary", metric[0], metric[1], "Optional metric");
             }
         }
+        if (showMetricSchedule) {
+            addMetricRow(table, "Schedule", "Plan period", startDate + " to " + endDate, endLabel);
+            for (SectionPlan sectionPlan : summary.sectionPlans) {
+                String pace = sectionDailyPace(sectionPlan);
+                String result = sectionPlan.deadlines.isEmpty()
+                        ? "No books"
+                        : finalResultMessage(
+                                sectionPlan.deadlines.get(sectionPlan.deadlines.size() - 1).deadline,
+                                endDate,
+                                endName()
+                        );
+                addMetricRow(table, sectionPlan.section.label, "Daily pace", pace, result);
+            }
+        }
+        if (showMetricBookDetails) {
+            for (SectionPlan sectionPlan : summary.sectionPlans) {
+                boolean audiobookSection = isAudiobookSection(sectionPlan.section.label);
+                for (BookDeadline deadline : sectionPlan.deadlines) {
+                    Book book = deadline.book;
+                    String remaining = audiobookSection
+                            ? formatDuration(unitsRemaining(book, sectionPlan.section.label))
+                            : String.valueOf(pagesRemaining(book)) + " pages";
+                    String details = "Daily " + (audiobookSection ? "time " + formatDuration(deadline.dailyPages) : "pages " + format2(deadline.dailyPages))
+                            + " | " + deadline.startDate + " to " + deadline.deadline
+                            + " | " + deadline.daysAllocated + " days | " + deadline.status;
+                    addMetricRow(table, sectionPlan.section.label, book.number + ". " + book.title, remaining, details);
+                }
+            }
+        }
+        HorizontalScrollView tableScroll = new HorizontalScrollView(this);
+        tableScroll.addView(table);
+        box.addView(tableScroll);
         return scroll;
     }
-    private HorizontalScrollView bookTable(BookSection section) {
-        HorizontalScrollView scroll = new HorizontalScrollView(this);
-        TableLayout table = new TableLayout(this);
-        scroll.addView(table);
-        boolean audiobookSection = isAudiobookSection(section.label);
-        addTableRow(
-                table,
-                true,
-                audiobookSection
-                        ? Arrays.asList("Book", "Title", "Start time", "End time", "Remaining time", "Duration")
-                        : Arrays.asList("Book", "Title", "Start page", "End page", "Current page", "Pages", "Remaining"),
-                -1
-        );
-        for (int i = 0; i < section.books.size(); i++) {
-            Book book = section.books.get(i);
-            List<String> row = audiobookSection
-                    ? Arrays.asList(
-                            String.valueOf(book.number),
-                            book.title,
-                            formatDuration(book.startPage),
-                            formatDuration(book.endPage),
-                            formatDuration(unitsRemaining(book, section.label)),
-                            formatDuration(totalUnits(book, section.label))
-                    )
-                    : Arrays.asList(
-                            String.valueOf(book.number),
-                            book.title,
-                            String.valueOf(book.startPage),
-                            String.valueOf(book.endPage),
-                            book.currentPage == null ? "" : String.valueOf(book.currentPage),
-                            String.valueOf(book.pages()),
-                            String.valueOf(pagesRemaining(book))
-                    );
-            int index = i;
-            TableRow tableRow = addTableRow(table, false, row, i == selectedBookIndex ? CARAMEL : -1);
-            tableRow.setOnClickListener(v -> {
-                selectedBookIndex = index;
-                showCurrentTab();
-            });
+
+    private void addMetricRow(TableLayout table, String area, String metric, String value, String details) {
+        addTableRow(table, false, Arrays.asList(area, metric, value, details), -1);
+    }
+    private void showBookPicker(BookSection section) {
+        if (section.books.isEmpty()) {
+            showError("Add a book first");
+            return;
         }
-        return scroll;
+        String[] choices = bookChoices(section).toArray(new String[0]);
+        new AlertDialog.Builder(this)
+                .setTitle("Choose a book to edit")
+                .setSingleChoiceItems(choices, selectedBookIndex, (dialog, which) -> {
+                    selectedBookIndex = which;
+                    dialog.dismiss();
+                    showCurrentTab();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void showSimultaneousBookPicker(BookSection section) {
+        if (section.books.size() < 2) {
+            showError("Add at least two books first");
+            return;
+        }
+        String[] choices = bookChoices(section).toArray(new String[0]);
+        boolean[] checked = new boolean[section.books.size()];
+        int selectedGroup = -1;
+        for (int groupIndex = 0; groupIndex < section.simultaneousGroups.size(); groupIndex++) {
+            List<Integer> group = section.simultaneousGroups.get(groupIndex);
+            if (hasSelectedBook(section) && group.contains(selectedBookIndex + 1)) {
+                selectedGroup = groupIndex;
+                for (Integer bookId : group) {
+                    checked[bookId - 1] = true;
+                }
+                break;
+            }
+        }
+        final int groupToReplace = selectedGroup;
+        new AlertDialog.Builder(this)
+                .setTitle("Select books to read simultaneously")
+                .setMultiChoiceItems(choices, checked, (dialog, which, isChecked) -> checked[which] = isChecked)
+                .setPositiveButton("Apply", (dialog, which) -> {
+                    List<Integer> selectedIds = new ArrayList<>();
+                    for (int index = 0; index < checked.length; index++) {
+                        if (checked[index]) {
+                            selectedIds.add(index + 1);
+                        }
+                    }
+                    applySimultaneousSelection(section, selectedIds, groupToReplace);
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void applySimultaneousSelection(BookSection section, List<Integer> selectedIds, int groupToReplace) {
+        if (selectedIds.size() == 1) {
+            showError("Choose at least two books, or clear the selection");
+            return;
+        }
+        List<List<Integer>> updated = new ArrayList<>();
+        for (int index = 0; index < section.simultaneousGroups.size(); index++) {
+            List<Integer> group = section.simultaneousGroups.get(index);
+            boolean overlaps = index == groupToReplace;
+            for (Integer bookId : selectedIds) {
+                overlaps = overlaps || group.contains(bookId);
+            }
+            if (!overlaps) {
+                updated.add(new ArrayList<>(group));
+            }
+        }
+        if (selectedIds.size() >= 2) {
+            updated.add(new ArrayList<>(selectedIds));
+        }
+        try {
+            section.simultaneousGroups = validateSimultaneousGroups(section.books, updated);
+            invalidateBaselineSchedules(section);
+            afterStateChange("Groups updated");
+        } catch (IllegalArgumentException ex) {
+            showError(ex.getMessage());
+        }
     }
 
     private HorizontalScrollView planTable(SectionPlan sectionPlan) {
@@ -1211,7 +1328,6 @@ public class MainActivity extends Activity {
     }
 
     private void afterStateChange(String message) {
-        summaryGenerated = false;
         autosaveJson(message);
         showCurrentTab();
     }
@@ -1233,6 +1349,8 @@ public class MainActivity extends Activity {
     }
 
     private void confirmNewPlan() {
+        showPlanDateFields = true;
+        showCurrentTab();
         new AlertDialog.Builder(this)
                 .setTitle("Reading Plan")
                 .setMessage("Replace the current plan?")
@@ -2163,6 +2281,17 @@ public class MainActivity extends Activity {
         return Math.min(Math.max(completed + scheduledUnits, completed), total);
     }
 
+    private String todayTargetValue(String sectionLabel, BookDeadline deadline) {
+        LocalDate today = LocalDate.now();
+        if (today.isBefore(deadline.startDate) || today.isAfter(deadline.deadline)) {
+            return isAudiobookSection(sectionLabel) ? formatDuration(0) : "0";
+        }
+        int todayTarget = targetUnitsForDate(deadline.book, sectionLabel, deadline, today);
+        int yesterdayTarget = targetUnitsForDate(deadline.book, sectionLabel, deadline, today.minusDays(1));
+        int targetUnits = Math.max(todayTarget - yesterdayTarget, 0);
+        return isAudiobookSection(sectionLabel) ? formatDuration(targetUnits) : String.valueOf(targetUnits);
+    }
+
     private static String targetDisplayValue(String sectionLabel, Book book, int targetUnits) {
         if (isAudiobookSection(sectionLabel)) {
             return formatDuration(Math.max(totalUnits(book, sectionLabel) - targetUnits, 0));
@@ -2174,7 +2303,7 @@ public class MainActivity extends Activity {
     }
 
     private static String sessionDailyPaceValue(String sectionLabel, double dailyPages) {
-        return isAudiobookSection(sectionLabel) ? formatDuration(dailyPages) : format2(dailyPages);
+        return isAudiobookSection(sectionLabel) ? formatDuration(dailyPages) : String.valueOf(Math.round(dailyPages));
     }
 
     private static String sessionText(String sectionLabel, Book book, ReadingSession session) {
@@ -2600,32 +2729,40 @@ public class MainActivity extends Activity {
         return deadlines;
     }
 
+    private List<String[]> allOptionalSummaryRows(List<SectionPlan> sectionPlans, double highestDailyPace) {
+        return optionalSummaryRows(sectionPlans, highestDailyPace, new StatsOptions(true, true, true, true, true));
+    }
+
     private List<String[]> optionalSummaryRows(List<SectionPlan> sectionPlans, double highestDailyPace) {
+        return optionalSummaryRows(sectionPlans, highestDailyPace, statsOptions);
+    }
+
+    private List<String[]> optionalSummaryRows(List<SectionPlan> sectionPlans, double highestDailyPace, StatsOptions options) {
         SectionPlan physical = sectionPlanByLabel(sectionPlans, PHYSICAL_BOOKS_LABEL);
         SectionPlan digital = sectionPlanByLabel(sectionPlans, DIGITAL_BOOKS_LABEL);
         SectionPlan audiobook = sectionPlanByLabel(sectionPlans, AUDIOBOOKS_LABEL);
         List<String[]> rows = new ArrayList<>();
-        if (statsOptions.bookCounts) {
+        if (options.bookCounts) {
             rows.add(new String[]{"Physical book count", String.valueOf(physical.section.books.size())});
             rows.add(new String[]{"Digital book count", String.valueOf(digital.section.books.size())});
             rows.add(new String[]{"Audiobook count", String.valueOf(audiobook.section.books.size())});
         }
-        if (statsOptions.pageShare) {
+        if (options.pageShare) {
             int totalPages = physical.totalPages + digital.totalPages;
             double physicalShare = totalPages == 0 ? 0.0 : (double) physical.totalPages / totalPages * 100.0;
             double digitalShare = totalPages == 0 ? 0.0 : (double) digital.totalPages / totalPages * 100.0;
             rows.add(new String[]{"Physical page share", format1(physicalShare) + "%"});
             rows.add(new String[]{"Digital page share", format1(digitalShare) + "%"});
         }
-        if (statsOptions.averagePages) {
+        if (options.averagePages) {
             rows.add(new String[]{"Physical average pages/book", format1(averagePages(physical))});
             rows.add(new String[]{"Digital average pages/book", format1(averagePages(digital))});
             rows.add(new String[]{"Audiobook average duration", formatDuration(averagePages(audiobook))});
         }
-        if (statsOptions.readingPeriod) {
+        if (options.readingPeriod) {
             rows.add(new String[]{"Reading period", availableReadingDaysCount(startDate, endDate) + " days"});
         }
-        if (statsOptions.paceDriver) {
+        if (options.paceDriver) {
             List<String> drivers = new ArrayList<>();
             for (SectionPlan plan : sectionPlans) {
                 if (!isAudiobookSection(plan.section.label)
