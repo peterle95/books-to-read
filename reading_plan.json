@@ -21,10 +21,11 @@
           "title": "capital",
           "baseline_schedule": {
             "start_date": "2026-07-05",
-            "deadline": "2026-07-31",
+            "deadline": "2026-08-01",
             "daily_target": 2.7333333333333334
           },
-          "deadline_override": "2026-07-31",
+          "deadline_override": "2026-08-01",
+          "start_date_override": null,
           "start_page": 1,
           "end_page": 1041,
           "current_page": 1000,
@@ -47,16 +48,17 @@
           "number": 2,
           "title": "wild swans",
           "baseline_schedule": {
-            "start_date": "2026-07-05",
-            "deadline": "2026-09-14",
-            "daily_target": 2.816666666666667
+            "start_date": "2026-07-17",
+            "deadline": "2026-09-13",
+            "daily_target": 6.810344827586207
           },
-          "deadline_override": null,
+          "deadline_override": "2026-09-13",
+          "start_date_override": "2026-07-17",
           "start_page": 1,
           "end_page": 669,
-          "current_page": 274,
+          "current_page": 292,
           "pages": 669,
-          "pages_read": 274,
+          "pages_read": 292,
           "reading_sessions": [
             {
               "date": "2026-07-06",
@@ -92,6 +94,11 @@
               "date": "2026-07-15",
               "current_page": 274,
               "pages_read": 9
+            },
+            {
+              "date": "2026-07-18",
+              "current_page": 292,
+              "pages_read": 18
             }
           ]
         },
@@ -99,16 +106,17 @@
           "number": 3,
           "title": "changing order",
           "baseline_schedule": {
-            "start_date": "2026-07-05",
-            "deadline": "2026-09-14",
-            "daily_target": 2.6500000000000004
+            "start_date": "2026-07-18",
+            "deadline": "2026-09-13",
+            "daily_target": 6.913793103448276
           },
-          "deadline_override": null,
+          "deadline_override": "2026-09-13",
+          "start_date_override": "2026-07-18",
           "start_page": 1,
           "end_page": 559,
-          "current_page": 138,
+          "current_page": 158,
           "pages": 559,
-          "pages_read": 138,
+          "pages_read": 158,
           "reading_sessions": [
             {
               "date": "2026-07-06",
@@ -124,6 +132,11 @@
               "date": "2026-07-11",
               "current_page": 138,
               "pages_read": 12
+            },
+            {
+              "date": "2026-07-17",
+              "current_page": 158,
+              "pages_read": 20
             }
           ]
         },
@@ -131,11 +144,12 @@
           "number": 4,
           "title": "byun chul",
           "baseline_schedule": {
-            "start_date": "2026-09-15",
-            "deadline": "2026-09-23",
-            "daily_target": 12.045454545454545
+            "start_date": "2026-09-14",
+            "deadline": "2026-09-22",
+            "daily_target": 12.333333333333334
           },
-          "deadline_override": null,
+          "deadline_override": "2026-09-22",
+          "start_date_override": "2026-09-14",
           "start_page": 1,
           "end_page": 111,
           "current_page": null,
@@ -147,11 +161,12 @@
           "number": 5,
           "title": "camus",
           "baseline_schedule": {
-            "start_date": "2026-09-24",
+            "start_date": "2026-09-23",
             "deadline": "2026-09-30",
-            "daily_target": 12.045454545454545
+            "daily_target": 11.5
           },
           "deadline_override": null,
+          "start_date_override": "2026-09-23",
           "start_page": 1,
           "end_page": 92,
           "current_page": null,
@@ -178,14 +193,15 @@
           "baseline_schedule": {
             "start_date": "2026-07-05",
             "deadline": "2026-09-30",
-            "daily_target": 3.1136363636363638
+            "daily_target": 3.034090909090909
           },
           "deadline_override": null,
+          "start_date_override": null,
           "start_page": 1,
           "end_page": 350,
-          "current_page": 76,
+          "current_page": 83,
           "pages": 350,
-          "pages_read": 76,
+          "pages_read": 83,
           "reading_sessions": [
             {
               "date": "2026-07-06",
@@ -196,6 +212,11 @@
               "date": "2026-07-16",
               "current_page": 76,
               "pages_read": 5
+            },
+            {
+              "date": "2026-07-18",
+              "current_page": 83,
+              "pages_read": 7
             }
           ]
         }
@@ -211,16 +232,17 @@
           "title": "pane e bugie",
           "baseline_schedule": {
             "start_date": "2026-07-05",
-            "deadline": "2026-07-27",
-            "daily_target": 622.6931818181819
+            "deadline": "2026-07-31",
+            "daily_target": 891.4285714285714
           },
-          "deadline_override": null,
+          "deadline_override": "2026-07-31",
+          "start_date_override": null,
           "start_time_seconds": 0,
           "end_time_seconds": 29820,
-          "current_time_seconds": 15780,
+          "current_time_seconds": 17340,
           "duration_seconds": 29820,
-          "time_listened_seconds": 15780,
-          "remaining_time_seconds": 14040,
+          "time_listened_seconds": 17340,
+          "remaining_time_seconds": 12480,
           "reading_sessions": [
             {
               "date": "2026-07-07",
@@ -251,6 +273,12 @@
               "current_time_seconds": 15780,
               "time_listened_seconds": 1740,
               "remaining_time_seconds": 14040
+            },
+            {
+              "date": "2026-07-18",
+              "current_time_seconds": 17340,
+              "time_listened_seconds": 1560,
+              "remaining_time_seconds": 12480
             }
           ]
         },
@@ -263,6 +291,7 @@
             "daily_target": 622.6931818181819
           },
           "deadline_override": null,
+          "start_date_override": null,
           "start_time_seconds": 0,
           "end_time_seconds": 40757,
           "current_time_seconds": null,
