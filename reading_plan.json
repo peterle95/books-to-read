@@ -10,7 +10,12 @@
     "reading_period": true,
     "pace_driver": true
   },
-  "rest_days": [],
+  "rest_days": [
+    {
+      "start_date": "2026-08-19",
+      "end_date": "2026-08-23"
+    }
+  ],
   "sections": [
     {
       "label": "Physical books",
@@ -21,10 +26,10 @@
           "title": "capital",
           "baseline_schedule": {
             "start_date": "2026-07-05",
-            "deadline": "2026-08-01",
-            "daily_target": 2.7333333333333334
+            "deadline": "2026-09-13",
+            "daily_target": 0.803921568627451
           },
-          "deadline_override": "2026-08-01",
+          "deadline_override": "2026-09-13",
           "start_date_override": null,
           "start_page": 1,
           "end_page": 1041,
@@ -114,9 +119,9 @@
           "start_date_override": "2026-07-18",
           "start_page": 1,
           "end_page": 559,
-          "current_page": 158,
+          "current_page": 178,
           "pages": 559,
-          "pages_read": 158,
+          "pages_read": 178,
           "reading_sessions": [
             {
               "date": "2026-07-06",
@@ -136,6 +141,11 @@
             {
               "date": "2026-07-17",
               "current_page": 158,
+              "pages_read": 20
+            },
+            {
+              "date": "2026-07-20",
+              "current_page": 178,
               "pages_read": 20
             }
           ]
@@ -199,9 +209,9 @@
           "start_date_override": null,
           "start_page": 1,
           "end_page": 350,
-          "current_page": 83,
+          "current_page": 89,
           "pages": 350,
-          "pages_read": 83,
+          "pages_read": 89,
           "reading_sessions": [
             {
               "date": "2026-07-06",
@@ -217,6 +227,11 @@
               "date": "2026-07-18",
               "current_page": 83,
               "pages_read": 7
+            },
+            {
+              "date": "2026-07-19",
+              "current_page": 89,
+              "pages_read": 6
             }
           ]
         }

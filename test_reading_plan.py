@@ -23,7 +23,12 @@ from reading_plan import (
     recalculate_baseline_schedules,
     write_json_plan,
 )
-from reading_plan_gui import ReadingPlanApp, target_units_for_date
+from reading_plan_gui import (
+    ReadingPlanApp,
+    rounded_up_page_target,
+    target_daily_pace_text,
+    target_units_for_date,
+)
 
 
 class BaselineSchedulePersistenceTests(unittest.TestCase):
@@ -246,6 +251,71 @@ class BaselineSchedulePersistenceTests(unittest.TestCase):
 
 
 class RestDayScheduleTests(unittest.TestCase):
+    def test_rest_day_ranges_include_both_endpoints(self):
+        rest_days = [RestDayRange(date(2026, 8, 1), date(2026, 8, 10))]
+
+        self.assertEqual(
+            [date(2026, 8, 11), date(2026, 8, 12)],
+            available_reading_days(date(2026, 8, 1), date(2026, 8, 12), rest_days),
+        )
+        self.assertEqual(
+            0,
+            available_reading_days_count(
+                date(2026, 8, 1), date(2026, 8, 10), rest_days
+            ),
+        )
+
+    def test_remaining_pace_uses_only_days_outside_inclusive_rest_range(self):
+        sections = [
+            BookSection("Physical books", [Book(1, "One", 1, 6)], []),
+            BookSection("Digital books", [], []),
+            BookSection("Audiobooks", [], []),
+        ]
+        rest_days = [RestDayRange(date(2026, 8, 1), date(2026, 8, 10))]
+
+        plans, *_ = build_remaining_section_plans(
+            sections,
+            date(2026, 8, 1),
+            date(2026, 8, 12),
+            date(2026, 8, 1),
+            rest_days,
+        )
+
+        self.assertEqual(3, plans[0].required_pace)
+        self.assertEqual(3, plans[0].deadlines[0].daily_pages)
+
+    def test_session_target_skips_both_rest_range_endpoints(self):
+        book = Book(1, "One", 1, 6)
+        deadline = BookDeadline(
+            book=book,
+            cumulative_pages=0,
+            start_date=date(2026, 8, 1),
+            deadline=date(2026, 8, 12),
+            days_allocated=2,
+            daily_pages=3,
+            status="",
+        )
+        rest_days = [RestDayRange(date(2026, 8, 1), date(2026, 8, 10))]
+
+        self.assertEqual(
+            0,
+            target_units_for_date(
+                book, "Physical books", deadline, date(2026, 8, 10), rest_days
+            ),
+        )
+        self.assertEqual(
+            3,
+            target_units_for_date(
+                book, "Physical books", deadline, date(2026, 8, 11), rest_days
+            ),
+        )
+        self.assertEqual(
+            6,
+            target_units_for_date(
+                book, "Physical books", deadline, date(2026, 8, 12), rest_days
+            ),
+        )
+
     def test_rest_days_are_excluded_from_deadlines_and_pace(self):
         rest_days = [RestDayRange(date(2026, 7, 3), date(2026, 7, 4))]
         sections = [
@@ -375,6 +445,14 @@ class StartDateOverrideTests(unittest.TestCase):
         self.assertEqual(baseline.start_date, deadline.start_date)
         self.assertEqual(baseline.deadline, deadline.deadline)
         self.assertAlmostEqual(20, deadline.daily_pages)
+
+
+class PageTargetDisplayTests(unittest.TestCase):
+    def test_page_targets_round_up_only_for_page_displays(self):
+        self.assertEqual(3, rounded_up_page_target(2.3))
+        self.assertEqual(3, rounded_up_page_target(2.8))
+        self.assertEqual("3 pages/day", target_daily_pace_text("Physical books", 2.3))
+        self.assertEqual("3 pages/day", target_daily_pace_text("Digital books", 2.8))
 
 class DeadlineOverrideTests(unittest.TestCase):
     def make_sections(self, books, groups=()):
