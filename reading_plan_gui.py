@@ -150,6 +150,10 @@ def display_value(label: str, value: int | float | None) -> str:
     return str(int(value))
 
 
+def rounded_up_page_target(daily_pages: float) -> int:
+    return max(0, ceil(daily_pages - 1e-9))
+
+
 def target_units_for_date(
     book: Book,
     section_label: str,
@@ -189,7 +193,7 @@ def target_display_value(book: Book, section_label: str, target_units: int) -> s
 def target_daily_pace_text(section_label: str, daily_pages: float) -> str:
     if is_audiobook_section(section_label):
         return f"{format_duration(daily_pages)}/day"
-    return f"{daily_pages:.2f} pages/day"
+    return f"{rounded_up_page_target(daily_pages)} pages/day"
 
 
 def groups_to_text(groups: list[tuple[int, ...]]) -> str:
