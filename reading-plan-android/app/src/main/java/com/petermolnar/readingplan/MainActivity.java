@@ -1133,7 +1133,7 @@ public class MainActivity extends Activity {
 
     private String chartDetails(ChartData chart) {
         return chart.startDate + " to " + chart.deadline
-                + " | " + (int) Math.ceil(chart.dailyTarget - 1e-9) + " pages per reading day";
+                + " | today " + chart.dailyTargetPages.get(chart.todayIndex) + " pages/day";
     }
 
     private class ChartView extends View {
@@ -1160,7 +1160,7 @@ public class MainActivity extends Activity {
 
             float left = dp(54);
             float top = dp(42);
-            float right = getWidth() - dp(16);
+            float right = getWidth() - dp(48);
             float bottom = getHeight() - dp(52);
             if (right <= left || bottom <= top) {
                 return;
@@ -1185,9 +1185,29 @@ public class MainActivity extends Activity {
             paint.setStrokeWidth(dp(2));
             canvas.drawLine(left, top, left, bottom, paint);
             canvas.drawLine(left, bottom, right, bottom, paint);
+            paint.setColor(CARAMEL);
+            canvas.drawLine(right, top, right, bottom, paint);
+            for (int tick = 0; tick <= 4; tick++) {
+                int value = (int) Math.ceil(chart.dailyYMax * tick / 4.0 - 1e-9);
+                float y = bottom - plotHeight * tick / 4f;
+                canvas.drawText(String.valueOf(value), right + dp(5), y + dp(4), paint);
+            }
+            canvas.drawText("Pages/day", right - dp(42), top - dp(10), paint);
 
-            drawSeries(canvas, chart.plannedPages, left, top, plotWidth, plotHeight, MOCHA, dp(3));
-            drawSeries(canvas, chart.actualPages, left, top, plotWidth, plotHeight, SUCCESS, dp(2));
+            drawSeries(canvas, chart.plannedPages, left, top, plotWidth, plotHeight, MOCHA, dp(3), chart.yMax, null);
+            drawSeries(canvas, chart.actualPages, left, top, plotWidth, plotHeight, SUCCESS, dp(2), chart.yMax, null);
+            drawSeries(
+                    canvas,
+                    chart.dailyTargetPages,
+                    left,
+                    top,
+                    plotWidth,
+                    plotHeight,
+                    CARAMEL,
+                    dp(2),
+                    chart.dailyYMax,
+                    new DashPathEffect(new float[]{dp(7), dp(5)}, 0)
+            );
 
             float todayX = xForIndex(chart.todayIndex, chart.dates.size(), left, plotWidth);
             paint.setColor(ERROR);
@@ -1211,6 +1231,8 @@ public class MainActivity extends Activity {
             canvas.drawText("Plan", left, dp(18), paint);
             paint.setColor(SUCCESS);
             canvas.drawText("Actual", left + dp(60), dp(18), paint);
+            paint.setColor(CARAMEL);
+            canvas.drawText("Daily target", left + dp(120), dp(18), paint);
             canvas.save();
             canvas.rotate(-90, dp(15), (top + bottom) / 2);
             paint.setColor(MOCHA);
@@ -1226,7 +1248,9 @@ public class MainActivity extends Activity {
                 float width,
                 float height,
                 int color,
-                float strokeWidth
+                float strokeWidth,
+                int valueMax,
+                DashPathEffect pathEffect
         ) {
             if (values.isEmpty()) {
                 return;
@@ -1235,10 +1259,11 @@ public class MainActivity extends Activity {
             paint.setColor(color);
             paint.setStyle(Paint.Style.STROKE);
             paint.setStrokeWidth(strokeWidth);
+            paint.setPathEffect(pathEffect);
             Path path = new Path();
             for (int index = 0; index < values.size(); index++) {
                 float x = xForIndex(index, values.size(), left, width);
-                float y = top + height - height * values.get(index) / chart.yMax;
+                float y = top + height - height * values.get(index) / valueMax;
                 if (index == 0) {
                     path.moveTo(x, y);
                 } else {
@@ -1246,6 +1271,7 @@ public class MainActivity extends Activity {
                 }
             }
             canvas.drawPath(path, paint);
+            paint.setPathEffect(null);
         }
 
         private void drawDateLabel(
@@ -3849,12 +3875,13 @@ public class MainActivity extends Activity {
         final Book book;
         final LocalDate startDate;
         final LocalDate deadline;
-        final double dailyTarget;
         final List<LocalDate> dates = new ArrayList<>();
         final List<Integer> plannedPages = new ArrayList<>();
         final List<Integer> actualPages = new ArrayList<>();
+        final List<Integer> dailyTargetPages = new ArrayList<>();
         final int todayIndex;
         final int yMax;
+        final int dailyYMax;
 
         ChartData(String sectionLabel, Book book, BookDeadline deadline) {
             this.sectionLabel = sectionLabel;
@@ -3862,10 +3889,11 @@ public class MainActivity extends Activity {
             BaselineSchedule baseline = book.baselineSchedule;
             this.startDate = baseline == null ? deadline.startDate : baseline.startDate;
             this.deadline = baseline == null ? deadline.deadline : baseline.deadline;
-            this.dailyTarget = baseline == null ? deadline.dailyPages : baseline.dailyTarget;
+            double dailyTarget = baseline == null ? deadline.dailyPages : baseline.dailyTarget;
 
             int plannedMaximum = 0;
             int actualMaximum = 0;
+            int dailyMaximum = 0;
             int readingDays = 0;
             int sessionActual = 0;
             LocalDate today = LocalDate.now();
@@ -3895,12 +3923,26 @@ public class MainActivity extends Activity {
                 }
                 actual = Math.min(Math.max(actual, 0), totalUnits(book, sectionLabel));
                 actualPages.add(actual);
+                int dailyTargetForDate = 0;
+                if (!isRestDay(date)) {
+                    int daysRemaining = availableReadingDaysCount(date, this.deadline);
+                    int progress = !date.isBefore(today) && book.currentPage != null
+                            ? completedUnits(book, sectionLabel)
+                            : sessionActual;
+                    int remaining = Math.max(totalUnits(book, sectionLabel) - progress, 0);
+                    dailyTargetForDate = daysRemaining == 0
+                            ? 0
+                            : (int) Math.ceil((double) remaining / daysRemaining - 1e-9);
+                }
+                dailyTargetPages.add(dailyTargetForDate);
                 plannedMaximum = Math.max(plannedMaximum, planned);
                 actualMaximum = Math.max(actualMaximum, actual);
+                dailyMaximum = Math.max(dailyMaximum, dailyTargetForDate);
             }
             int dayOffset = (int) ChronoUnit.DAYS.between(startDate, today);
             todayIndex = clamp(dayOffset, 0, Math.max(dates.size() - 1, 0));
             yMax = Math.max(1, Math.max(totalUnits(book, sectionLabel), Math.max(plannedMaximum, actualMaximum)));
+            dailyYMax = Math.max(1, dailyMaximum);
         }
     }
 
