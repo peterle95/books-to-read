@@ -2618,8 +2618,19 @@ public class MainActivity extends Activity {
 
     private String todayTargetValue(String sectionLabel, BookDeadline deadline) {
         LocalDate today = LocalDate.now();
-        if (today.isBefore(deadline.startDate) || today.isAfter(deadline.deadline)) {
+        if (today.isBefore(deadline.startDate)
+                || today.isAfter(deadline.deadline)
+                || isRestDay(today)) {
             return isAudiobookSection(sectionLabel) ? formatDuration(0) : "0";
+        }
+        if (!isAudiobookSection(sectionLabel)) {
+            LocalDate paceStart = deadline.startDate;
+            if (deadline.book.currentPage != null && today.isAfter(paceStart)) {
+                paceStart = today;
+            }
+            if (!today.isBefore(paceStart) && deadline.dailyPages > 0) {
+                return String.valueOf(roundedUpPageTarget(deadline.dailyPages));
+            }
         }
         int todayTarget = targetUnitsForDate(deadline.book, sectionLabel, deadline, today);
         int yesterdayTarget = targetUnitsForDate(deadline.book, sectionLabel, deadline, today.minusDays(1));
@@ -2685,9 +2696,11 @@ public class MainActivity extends Activity {
     }
 
     private static String sessionDailyPaceValue(String sectionLabel, double dailyPages) {
-        return isAudiobookSection(sectionLabel)
-                ? formatDuration(dailyPages)
-                : String.valueOf((int) Math.ceil(dailyPages - 1e-9));
+        return isAudiobookSection(sectionLabel) ? formatDuration(dailyPages) : String.valueOf(roundedUpPageTarget(dailyPages));
+    }
+
+    private static int roundedUpPageTarget(double dailyPages) {
+        return Math.max(0, (int) Math.ceil(dailyPages - 1e-9));
     }
 
     private static String sessionText(String sectionLabel, Book book, ReadingSession session) {

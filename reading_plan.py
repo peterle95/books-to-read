@@ -698,12 +698,14 @@ def recalculate_baseline_schedules(
             end_date,
             (
                 sum(remaining_units(book, section.label) for book in section.books)
-                / available_reading_days_count(start_date, end_date)
-                if section.books and available_reading_days_count(start_date, end_date)
+                / available_reading_days_count(start_date, end_date, rest_days)
+                if section.books
+                and available_reading_days_count(start_date, end_date, rest_days)
                 else 0.0
             ),
             active_simultaneous_groups(section),
             lambda book: remaining_units(book, section.label),
+            rest_days,
         )[0]
         _store_baseline_schedules(
             section, plan, lambda book: remaining_units(book, section.label), rest_days
