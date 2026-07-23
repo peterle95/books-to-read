@@ -7,6 +7,10 @@ import android.app.Dialog;
 import android.content.ContentResolver;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.Canvas;
+import android.graphics.DashPathEffect;
+import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
@@ -85,6 +89,8 @@ public class MainActivity extends Activity {
     private static final int ERROR_DARK = 0xff6f231a;
     private static final int VIOLET = 0xff7c3aed;
     private static final int VIOLET_DARK = 0xff5b21b6;
+    private static final int TARGET_COMPLETE = 0xff00ba40;
+    private static final int TARGET_COMPLETE_DARK = 0xff00832d;
 
     private LinearLayout root;
     private LinearLayout tabBar;
@@ -108,6 +114,7 @@ public class MainActivity extends Activity {
     private boolean showMetricBreakdown = false;
     private boolean showMetricSchedule = false;
     private boolean showMetricBookDetails = false;
+    private boolean showActualPaceProjection = true;
     private boolean restoring = false;
 
     @Override
@@ -409,7 +416,6 @@ public class MainActivity extends Activity {
 
         LinearLayout metrics = row();
         metrics.setPadding(dp(12), dp(10), dp(12), dp(10));
-        metrics.setBackground(roundedBackground(LIGHT_CREAM, BORDER));
         TextView targetValue = metricValue();
         TextView paceValue = metricValue();
         String targetLabel = audiobookSection ? "Target time left" : "Target page";
@@ -417,11 +423,31 @@ public class MainActivity extends Activity {
         metrics.addView(metricColumn(targetLabel, targetValue), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
         metrics.addView(metricColumn(paceLabel, paceValue), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
         detailsCard.addView(metrics);
+        Runnable updateTargetCompletion = () -> {
+            Book book = selectedSessionBook();
+            boolean complete = book != null && isTargetCompleteToday(book)
+                    && LocalDate.now().toString().equals(dateInput.getText().toString().trim());
+            if (book != null && !complete) {
+                complete = markTargetCompletedIfReached(
+                        book,
+                        selectedBookSection,
+                        dateInput.getText().toString().trim(),
+                        pageInput.getText().toString().trim()
+                );
+            }
+            metrics.setBackground(roundedBackground(
+                    complete ? TARGET_COMPLETE : LIGHT_CREAM,
+                    complete ? TARGET_COMPLETE_DARK : BORDER
+            ));
+            targetValue.setTextColor(complete ? CREAM : ESPRESSO);
+            paceValue.setTextColor(complete ? CREAM : ESPRESSO);
+        };
         Runnable updateTarget = () -> {
             Book book = selectedSessionBook();
             if (book == null) {
                 targetValue.setText("-");
                 paceValue.setText("-");
+                updateTargetCompletion.run();
                 return;
             }
             try {
@@ -432,8 +458,10 @@ public class MainActivity extends Activity {
                 targetValue.setText("-");
                 paceValue.setText("-");
             }
+            updateTargetCompletion.run();
         };
         dateInput.addTextChangedListener(new SimpleTextWatcher(updateTarget));
+        pageInput.addTextChangedListener(new SimpleTextWatcher(updateTargetCompletion));
         updateTarget.run();
 
         Button add = actionButton("Add session", v -> {
@@ -447,7 +475,13 @@ public class MainActivity extends Activity {
                 int currentPage = isAudiobookSection(selectedBookSection)
                         ? currentTimeFromRemaining(book, parseDuration(pageInput.getText().toString().trim()))
                         : Integer.parseInt(pageInput.getText().toString().trim());
+                boolean targetReached = targetReached(
+                        book, selectedBookSection, sessionDate, currentPage
+                );
                 addReadingSession(book, sessionDate, currentPage, selectedBookSection);
+                if (targetReached && sessionDate.equals(LocalDate.now())) {
+                    book.targetCompletedDate = sessionDate.toString();
+                }
                 selectedSessionBookNumber = book.number;
                 afterStateChange("Session added");
             } catch (IllegalArgumentException ex) {
@@ -880,7 +914,7 @@ public class MainActivity extends Activity {
             List<ReadingSession> sessions = oldBook.startPage == fields.startPage && oldBook.endPage == fields.endPage
                     ? oldBook.readingSessions
                     : new ArrayList<>();
-            section.books.set(selectedBookIndex, new Book(oldBook.number, fields.title, fields.startPage, fields.endPage, currentPage, sessions, oldBook.baselineSchedule, oldBook.deadlineOverride, oldBook.startDateOverride));
+            section.books.set(selectedBookIndex, new Book(oldBook.number, fields.title, fields.startPage, fields.endPage, currentPage, sessions, oldBook.baselineSchedule, oldBook.deadlineOverride, oldBook.startDateOverride, oldBook.targetCompletedDate));
             invalidateBaselineSchedules(section);
             afterStateChange("Book replaced");
         }));
@@ -902,7 +936,21 @@ public class MainActivity extends Activity {
             invalidateBaselineSchedules(section);
             afterStateChange("Book deleted");
         }));
+        Button complete = actionButton("Complete Selected", v -> {
+            if (!hasSelectedBook(section)) {
+                showError("Select a book first");
+                return;
+            }
+            Book book = section.books.get(selectedBookIndex);
+            if (completedUnits(book, section.label) >= totalUnits(book, section.label)) {
+                showError("Book is already complete");
+                return;
+            }
+            book.currentPage = book.endPage;
+            afterStateChange("Book completed");
+        });
         box.addView(buttons2);
+        box.addView(complete);
 
         LinearLayout buttons3 = row();
         buttons3.addView(actionButton("Move Up", v -> moveSelectedBook(section, -1)));
@@ -953,6 +1001,7 @@ public class MainActivity extends Activity {
 
         LinearLayout header = row();
         header.addView(heading("Metrics"), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        header.addView(secondaryButton("Charts", v -> showChartsDialog()));
         header.addView(secondaryButton("Reset view", v -> {
             showMetricBreakdown = false;
             showMetricSchedule = false;
@@ -1024,6 +1073,287 @@ public class MainActivity extends Activity {
         tableScroll.addView(table);
         box.addView(tableScroll);
         return scroll;
+    }
+
+    private void showChartsDialog() {
+        List<ChartData> charts = chartData();
+        if (charts.isEmpty()) {
+            showError("Add a physical or digital book first");
+            return;
+        }
+
+        Dialog dialog = new Dialog(this);
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(18), dp(14), dp(18), dp(18));
+        panel.setBackgroundColor(CREAM);
+
+        LinearLayout header = row();
+        header.addView(heading("Charts"), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        header.addView(secondaryButton("Close", v -> dialog.dismiss()));
+        panel.addView(header);
+
+        List<String> choices = new ArrayList<>();
+        for (ChartData chart : charts) {
+            choices.add(chart.sectionLabel + " - " + chart.book.number + ". " + chart.book.title);
+        }
+        panel.addView(label("Book"));
+        Spinner bookSpinner = spinner(choices, choices.get(0));
+        panel.addView(bookSpinner);
+
+        ChartView chartView = new ChartView(this, charts.get(0));
+        chartView.setProjectionVisible(showActualPaceProjection);
+
+        CheckBox projectionToggle = checkBox(
+                "Show projection based on actual reading pace",
+                showActualPaceProjection
+        );
+        projectionToggle.setOnCheckedChangeListener((button, checked) -> {
+            showActualPaceProjection = checked;
+            chartView.setProjectionVisible(checked);
+        });
+        panel.addView(projectionToggle);
+
+        panel.addView(chartView, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1
+        ));
+        TextView chartDetails = label(chartDetails(charts.get(0)));
+        chartDetails.setTextColor(MOCHA);
+        panel.addView(chartDetails);
+
+        bookSpinner.setOnItemSelectedListener(new SimpleItemSelectedListener(() -> {
+            int index = bookSpinner.getSelectedItemPosition();
+            if (index >= 0 && index < charts.size()) {
+                chartView.setChartData(charts.get(index));
+                chartDetails.setText(chartDetails(charts.get(index)));
+            }
+        }));
+
+        dialog.setContentView(panel);
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawable(new ColorDrawable(CREAM));
+            window.setGravity(Gravity.CENTER);
+        }
+        dialog.show();
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setLayout(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    (int) (getResources().getDisplayMetrics().heightPixels * 0.9f)
+            );
+        }
+    }
+
+    private List<ChartData> chartData() {
+        PlanSummary summary = buildRemainingPlans();
+        List<ChartData> charts = new ArrayList<>();
+        for (String sectionLabel : Arrays.asList(PHYSICAL_BOOKS_LABEL, DIGITAL_BOOKS_LABEL)) {
+            SectionPlan plan = sectionPlanByLabel(summary.sectionPlans, sectionLabel);
+            for (BookDeadline deadline : plan.deadlines) {
+                if (deadline.book.pages() > 0) {
+                    charts.add(new ChartData(sectionLabel, deadline.book, deadline));
+                }
+            }
+        }
+        return charts;
+    }
+
+    private String chartDetails(ChartData chart) {
+        String projection = chart.actualPace <= 0.0
+                ? "no actual pace yet"
+                : "actual pace " + format2(chart.actualPace) + " pages/day";
+        return chart.startDate + " to " + chart.plannedDeadline
+                + " | today " + chart.dailyTargetPages.get(chart.todayIndex) + " pages/day"
+                + " | " + projection;
+    }
+
+    private class ChartView extends View {
+        private ChartData chart;
+        private boolean projectionVisible = true;
+
+        ChartView(android.content.Context context, ChartData chart) {
+            super(context);
+            this.chart = chart;
+            setBackgroundColor(CREAM);
+            setMinimumHeight(dp(300));
+        }
+
+        void setChartData(ChartData chart) {
+            this.chart = chart;
+            invalidate();
+        }
+
+        void setProjectionVisible(boolean visible) {
+            projectionVisible = visible;
+            invalidate();
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            if (chart == null || chart.dates.isEmpty()) {
+                return;
+            }
+
+            float left = dp(54);
+            float top = dp(42);
+            float right = getWidth() - dp(48);
+            float bottom = getHeight() - dp(52);
+            if (right <= left || bottom <= top) {
+                return;
+            }
+            float plotWidth = right - left;
+            float plotHeight = bottom - top;
+            Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            paint.setTextSize(dp(11));
+            paint.setColor(MOCHA);
+
+            for (int tick = 0; tick <= 4; tick++) {
+                int value = (int) Math.ceil(chart.yMax * tick / 4.0 - 1e-9);
+                float y = bottom - plotHeight * tick / 4f;
+                paint.setColor(BORDER);
+                paint.setStrokeWidth(dp(1));
+                canvas.drawLine(left, y, right, y, paint);
+                paint.setColor(MOCHA);
+                canvas.drawText(String.valueOf(value), dp(8), y + dp(4), paint);
+            }
+
+            paint.setColor(ESPRESSO);
+            paint.setStrokeWidth(dp(2));
+            canvas.drawLine(left, top, left, bottom, paint);
+            canvas.drawLine(left, bottom, right, bottom, paint);
+            paint.setColor(CARAMEL);
+            canvas.drawLine(right, top, right, bottom, paint);
+            for (int tick = 0; tick <= 4; tick++) {
+                int value = (int) Math.ceil(chart.dailyYMax * tick / 4.0 - 1e-9);
+                float y = bottom - plotHeight * tick / 4f;
+                canvas.drawText(String.valueOf(value), right + dp(5), y + dp(4), paint);
+            }
+            canvas.drawText("Pages/day", right - dp(42), top - dp(10), paint);
+
+            drawSeries(canvas, chart.plannedPages, left, top, plotWidth, plotHeight, MOCHA, dp(3), chart.yMax, null);
+            drawSeries(canvas, chart.actualPages, left, top, plotWidth, plotHeight, SUCCESS, dp(2), chart.yMax, null);
+            drawSeries(
+                    canvas,
+                    chart.dailyTargetPages,
+                    left,
+                    top,
+                    plotWidth,
+                    plotHeight,
+                    CARAMEL,
+                    dp(2),
+                    chart.dailyYMax,
+                    new DashPathEffect(new float[]{dp(7), dp(5)}, 0)
+            );
+            if (projectionVisible) {
+                drawSeries(
+                        canvas,
+                        chart.projectionPages,
+                        left,
+                        top,
+                        plotWidth,
+                        plotHeight,
+                        VIOLET,
+                        dp(2),
+                        chart.yMax,
+                        new DashPathEffect(new float[]{dp(4), dp(4)}, 0)
+                );
+            }
+
+            float todayX = xForIndex(chart.todayIndex, chart.dates.size(), left, plotWidth);
+            paint.setColor(ERROR);
+            paint.setStrokeWidth(dp(2));
+            paint.setPathEffect(new DashPathEffect(new float[]{dp(6), dp(4)}, 0));
+            canvas.drawLine(todayX, top, todayX, bottom, paint);
+            paint.setPathEffect(null);
+            paint.setTextSize(dp(11));
+            canvas.drawText("Today", Math.max(left, todayX - dp(17)), top - dp(10), paint);
+
+            int labelStep = Math.max(1, (chart.dates.size() - 1) / 4);
+            for (int index = 0; index < chart.dates.size(); index += labelStep) {
+                drawDateLabel(canvas, chart.dates.get(index), index, chart.dates.size(), left, right, bottom, paint);
+            }
+            int last = chart.dates.size() - 1;
+            if (last % labelStep != 0) {
+                drawDateLabel(canvas, chart.dates.get(last), last, chart.dates.size(), left, right, bottom, paint);
+            }
+
+            paint.setColor(MOCHA);
+            canvas.drawText("Plan", left, dp(18), paint);
+            paint.setColor(SUCCESS);
+            canvas.drawText("Actual", left + dp(60), dp(18), paint);
+            paint.setColor(CARAMEL);
+            canvas.drawText("Daily target", left + dp(120), dp(18), paint);
+            if (projectionVisible) {
+                paint.setColor(VIOLET);
+                canvas.drawText("Projection", left + dp(210), dp(18), paint);
+            }
+            canvas.save();
+            canvas.rotate(-90, dp(15), (top + bottom) / 2);
+            paint.setColor(MOCHA);
+            canvas.drawText("Pages", dp(15), (top + bottom) / 2, paint);
+            canvas.restore();
+        }
+
+        private void drawSeries(
+                Canvas canvas,
+                List<Integer> values,
+                float left,
+                float top,
+                float width,
+                float height,
+                int color,
+                float strokeWidth,
+                int valueMax,
+                DashPathEffect pathEffect
+        ) {
+            if (values.isEmpty()) {
+                return;
+            }
+            Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            paint.setColor(color);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(strokeWidth);
+            paint.setPathEffect(pathEffect);
+            Path path = new Path();
+            boolean hasPoint = false;
+            for (int index = 0; index < values.size(); index++) {
+                if (values.get(index) < 0) {
+                    hasPoint = false;
+                    continue;
+                }
+                float x = xForIndex(index, values.size(), left, width);
+                float y = top + height - height * values.get(index) / valueMax;
+                if (!hasPoint) {
+                    path.moveTo(x, y);
+                } else {
+                    path.lineTo(x, y);
+                }
+                hasPoint = true;
+            }
+            canvas.drawPath(path, paint);
+            paint.setPathEffect(null);
+        }
+
+        private void drawDateLabel(
+                Canvas canvas,
+                LocalDate date,
+                int index,
+                int count,
+                float left,
+                float right,
+                float bottom,
+                Paint paint
+        ) {
+            String text = String.format(Locale.US, "%02d-%02d", date.getMonthValue(), date.getDayOfMonth());
+            float x = xForIndex(index, count, left, right - left);
+            paint.setColor(MOCHA);
+            canvas.drawText(text, Math.min(x - dp(17), right - dp(34)), bottom + dp(22), paint);
+        }
+
+        private float xForIndex(int index, int count, float left, float width) {
+            return count <= 1 ? left : left + width * index / (count - 1);
+        }
     }
 
     private void addMetricRow(TableLayout table, String area, String metric, String value, String details) {
@@ -1635,6 +1965,7 @@ public class MainActivity extends Activity {
         object.put("baseline_schedule", baselineScheduleToJson(book.baselineSchedule));
         object.put("deadline_override", book.deadlineOverride == null ? JSONObject.NULL : book.deadlineOverride.toString());
         object.put("start_date_override", book.startDateOverride == null ? JSONObject.NULL : book.startDateOverride.toString());
+        object.put("target_completed_date", book.targetCompletedDate == null ? JSONObject.NULL : book.targetCompletedDate);
         if (isAudiobookSection(sectionLabel)) {
             object.put("start_time_seconds", book.startPage);
             object.put("end_time_seconds", book.endPage);
@@ -1825,7 +2156,11 @@ public class MainActivity extends Activity {
         if (object.has("start_date_override") && !object.isNull("start_date_override")) {
             startDateOverride = parseDate(object.getString("start_date_override"));
         }
-        return new Book(fallbackNumber, title, startPage, endPage, currentPage, sessions, baselineSchedule, deadlineOverride, startDateOverride);
+        String targetCompletedDate = null;
+        if (object.has("target_completed_date") && !object.isNull("target_completed_date")) {
+            targetCompletedDate = parseDate(object.getString("target_completed_date")).toString();
+        }
+        return new Book(fallbackNumber, title, startPage, endPage, currentPage, sessions, baselineSchedule, deadlineOverride, startDateOverride, targetCompletedDate);
     }
 
     private static Object baselineScheduleToJson(BaselineSchedule schedule) throws JSONException {
@@ -2301,6 +2636,53 @@ public class MainActivity extends Activity {
         int yesterdayTarget = targetUnitsForDate(deadline.book, sectionLabel, deadline, today.minusDays(1));
         int targetUnits = Math.max(todayTarget - yesterdayTarget, 0);
         return isAudiobookSection(sectionLabel) ? formatDuration(targetUnits) : String.valueOf(targetUnits);
+    }
+
+    private boolean isTargetCompleteToday(Book book) {
+        return LocalDate.now().toString().equals(book.targetCompletedDate);
+    }
+
+    private boolean markTargetCompletedIfReached(
+            Book book, String sectionLabel, String dateText, String inputText
+    ) {
+        try {
+            LocalDate targetDate = parseDate(dateText);
+            if (!targetDate.equals(LocalDate.now()) || inputText.isEmpty()) {
+                return isTargetCompleteToday(book);
+            }
+            int currentPage = isAudiobookSection(sectionLabel)
+                    ? currentTimeFromRemaining(book, parseDuration(inputText))
+                    : Integer.parseInt(inputText);
+            if (!targetReached(book, sectionLabel, targetDate, currentPage)) {
+                return false;
+            }
+            if (!isTargetCompleteToday(book)) {
+                book.targetCompletedDate = targetDate.toString();
+                autosaveJson("Today's target completed");
+            }
+            return true;
+        } catch (IllegalArgumentException ex) {
+            return isTargetCompleteToday(book);
+        }
+    }
+
+    private boolean targetReached(Book book, String sectionLabel, LocalDate targetDate, int currentPage) {
+        if (!targetDate.equals(LocalDate.now())) {
+            return false;
+        }
+        PlanSummary summary = buildRemainingPlans();
+        BookDeadline deadline = deadlineForBook(
+                sectionPlanByLabel(summary.sectionPlans, sectionLabel), book
+        );
+        if (deadline == null) {
+            return false;
+        }
+        int completed = completedUnits(book, sectionLabel);
+        int target = targetUnitsForDate(book, sectionLabel, deadline, targetDate);
+        int currentUnits = isAudiobookSection(sectionLabel)
+                ? currentPage - book.startPage
+                : currentPage - book.startPage + 1;
+        return target > completed && currentUnits >= target;
     }
 
     private static String targetDisplayValue(String sectionLabel, Book book, int targetUnits) {
@@ -3563,6 +3945,144 @@ public class MainActivity extends Activity {
             this.dailyPace = dailyPace;
         }
     }
+
+    private class ChartData {
+        final String sectionLabel;
+        final Book book;
+        final LocalDate startDate;
+        final LocalDate plannedDeadline;
+        final LocalDate deadline;
+        final List<LocalDate> dates = new ArrayList<>();
+        final List<Integer> plannedPages = new ArrayList<>();
+        final List<Integer> actualPages = new ArrayList<>();
+        final List<Integer> dailyTargetPages = new ArrayList<>();
+        final List<Integer> projectionPages = new ArrayList<>();
+        final double actualPace;
+        final int todayIndex;
+        final int yMax;
+        final int dailyYMax;
+
+        ChartData(String sectionLabel, Book book, BookDeadline deadline) {
+            this.sectionLabel = sectionLabel;
+            this.book = book;
+            BaselineSchedule baseline = book.baselineSchedule;
+            this.startDate = baseline == null ? deadline.startDate : baseline.startDate;
+            this.plannedDeadline = baseline == null ? deadline.deadline : baseline.deadline;
+            double dailyTarget = baseline == null ? deadline.dailyPages : baseline.dailyTarget;
+
+            int plannedMaximum = 0;
+            int actualMaximum = 0;
+            int dailyMaximum = 0;
+            int readingDays = 0;
+            int sessionActual = 0;
+            LocalDate today = LocalDate.now();
+            this.actualPace = actualReadingPace(book, sectionLabel, today);
+            LocalDate projectedDeadline = projectedCompletionDate(
+                    book, sectionLabel, today, actualPace
+            );
+            LocalDate chartDeadline = this.plannedDeadline.isAfter(projectedDeadline)
+                    ? this.plannedDeadline
+                    : projectedDeadline;
+            if (chartDeadline.isBefore(today)) {
+                chartDeadline = today;
+            }
+            this.deadline = chartDeadline;
+            for (LocalDate date = startDate; !date.isAfter(this.deadline); date = date.plusDays(1)) {
+                dates.add(date);
+                if (!isRestDay(date)) {
+                    readingDays++;
+                }
+                int planned = Math.min(
+                        totalUnits(book, sectionLabel),
+                        date.isAfter(this.plannedDeadline)
+                                ? totalUnits(book, sectionLabel)
+                                : (int) Math.ceil(dailyTarget * readingDays - 1e-9)
+                );
+                plannedPages.add(planned);
+                for (ReadingSession session : book.readingSessions) {
+                    if (!session.date.isAfter(date)) {
+                        sessionActual = Math.max(
+                                sessionActual,
+                                isAudiobookSection(sectionLabel)
+                                        ? session.currentPage - book.startPage
+                                        : session.currentPage - book.startPage + 1
+                        );
+                    }
+                }
+                int actual = sessionActual;
+                if (!date.isBefore(today) && book.currentPage != null) {
+                    actual = Math.max(actual, completedUnits(book, sectionLabel));
+                }
+                actual = Math.min(Math.max(actual, 0), totalUnits(book, sectionLabel));
+                actualPages.add(actual);
+                int dailyTargetForDate = 0;
+                if (!isRestDay(date) && !date.isAfter(this.plannedDeadline)) {
+                    int daysRemaining = availableReadingDaysCount(date, this.deadline);
+                    int progress = !date.isBefore(today) && book.currentPage != null
+                            ? completedUnits(book, sectionLabel)
+                            : sessionActual;
+                    int remaining = Math.max(totalUnits(book, sectionLabel) - progress, 0);
+                    dailyTargetForDate = daysRemaining == 0
+                            ? 0
+                            : (int) Math.ceil((double) remaining / daysRemaining - 1e-9);
+                }
+                dailyTargetPages.add(dailyTargetForDate);
+                int projected = -1;
+                if (!date.isBefore(today) && actualPace > 0.0) {
+                    int projectedReadingDays = availableReadingDaysCount(today, date);
+                    projected = Math.min(
+                            totalUnits(book, sectionLabel),
+                            completedUnits(book, sectionLabel)
+                                    + (int) Math.ceil(actualPace * projectedReadingDays - 1e-9)
+                    );
+                }
+                projectionPages.add(projected);
+                plannedMaximum = Math.max(plannedMaximum, planned);
+                actualMaximum = Math.max(actualMaximum, actual);
+                dailyMaximum = Math.max(dailyMaximum, dailyTargetForDate);
+            }
+            int dayOffset = (int) ChronoUnit.DAYS.between(startDate, today);
+            todayIndex = clamp(dayOffset, 0, Math.max(dates.size() - 1, 0));
+            yMax = Math.max(1, Math.max(totalUnits(book, sectionLabel), Math.max(plannedMaximum, actualMaximum)));
+            dailyYMax = Math.max(1, dailyMaximum);
+        }
+
+        private double actualReadingPace(Book book, String sectionLabel, LocalDate today) {
+            if (book.readingSessions.isEmpty() || completedUnits(book, sectionLabel) <= 0) {
+                return 0.0;
+            }
+            LocalDate firstSession = book.readingSessions.get(0).date;
+            for (ReadingSession session : book.readingSessions) {
+                if (session.date.isBefore(firstSession)) {
+                    firstSession = session.date;
+                }
+            }
+            int elapsedReadingDays = availableReadingDaysCount(firstSession, today);
+            return elapsedReadingDays <= 0
+                    ? 0.0
+                    : (double) completedUnits(book, sectionLabel) / elapsedReadingDays;
+        }
+
+        private LocalDate projectedCompletionDate(
+                Book book, String sectionLabel, LocalDate today, double pace
+        ) {
+            int total = totalUnits(book, sectionLabel);
+            int completed = completedUnits(book, sectionLabel);
+            if (pace <= 0.0 || completed >= total) {
+                return today;
+            }
+            int readingDays = 0;
+            LocalDate date = today;
+            while (completed + (int) Math.ceil(pace * readingDays - 1e-9) < total) {
+                if (!isRestDay(date)) {
+                    readingDays++;
+                }
+                date = date.plusDays(1);
+            }
+            return date.minusDays(1);
+        }
+    }
+
     private static class SessionEntry {
         final int sectionIndex;
         final int bookIndex;
@@ -3624,6 +4144,7 @@ public class MainActivity extends Activity {
         BaselineSchedule baselineSchedule;
         LocalDate deadlineOverride;
         LocalDate startDateOverride;
+        String targetCompletedDate;
 
         Book(int number, String title, int startPage, int endPage) {
             this(number, title, startPage, endPage, null, new ArrayList<>(), null, null, null);
@@ -3669,6 +4190,21 @@ public class MainActivity extends Activity {
                 LocalDate deadlineOverride,
                 LocalDate startDateOverride
         ) {
+            this(number, title, startPage, endPage, currentPage, readingSessions, baselineSchedule, deadlineOverride, startDateOverride, null);
+        }
+
+        Book(
+                int number,
+                String title,
+                int startPage,
+                int endPage,
+                Integer currentPage,
+                List<ReadingSession> readingSessions,
+                BaselineSchedule baselineSchedule,
+                LocalDate deadlineOverride,
+                LocalDate startDateOverride,
+                String targetCompletedDate
+        ) {
             this.number = number;
             this.title = title;
             this.startPage = startPage;
@@ -3678,6 +4214,7 @@ public class MainActivity extends Activity {
             this.baselineSchedule = baselineSchedule;
             this.deadlineOverride = deadlineOverride;
             this.startDateOverride = startDateOverride;
+            this.targetCompletedDate = targetCompletedDate;
         }
         int pages() {
             return endPage - startPage + 1;

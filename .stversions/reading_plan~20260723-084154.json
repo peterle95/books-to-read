@@ -25,12 +25,13 @@
           "number": 1,
           "title": "capital",
           "baseline_schedule": {
-            "start_date": "2026-07-05",
+            "start_date": "2024-01-01",
             "deadline": "2026-09-13",
-            "daily_target": 0.803921568627451
+            "daily_target": 0.8367346938775511
           },
           "deadline_override": "2026-09-13",
-          "start_date_override": null,
+          "start_date_override": "2024-01-01",
+          "target_completed_date": null,
           "start_page": 1,
           "end_page": 1041,
           "current_page": 1000,
@@ -55,16 +56,16 @@
           "baseline_schedule": {
             "start_date": "2026-07-01",
             "deadline": "2026-09-13",
-            "daily_target": 7.122448979591836
+            "daily_target": 7.163265306122449
           },
           "deadline_override": "2026-09-13",
           "start_date_override": "2026-07-01",
           "target_completed_date": "2026-07-22",
           "start_page": 1,
           "end_page": 669,
-          "current_page": 320,
+          "current_page": 318,
           "pages": 669,
-          "pages_read": 320,
+          "pages_read": 318,
           "reading_sessions": [
             {
               "date": "2026-07-06",
@@ -113,8 +114,8 @@
             },
             {
               "date": "2026-07-22",
-              "current_page": 320,
-              "pages_read": 10
+              "current_page": 318,
+              "pages_read": 8
             }
           ]
         },
@@ -221,12 +222,12 @@
           },
           "deadline_override": null,
           "start_date_override": "2026-07-01",
-          "target_completed_date": "2026-07-23",
+          "target_completed_date": null,
           "start_page": 1,
           "end_page": 350,
-          "current_page": 89,
+          "current_page": 105,
           "pages": 350,
-          "pages_read": 89,
+          "pages_read": 105,
           "reading_sessions": [
             {
               "date": "2026-07-06",
@@ -247,6 +248,16 @@
               "date": "2026-07-19",
               "current_page": 89,
               "pages_read": 6
+            },
+            {
+              "date": "2026-07-21",
+              "current_page": 101,
+              "pages_read": 12
+            },
+            {
+              "date": "2026-07-22",
+              "current_page": 105,
+              "pages_read": 4
             }
           ]
         }
@@ -263,7 +274,7 @@
           "baseline_schedule": {
             "start_date": "2026-07-05",
             "deadline": "2026-07-31",
-            "daily_target": 798
+            "daily_target": 1248
           },
           "deadline_override": "2026-07-31",
           "start_date_override": null,
@@ -323,9 +334,9 @@
           "number": 2,
           "title": "Nuclear War",
           "baseline_schedule": {
-            "start_date": "2026-07-19",
+            "start_date": "2026-07-25",
             "deadline": "2026-09-30",
-            "daily_target": 587.1927710843373
+            "daily_target": 641.4096385542168
           },
           "deadline_override": null,
           "start_date_override": null,
