@@ -114,6 +114,7 @@ public class MainActivity extends Activity {
     private boolean showMetricBreakdown = false;
     private boolean showMetricSchedule = false;
     private boolean showMetricBookDetails = false;
+    private boolean showActualPaceProjection = true;
     private boolean restoring = false;
 
     @Override
@@ -935,7 +936,21 @@ public class MainActivity extends Activity {
             invalidateBaselineSchedules(section);
             afterStateChange("Book deleted");
         }));
+        Button complete = actionButton("Complete Selected", v -> {
+            if (!hasSelectedBook(section)) {
+                showError("Select a book first");
+                return;
+            }
+            Book book = section.books.get(selectedBookIndex);
+            if (completedUnits(book, section.label) >= totalUnits(book, section.label)) {
+                showError("Book is already complete");
+                return;
+            }
+            book.currentPage = book.endPage;
+            afterStateChange("Book completed");
+        });
         box.addView(buttons2);
+        box.addView(complete);
 
         LinearLayout buttons3 = row();
         buttons3.addView(actionButton("Move Up", v -> moveSelectedBook(section, -1)));
@@ -1087,6 +1102,18 @@ public class MainActivity extends Activity {
         panel.addView(bookSpinner);
 
         ChartView chartView = new ChartView(this, charts.get(0));
+        chartView.setProjectionVisible(showActualPaceProjection);
+
+        CheckBox projectionToggle = checkBox(
+                "Show projection based on actual reading pace",
+                showActualPaceProjection
+        );
+        projectionToggle.setOnCheckedChangeListener((button, checked) -> {
+            showActualPaceProjection = checked;
+            chartView.setProjectionVisible(checked);
+        });
+        panel.addView(projectionToggle);
+
         panel.addView(chartView, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1
         ));
@@ -1132,12 +1159,17 @@ public class MainActivity extends Activity {
     }
 
     private String chartDetails(ChartData chart) {
-        return chart.startDate + " to " + chart.deadline
-                + " | today " + chart.dailyTargetPages.get(chart.todayIndex) + " pages/day";
+        String projection = chart.actualPace <= 0.0
+                ? "no actual pace yet"
+                : "actual pace " + format2(chart.actualPace) + " pages/day";
+        return chart.startDate + " to " + chart.plannedDeadline
+                + " | today " + chart.dailyTargetPages.get(chart.todayIndex) + " pages/day"
+                + " | " + projection;
     }
 
     private class ChartView extends View {
         private ChartData chart;
+        private boolean projectionVisible = true;
 
         ChartView(android.content.Context context, ChartData chart) {
             super(context);
@@ -1148,6 +1180,11 @@ public class MainActivity extends Activity {
 
         void setChartData(ChartData chart) {
             this.chart = chart;
+            invalidate();
+        }
+
+        void setProjectionVisible(boolean visible) {
+            projectionVisible = visible;
             invalidate();
         }
 
@@ -1208,6 +1245,20 @@ public class MainActivity extends Activity {
                     chart.dailyYMax,
                     new DashPathEffect(new float[]{dp(7), dp(5)}, 0)
             );
+            if (projectionVisible) {
+                drawSeries(
+                        canvas,
+                        chart.projectionPages,
+                        left,
+                        top,
+                        plotWidth,
+                        plotHeight,
+                        VIOLET,
+                        dp(2),
+                        chart.yMax,
+                        new DashPathEffect(new float[]{dp(4), dp(4)}, 0)
+                );
+            }
 
             float todayX = xForIndex(chart.todayIndex, chart.dates.size(), left, plotWidth);
             paint.setColor(ERROR);
@@ -1233,6 +1284,10 @@ public class MainActivity extends Activity {
             canvas.drawText("Actual", left + dp(60), dp(18), paint);
             paint.setColor(CARAMEL);
             canvas.drawText("Daily target", left + dp(120), dp(18), paint);
+            if (projectionVisible) {
+                paint.setColor(VIOLET);
+                canvas.drawText("Projection", left + dp(210), dp(18), paint);
+            }
             canvas.save();
             canvas.rotate(-90, dp(15), (top + bottom) / 2);
             paint.setColor(MOCHA);
@@ -1261,14 +1316,20 @@ public class MainActivity extends Activity {
             paint.setStrokeWidth(strokeWidth);
             paint.setPathEffect(pathEffect);
             Path path = new Path();
+            boolean hasPoint = false;
             for (int index = 0; index < values.size(); index++) {
+                if (values.get(index) < 0) {
+                    hasPoint = false;
+                    continue;
+                }
                 float x = xForIndex(index, values.size(), left, width);
                 float y = top + height - height * values.get(index) / valueMax;
-                if (index == 0) {
+                if (!hasPoint) {
                     path.moveTo(x, y);
                 } else {
                     path.lineTo(x, y);
                 }
+                hasPoint = true;
             }
             canvas.drawPath(path, paint);
             paint.setPathEffect(null);
@@ -2624,7 +2685,9 @@ public class MainActivity extends Activity {
     }
 
     private static String sessionDailyPaceValue(String sectionLabel, double dailyPages) {
-        return isAudiobookSection(sectionLabel) ? formatDuration(dailyPages) : String.valueOf(Math.round(dailyPages));
+        return isAudiobookSection(sectionLabel)
+                ? formatDuration(dailyPages)
+                : String.valueOf((int) Math.ceil(dailyPages - 1e-9));
     }
 
     private static String sessionText(String sectionLabel, Book book, ReadingSession session) {
@@ -3874,11 +3937,14 @@ public class MainActivity extends Activity {
         final String sectionLabel;
         final Book book;
         final LocalDate startDate;
+        final LocalDate plannedDeadline;
         final LocalDate deadline;
         final List<LocalDate> dates = new ArrayList<>();
         final List<Integer> plannedPages = new ArrayList<>();
         final List<Integer> actualPages = new ArrayList<>();
         final List<Integer> dailyTargetPages = new ArrayList<>();
+        final List<Integer> projectionPages = new ArrayList<>();
+        final double actualPace;
         final int todayIndex;
         final int yMax;
         final int dailyYMax;
@@ -3888,7 +3954,7 @@ public class MainActivity extends Activity {
             this.book = book;
             BaselineSchedule baseline = book.baselineSchedule;
             this.startDate = baseline == null ? deadline.startDate : baseline.startDate;
-            this.deadline = baseline == null ? deadline.deadline : baseline.deadline;
+            this.plannedDeadline = baseline == null ? deadline.deadline : baseline.deadline;
             double dailyTarget = baseline == null ? deadline.dailyPages : baseline.dailyTarget;
 
             int plannedMaximum = 0;
@@ -3897,6 +3963,17 @@ public class MainActivity extends Activity {
             int readingDays = 0;
             int sessionActual = 0;
             LocalDate today = LocalDate.now();
+            this.actualPace = actualReadingPace(book, sectionLabel, today);
+            LocalDate projectedDeadline = projectedCompletionDate(
+                    book, sectionLabel, today, actualPace
+            );
+            LocalDate chartDeadline = this.plannedDeadline.isAfter(projectedDeadline)
+                    ? this.plannedDeadline
+                    : projectedDeadline;
+            if (chartDeadline.isBefore(today)) {
+                chartDeadline = today;
+            }
+            this.deadline = chartDeadline;
             for (LocalDate date = startDate; !date.isAfter(this.deadline); date = date.plusDays(1)) {
                 dates.add(date);
                 if (!isRestDay(date)) {
@@ -3904,7 +3981,9 @@ public class MainActivity extends Activity {
                 }
                 int planned = Math.min(
                         totalUnits(book, sectionLabel),
-                        (int) Math.ceil(dailyTarget * readingDays - 1e-9)
+                        date.isAfter(this.plannedDeadline)
+                                ? totalUnits(book, sectionLabel)
+                                : (int) Math.ceil(dailyTarget * readingDays - 1e-9)
                 );
                 plannedPages.add(planned);
                 for (ReadingSession session : book.readingSessions) {
@@ -3924,7 +4003,7 @@ public class MainActivity extends Activity {
                 actual = Math.min(Math.max(actual, 0), totalUnits(book, sectionLabel));
                 actualPages.add(actual);
                 int dailyTargetForDate = 0;
-                if (!isRestDay(date)) {
+                if (!isRestDay(date) && !date.isAfter(this.plannedDeadline)) {
                     int daysRemaining = availableReadingDaysCount(date, this.deadline);
                     int progress = !date.isBefore(today) && book.currentPage != null
                             ? completedUnits(book, sectionLabel)
@@ -3935,6 +4014,16 @@ public class MainActivity extends Activity {
                             : (int) Math.ceil((double) remaining / daysRemaining - 1e-9);
                 }
                 dailyTargetPages.add(dailyTargetForDate);
+                int projected = -1;
+                if (!date.isBefore(today) && actualPace > 0.0) {
+                    int projectedReadingDays = availableReadingDaysCount(today, date);
+                    projected = Math.min(
+                            totalUnits(book, sectionLabel),
+                            completedUnits(book, sectionLabel)
+                                    + (int) Math.ceil(actualPace * projectedReadingDays - 1e-9)
+                    );
+                }
+                projectionPages.add(projected);
                 plannedMaximum = Math.max(plannedMaximum, planned);
                 actualMaximum = Math.max(actualMaximum, actual);
                 dailyMaximum = Math.max(dailyMaximum, dailyTargetForDate);
@@ -3943,6 +4032,41 @@ public class MainActivity extends Activity {
             todayIndex = clamp(dayOffset, 0, Math.max(dates.size() - 1, 0));
             yMax = Math.max(1, Math.max(totalUnits(book, sectionLabel), Math.max(plannedMaximum, actualMaximum)));
             dailyYMax = Math.max(1, dailyMaximum);
+        }
+
+        private double actualReadingPace(Book book, String sectionLabel, LocalDate today) {
+            if (book.readingSessions.isEmpty() || completedUnits(book, sectionLabel) <= 0) {
+                return 0.0;
+            }
+            LocalDate firstSession = book.readingSessions.get(0).date;
+            for (ReadingSession session : book.readingSessions) {
+                if (session.date.isBefore(firstSession)) {
+                    firstSession = session.date;
+                }
+            }
+            int elapsedReadingDays = availableReadingDaysCount(firstSession, today);
+            return elapsedReadingDays <= 0
+                    ? 0.0
+                    : (double) completedUnits(book, sectionLabel) / elapsedReadingDays;
+        }
+
+        private LocalDate projectedCompletionDate(
+                Book book, String sectionLabel, LocalDate today, double pace
+        ) {
+            int total = totalUnits(book, sectionLabel);
+            int completed = completedUnits(book, sectionLabel);
+            if (pace <= 0.0 || completed >= total) {
+                return today;
+            }
+            int readingDays = 0;
+            LocalDate date = today;
+            while (completed + (int) Math.ceil(pace * readingDays - 1e-9) < total) {
+                if (!isRestDay(date)) {
+                    readingDays++;
+                }
+                date = date.plusDays(1);
+            }
+            return date.minusDays(1);
         }
     }
 
