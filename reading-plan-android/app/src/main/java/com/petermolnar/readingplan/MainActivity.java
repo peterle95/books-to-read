@@ -1078,7 +1078,7 @@ public class MainActivity extends Activity {
     private void showChartsDialog() {
         List<ChartData> charts = chartData();
         if (charts.isEmpty()) {
-            showError("Add a physical or digital book first");
+            showError("Add a physical, digital, or audiobook first");
             return;
         }
 
@@ -1147,7 +1147,7 @@ public class MainActivity extends Activity {
     private List<ChartData> chartData() {
         PlanSummary summary = buildRemainingPlans();
         List<ChartData> charts = new ArrayList<>();
-        for (String sectionLabel : Arrays.asList(PHYSICAL_BOOKS_LABEL, DIGITAL_BOOKS_LABEL)) {
+        for (String sectionLabel : Arrays.asList(PHYSICAL_BOOKS_LABEL, DIGITAL_BOOKS_LABEL, AUDIOBOOKS_LABEL)) {
             SectionPlan plan = sectionPlanByLabel(summary.sectionPlans, sectionLabel);
             for (BookDeadline deadline : plan.deadlines) {
                 if (deadline.book.pages() > 0) {
@@ -1159,11 +1159,12 @@ public class MainActivity extends Activity {
     }
 
     private String chartDetails(ChartData chart) {
+        boolean audio = isAudiobookSection(chart.sectionLabel);
         String projection = chart.actualPace <= 0.0
                 ? "no actual pace yet"
-                : "actual pace " + format2(chart.actualPace) + " pages/day";
+                : "actual pace " + (audio ? formatDuration(chart.actualPace) : format2(chart.actualPace)) + (audio ? "/day" : " pages/day");
         return chart.startDate + " to " + chart.plannedDeadline
-                + " | today " + chart.dailyTargetPages.get(chart.todayIndex) + " pages/day"
+                + " | today " + (audio ? formatDuration(chart.dailyTargetPages.get(chart.todayIndex)) : String.valueOf(chart.dailyTargetPages.get(chart.todayIndex))) + (audio ? "/day" : " pages/day")
                 + " | " + projection;
     }
 
@@ -1208,6 +1209,7 @@ public class MainActivity extends Activity {
             paint.setTextSize(dp(11));
             paint.setColor(MOCHA);
 
+            boolean audio = isAudiobookSection(chart.sectionLabel);
             for (int tick = 0; tick <= 4; tick++) {
                 int value = (int) Math.ceil(chart.yMax * tick / 4.0 - 1e-9);
                 float y = bottom - plotHeight * tick / 4f;
@@ -1215,7 +1217,8 @@ public class MainActivity extends Activity {
                 paint.setStrokeWidth(dp(1));
                 canvas.drawLine(left, y, right, y, paint);
                 paint.setColor(MOCHA);
-                canvas.drawText(String.valueOf(value), dp(8), y + dp(4), paint);
+                String label = audio ? formatDuration(value) : String.valueOf(value);
+                canvas.drawText(label, dp(8), y + dp(4), paint);
             }
 
             paint.setColor(ESPRESSO);
@@ -1227,9 +1230,10 @@ public class MainActivity extends Activity {
             for (int tick = 0; tick <= 4; tick++) {
                 int value = (int) Math.ceil(chart.dailyYMax * tick / 4.0 - 1e-9);
                 float y = bottom - plotHeight * tick / 4f;
-                canvas.drawText(String.valueOf(value), right + dp(5), y + dp(4), paint);
+                String label = audio ? formatDuration(value) : String.valueOf(value);
+                canvas.drawText(label, right + dp(5), y + dp(4), paint);
             }
-            canvas.drawText("Pages/day", right - dp(42), top - dp(10), paint);
+            canvas.drawText(audio ? "Time/day" : "Pages/day", right - dp(42), top - dp(10), paint);
 
             drawSeries(canvas, chart.plannedPages, left, top, plotWidth, plotHeight, MOCHA, dp(3), chart.yMax, null);
             drawSeries(canvas, chart.actualPages, left, top, plotWidth, plotHeight, SUCCESS, dp(2), chart.yMax, null);
