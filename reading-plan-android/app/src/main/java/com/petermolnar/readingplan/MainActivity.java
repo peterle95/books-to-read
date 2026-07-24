@@ -96,6 +96,7 @@ public class MainActivity extends Activity {
     private LinearLayout tabBar;
     private FrameLayout content;
     private Button jsonStatusButton;
+    private Dialog metricsDialog;
     private boolean jsonLoaded;
 
     private final List<BookSection> sections = blankSections();
@@ -325,7 +326,7 @@ public class MainActivity extends Activity {
     }
     private void renderTabBar() {
         tabBar.removeAllViews();
-        for (String tab : Arrays.asList("Session", "Plan", "Books", "Metrics")) {
+        for (String tab : Arrays.asList("Session", "Plan", "Books", "Charts")) {
             boolean selected = tab.equals(currentTab);
             Button button = new Button(this);
             button.setText(tab);
@@ -353,8 +354,8 @@ public class MainActivity extends Activity {
             content.addView(buildPlanView());
         } else if ("Books".equals(currentTab)) {
             content.addView(buildBooksView());
-        } else if ("Metrics".equals(currentTab)) {
-            content.addView(buildMetricsView());
+        } else if ("Charts".equals(currentTab)) {
+            content.addView(buildChartsView());
         } else if ("Settings".equals(currentTab)) {
             content.addView(buildSettingsView());
         }
@@ -393,15 +394,19 @@ public class MainActivity extends Activity {
         box.addView(formatCard);
 
         BookSection section = sectionByLabel(selectedBookSection);
+        List<Book> sessionBooks = availableSessionBooks(section);
         Book selected = selectedSessionBook();
         LinearLayout bookCard = surfaceCard();
         bookCard.addView(sectionTitle("Choose a book"));
-        if (section.books.isEmpty()) {
-            TextView empty = label("Add a book in the Books tab before logging a session.");
+        if (sessionBooks.isEmpty()) {
+            String emptyMessage = section.books.isEmpty()
+                    ? "Add a book in the Books tab before logging a session."
+                    : "All books in this format are complete.";
+            TextView empty = label(emptyMessage);
             empty.setTextColor(MOCHA);
             bookCard.addView(empty);
         } else {
-            addSessionBookButtons(bookCard, section);
+            addSessionBookButtons(bookCard, sessionBooks);
         }
         box.addView(bookCard);
 
@@ -506,11 +511,12 @@ public class MainActivity extends Activity {
         container.addView(button, params);
     }
 
-    private void addSessionBookButtons(LinearLayout container, BookSection section) {
-        for (int start = 0; start < section.books.size(); start += 2) {
+    private void addSessionBookButtons(LinearLayout container, List<Book> sessionBooks) {
+        for (int start = 0; start < sessionBooks.size(); start += 2) {
             LinearLayout bookRow = row();
-            for (int index = start; index < Math.min(start + 2, section.books.size()); index++) {
-                Book book = section.books.get(index);
+            int rowEnd = Math.min(start + 2, sessionBooks.size());
+            for (int index = start; index < rowEnd; index++) {
+                Book book = sessionBooks.get(index);
                 Button button = selectionButton(book.number + ". " + book.title, book.number == selectedSessionBookNumber);
                 int bookNumber = book.number;
                 button.setOnClickListener(v -> {
@@ -518,7 +524,7 @@ public class MainActivity extends Activity {
                     showCurrentTab();
                 });
                 LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
-                params.setMargins(0, 0, index + 1 < section.books.size() ? dp(6) : 0, dp(6));
+                params.setMargins(0, 0, index + 1 < rowEnd ? dp(6) : 0, dp(6));
                 bookRow.addView(button, params);
             }
             container.addView(bookRow);
@@ -527,18 +533,29 @@ public class MainActivity extends Activity {
 
     private Book selectedSessionBook() {
         BookSection section = sectionByLabel(selectedBookSection);
-        for (Book book : section.books) {
+        List<Book> sessionBooks = availableSessionBooks(section);
+        for (Book book : sessionBooks) {
             if (book.number == selectedSessionBookNumber) {
                 return book;
             }
         }
-        if (section.books.isEmpty()) {
+        if (sessionBooks.isEmpty()) {
             selectedSessionBookNumber = -1;
             return null;
         }
-        Book first = section.books.get(0);
+        Book first = sessionBooks.get(0);
         selectedSessionBookNumber = first.number;
         return first;
+    }
+
+    private List<Book> availableSessionBooks(BookSection section) {
+        List<Book> available = new ArrayList<>();
+        for (Book book : section.books) {
+            if (completedUnits(book, section.label) < totalUnits(book, section.label)) {
+                available.add(book);
+            }
+        }
+        return available;
     }
 
     private void showEntriesSheet() {
@@ -1001,12 +1018,16 @@ public class MainActivity extends Activity {
 
         LinearLayout header = row();
         header.addView(heading("Metrics"), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
-        header.addView(secondaryButton("Charts", v -> showChartsDialog()));
+        header.addView(secondaryButton("Close", v -> {
+            if (metricsDialog != null) {
+                metricsDialog.dismiss();
+            }
+        }));
         header.addView(secondaryButton("Reset view", v -> {
             showMetricBreakdown = false;
             showMetricSchedule = false;
             showMetricBookDetails = false;
-            showCurrentTab();
+            showMetricsDialog();
         }));
         box.addView(header);
         TextView helper = label("Start with five key metrics, then add the details you want to explore.");
@@ -1014,15 +1035,15 @@ public class MainActivity extends Activity {
         box.addView(helper);
         box.addView(secondaryButton(showMetricBreakdown ? "Hide summary metrics" : "Add summary metrics", v -> {
             showMetricBreakdown = !showMetricBreakdown;
-            showCurrentTab();
+            showMetricsDialog();
         }));
         box.addView(secondaryButton(showMetricSchedule ? "Hide schedule information" : "Add schedule information", v -> {
             showMetricSchedule = !showMetricSchedule;
-            showCurrentTab();
+            showMetricsDialog();
         }));
         box.addView(secondaryButton(showMetricBookDetails ? "Hide book schedules" : "Add book schedules", v -> {
             showMetricBookDetails = !showMetricBookDetails;
-            showCurrentTab();
+            showMetricsDialog();
         }));
 
         PlanSummary summary = buildRemainingPlans();
@@ -1075,23 +1096,20 @@ public class MainActivity extends Activity {
         return scroll;
     }
 
-    private void showChartsDialog() {
-        List<ChartData> charts = chartData();
-        if (charts.isEmpty()) {
-            showError("Add a physical, digital, or audiobook first");
-            return;
-        }
-
-        Dialog dialog = new Dialog(this);
-        LinearLayout panel = new LinearLayout(this);
-        panel.setOrientation(LinearLayout.VERTICAL);
-        panel.setPadding(dp(18), dp(14), dp(18), dp(18));
-        panel.setBackgroundColor(CREAM);
-
+    private View buildChartsView() {
+        LinearLayout panel = verticalBox();
         LinearLayout header = row();
         header.addView(heading("Charts"), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
-        header.addView(secondaryButton("Close", v -> dialog.dismiss()));
+        header.addView(secondaryButton("Metrics", v -> showMetricsDialog()));
         panel.addView(header);
+
+        List<ChartData> charts = chartData();
+        if (charts.isEmpty()) {
+            TextView empty = label("Add a physical, digital, or audiobook first.");
+            empty.setTextColor(MOCHA);
+            panel.addView(empty);
+            return panel;
+        }
 
         List<String> choices = new ArrayList<>();
         for (ChartData chart : charts) {
@@ -1103,59 +1121,107 @@ public class MainActivity extends Activity {
 
         ChartView chartView = new ChartView(this, charts.get(0));
         chartView.setProjectionVisible(showActualPaceProjection);
-
-        CheckBox projectionToggle = checkBox(
-                "Show projection based on actual reading pace",
-                showActualPaceProjection
-        );
+        CheckBox projectionToggle = checkBox("Show projection based on actual reading pace", showActualPaceProjection);
         projectionToggle.setOnCheckedChangeListener((button, checked) -> {
             showActualPaceProjection = checked;
             chartView.setProjectionVisible(checked);
         });
         panel.addView(projectionToggle);
-
-        panel.addView(chartView, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1
-        ));
-        TextView chartDetails = label(chartDetails(charts.get(0)));
-        chartDetails.setTextColor(MOCHA);
-        panel.addView(chartDetails);
-
+        panel.addView(chartView, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
+        TextView details = label(chartDetails(charts.get(0)));
+        details.setTextColor(MOCHA);
+        panel.addView(details);
         bookSpinner.setOnItemSelectedListener(new SimpleItemSelectedListener(() -> {
             int index = bookSpinner.getSelectedItemPosition();
             if (index >= 0 && index < charts.size()) {
                 chartView.setChartData(charts.get(index));
-                chartDetails.setText(chartDetails(charts.get(index)));
+                details.setText(chartDetails(charts.get(index)));
             }
         }));
+        return panel;
+    }
 
-        dialog.setContentView(panel);
+    private void showMetricsDialog() {
+        if (metricsDialog != null && metricsDialog.isShowing()) {
+            metricsDialog.dismiss();
+        }
+        Dialog dialog = new Dialog(this);
+        metricsDialog = dialog;
+        dialog.setContentView(buildMetricsView());
+        dialog.setOnDismissListener(ignored -> {
+            if (metricsDialog == dialog) {
+                metricsDialog = null;
+            }
+        });
+        dialog.show();
         Window window = dialog.getWindow();
         if (window != null) {
             window.setBackgroundDrawable(new ColorDrawable(CREAM));
             window.setGravity(Gravity.CENTER);
-        }
-        dialog.show();
-        if (dialog.getWindow() != null) {
-            dialog.getWindow().setLayout(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    (int) (getResources().getDisplayMetrics().heightPixels * 0.9f)
-            );
+            window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT,
+                    (int) (getResources().getDisplayMetrics().heightPixels * 0.9f));
         }
     }
 
     private List<ChartData> chartData() {
         PlanSummary summary = buildRemainingPlans();
         List<ChartData> charts = new ArrayList<>();
-        for (String sectionLabel : Arrays.asList(PHYSICAL_BOOKS_LABEL, DIGITAL_BOOKS_LABEL, AUDIOBOOKS_LABEL)) {
+        for (String sectionLabel : BOOK_SECTION_LABELS) {
+            BookSection section = sectionByLabel(sectionLabel);
             SectionPlan plan = sectionPlanByLabel(summary.sectionPlans, sectionLabel);
-            for (BookDeadline deadline : plan.deadlines) {
-                if (deadline.book.pages() > 0) {
-                    charts.add(new ChartData(sectionLabel, deadline.book, deadline));
+            for (Book book : section.books) {
+                if (totalUnits(book, sectionLabel) <= 0) {
+                    continue;
                 }
+                BookDeadline deadline = deadlineForBook(plan, book);
+                if (deadline == null) {
+                    deadline = chartDeadlineForBook(sectionLabel, book);
+                }
+                charts.add(new ChartData(sectionLabel, book, deadline));
             }
         }
         return charts;
+    }
+
+    private BookDeadline chartDeadlineForBook(String sectionLabel, Book book) {
+        BaselineSchedule baseline = book.baselineSchedule;
+        LocalDate firstSession = firstSessionDate(book);
+        LocalDate lastSession = lastSessionDate(book);
+        LocalDate chartStart = baseline != null ? baseline.startDate
+                : book.startDateOverride != null ? book.startDateOverride
+                : firstSession != null ? firstSession : startDate;
+        LocalDate chartDeadline = baseline != null ? baseline.deadline
+                : book.deadlineOverride != null ? book.deadlineOverride
+                : lastSession != null ? lastSession : LocalDate.now();
+        if (chartDeadline.isBefore(chartStart)) {
+            chartStart = chartDeadline;
+        }
+        int readingDays = Math.max(availableReadingDaysCount(chartStart, chartDeadline), 1);
+        double dailyTarget = baseline != null ? baseline.dailyTarget
+                : (double) totalUnits(book, sectionLabel) / readingDays;
+        return new BookDeadline(book, totalUnits(book, sectionLabel), chartStart, chartDeadline,
+                readingDays, dailyTarget,
+                completedUnits(book, sectionLabel) >= totalUnits(book, sectionLabel) ? "completed" : "chart only");
+    }
+
+    private static LocalDate firstSessionDate(Book book) {
+        LocalDate first = null;
+        for (ReadingSession session : book.readingSessions) {
+            if (first == null || session.date.isBefore(first)) {
+                first = session.date;
+            }
+        }
+        return first;
+    }
+
+    private static LocalDate lastSessionDate(Book book) {
+        LocalDate last = null;
+        for (ReadingSession session : book.readingSessions) {
+            if (last == null || session.date.isAfter(last)) {
+                last = session.date;
+            }
+        }
+        return last;
     }
 
     private String chartDetails(ChartData chart) {
