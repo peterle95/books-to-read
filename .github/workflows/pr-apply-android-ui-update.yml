@@ -31,7 +31,12 @@ jobs:
             capture { sub(/^          /, ""); print }
           ' .github/workflows/apply-android-ui-update.yml > /tmp/apply-update.sh
           if ! bash /tmp/apply-update.sh > /tmp/update.log 2>&1; then
-            tail -100 /tmp/update.log
+            cp /tmp/update.log .github/android-ui-update-error.log
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add .github/android-ui-update-error.log
+            git commit -m "record Android update failure"
+            git push origin HEAD:charts-audio
             exit 1
           fi
 
@@ -44,12 +49,13 @@ jobs:
       - name: Commit and push update
         shell: bash
         run: |
+          rm -f .github/android-ui-update-error.log
           rm .github/workflows/apply-android-ui-update.yml
           rm .github/workflows/trigger-android-ui-update.yml
           rm .github/workflows/pr-apply-android-ui-update.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add reading-plan-android/app/src/main/java/com/petermolnar/readingplan/MainActivity.java .github/workflows/
+          git add reading-plan-android/app/src/main/java/com/petermolnar/readingplan/MainActivity.java .github/
           git diff --cached --check
           git commit -m "update charts and session UI"
           git push origin HEAD:charts-audio
