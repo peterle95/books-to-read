@@ -2,7 +2,7 @@ name: Apply Android UI update from temporary PR
 
 on:
   pull_request:
-    types: [opened]
+    types: [reopened]
     branches:
       - charts-audio
 
@@ -19,6 +19,7 @@ jobs:
         with:
           ref: charts-audio
           fetch-depth: 0
+          show-progress: false
 
       - name: Run stored source update
         shell: bash
@@ -29,7 +30,10 @@ jobs:
             found && /^        run: \|/ { capture=1; next }
             capture { sub(/^          /, ""); print }
           ' .github/workflows/apply-android-ui-update.yml > /tmp/apply-update.sh
-          bash /tmp/apply-update.sh
+          if ! bash /tmp/apply-update.sh > /tmp/update.log 2>&1; then
+            tail -100 /tmp/update.log
+            exit 1
+          fi
 
       - name: Build Android app
         working-directory: reading-plan-android
