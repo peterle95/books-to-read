@@ -3069,7 +3069,18 @@ public class MainActivity extends Activity {
                     : Collections.singletonList(book.number);
             List<Book> groupBooks = new ArrayList<>();
             for (Integer groupId : groupIds) {
-                groupBooks.add(booksByNumber.get(groupId));
+                Book groupBook = booksByNumber.get(groupId);
+            
+                // Completed books have no remaining work and must not receive
+                // another deadline.
+                if (groupBook != null && counter.pages(groupBook) > 0) {
+                    groupBooks.add(groupBook);
+                }
+            }
+            
+            if (groupBooks.isEmpty()) {
+                bookIndex++;
+                continue;
             }
             int groupPages = 0;
             for (Book groupBook : groupBooks) {
