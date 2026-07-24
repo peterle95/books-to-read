@@ -21,25 +21,8 @@ jobs:
           fetch-depth: 0
           show-progress: false
 
-      - name: Run stored source update
-        shell: bash
-        run: |
-          awk '
-            /      - name: Update MainActivity/ { found=1; next }
-            found && /      - name: Build Android app/ { exit }
-            found && /^        run: \|/ { capture=1; next }
-            capture { sub(/^          /, ""); print }
-          ' .github/workflows/apply-android-ui-update.yml > /tmp/apply-update.sh
-          if ! bash /tmp/apply-update.sh > /tmp/update.log 2>&1; then
-            cp /tmp/update.log .github/android-ui-update-error.log
-            cp /tmp/apply-update.sh .github/android-ui-update-extracted.sh
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add .github/android-ui-update-error.log .github/android-ui-update-extracted.sh
-            git commit -m "record Android update diagnostics"
-            git push origin HEAD:charts-audio
-            exit 1
-          fi
+      - name: Update MainActivity
+        run: python3 .github/scripts/update_android_ui.py
 
       - name: Build Android app
         working-directory: reading-plan-android
@@ -51,6 +34,7 @@ jobs:
         shell: bash
         run: |
           rm -f .github/android-ui-update-error.log .github/android-ui-update-extracted.sh
+          rm -rf .github/scripts
           rm .github/workflows/apply-android-ui-update.yml
           rm .github/workflows/trigger-android-ui-update.yml
           rm .github/workflows/pr-apply-android-ui-update.yml
