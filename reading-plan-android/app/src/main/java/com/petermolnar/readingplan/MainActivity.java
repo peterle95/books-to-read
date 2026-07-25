@@ -7,17 +7,11 @@ import android.app.Dialog;
 import android.content.ContentResolver;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.graphics.Canvas;
-import android.graphics.DashPathEffect;
-import android.graphics.Paint;
-import android.graphics.Path;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
-import android.text.Editable;
 import android.text.InputType;
-import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -59,7 +53,24 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+
+import com.petermolnar.readingplan.model.BaselineSchedule;
+import com.petermolnar.readingplan.model.Book;
+import com.petermolnar.readingplan.model.BookDeadline;
+import com.petermolnar.readingplan.model.BookFields;
+import com.petermolnar.readingplan.model.BookSection;
+import com.petermolnar.readingplan.model.CsvPlan;
+import com.petermolnar.readingplan.model.PageCounter;
+import com.petermolnar.readingplan.model.ParseTableResult;
+import com.petermolnar.readingplan.model.PlanSummary;
+import com.petermolnar.readingplan.model.ReadingSession;
+import com.petermolnar.readingplan.model.RestDayRange;
+import com.petermolnar.readingplan.model.SectionPlan;
+import com.petermolnar.readingplan.model.SessionEntry;
+import com.petermolnar.readingplan.model.SessionTarget;
+import com.petermolnar.readingplan.model.StatsOptions;
 
 public class MainActivity extends Activity {
     private static final String PREFS = "reading_plan_prefs";
@@ -75,22 +86,6 @@ public class MainActivity extends Activity {
             DIGITAL_BOOKS_LABEL,
             AUDIOBOOKS_LABEL
     );
-    private static final int LATTE = 0xfff1e4d4;
-    private static final int CREAM = 0xfffff8f0;
-    private static final int LIGHT_CREAM = 0xfff7ede2;
-    private static final int ESPRESSO = 0xff3a241a;
-    private static final int MOCHA = 0xff6f4e37;
-    private static final int CARAMEL = 0xffb56b3c;
-    private static final int CARAMEL_DARK = 0xff87421e;
-    private static final int BORDER = 0xffd6baa1;
-    private static final int SUCCESS = 0xff3d6b4f;
-    private static final int SUCCESS_DARK = 0xff28513a;
-    private static final int ERROR = 0xff9f3a2b;
-    private static final int ERROR_DARK = 0xff6f231a;
-    private static final int VIOLET = 0xff7c3aed;
-    private static final int VIOLET_DARK = 0xff5b21b6;
-    private static final int TARGET_COMPLETE = 0xff00ba40;
-    private static final int TARGET_COMPLETE_DARK = 0xff00832d;
 
     private LinearLayout root;
     private LinearLayout tabBar;
@@ -130,7 +125,7 @@ public class MainActivity extends Activity {
     private void buildRoot() {
         root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(LATTE);
+        root.setBackgroundColor(Colors.LATTE);
 
         LinearLayout header = new LinearLayout(this);
         header.setOrientation(LinearLayout.HORIZONTAL);
@@ -143,7 +138,7 @@ public class MainActivity extends Activity {
 
         TextView title = new TextView(this);
         title.setText("Reading Plan");
-        title.setTextColor(ESPRESSO);
+        title.setTextColor(Colors.ESPRESSO);
         title.setTextSize(22);
         title.setTypeface(null, 1);
         header.addView(title, new LinearLayout.LayoutParams(
@@ -155,11 +150,11 @@ public class MainActivity extends Activity {
         jsonStatusButton = new Button(this);
         jsonStatusButton.setText("JSON");
         jsonStatusButton.setAllCaps(false);
-        jsonStatusButton.setTextColor(CREAM);
+        jsonStatusButton.setTextColor(Colors.CREAM);
         jsonStatusButton.setTextSize(13);
         jsonStatusButton.setMinHeight(dp(44));
         jsonStatusButton.setOnClickListener(v -> openSettings());
-        attachButtonAnimation(jsonStatusButton, SUCCESS, SUCCESS_DARK);
+        attachButtonAnimation(jsonStatusButton, Colors.SUCCESS, Colors.SUCCESS_DARK);
         LinearLayout.LayoutParams jsonParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 dp(48)
@@ -170,11 +165,11 @@ public class MainActivity extends Activity {
 
         ImageButton settings = new ImageButton(this);
         settings.setImageResource(android.R.drawable.ic_menu_manage);
-        settings.setColorFilter(CREAM);
-        settings.setBackground(roundedBackground(CARAMEL, CARAMEL_DARK));
+        settings.setColorFilter(Colors.CREAM);
+        settings.setBackground(roundedBackground(Colors.CARAMEL, Colors.CARAMEL_DARK));
         settings.setContentDescription("Settings");
         settings.setOnClickListener(v -> openSettings());
-        attachButtonAnimation(settings, CARAMEL, CARAMEL_DARK);
+        attachButtonAnimation(settings, Colors.CARAMEL, Colors.CARAMEL_DARK);
         header.addView(settings, new LinearLayout.LayoutParams(dp(48), dp(48)));
 
         content = new FrameLayout(this);
@@ -186,7 +181,7 @@ public class MainActivity extends Activity {
 
 
         View tabDivider = new View(this);
-        tabDivider.setBackgroundColor(BORDER);
+        tabDivider.setBackgroundColor(Colors.BORDER);
         root.addView(tabDivider, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 dp(2)
@@ -194,7 +189,7 @@ public class MainActivity extends Activity {
 
         tabBar = new LinearLayout(this);
         tabBar.setOrientation(LinearLayout.HORIZONTAL);
-        tabBar.setBackgroundColor(LIGHT_CREAM);
+        tabBar.setBackgroundColor(Colors.LIGHT_CREAM);
         tabBar.setPadding(dp(8), dp(4), dp(8), dp(8));
         root.addView(tabBar, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -214,9 +209,9 @@ public class MainActivity extends Activity {
         Button button = new Button(this);
         button.setText(label);
         button.setAllCaps(false);
-        button.setTextColor(CREAM);
+        button.setTextColor(Colors.CREAM);
         button.setTextSize(15);
-        button.setBackground(roundedBackground(CARAMEL, CARAMEL_DARK));
+        button.setBackground(roundedBackground(Colors.CARAMEL, Colors.CARAMEL_DARK));
         button.setOnClickListener(listener);
         button.setMinHeight(dp(48));
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
@@ -225,7 +220,7 @@ public class MainActivity extends Activity {
         );
         params.setMargins(0, 0, dp(8), dp(4));
         button.setLayoutParams(params);
-        attachButtonAnimation(button, CARAMEL, CARAMEL_DARK);
+        attachButtonAnimation(button, Colors.CARAMEL, Colors.CARAMEL_DARK);
         return button;
     }
 
@@ -233,12 +228,12 @@ public class MainActivity extends Activity {
         Button button = new Button(this);
         button.setText(label);
         button.setAllCaps(false);
-        button.setTextColor(ESPRESSO);
+        button.setTextColor(Colors.ESPRESSO);
         button.setTextSize(14);
-        button.setBackground(roundedBackground(LIGHT_CREAM, BORDER));
+        button.setBackground(roundedBackground(Colors.LIGHT_CREAM, Colors.BORDER));
         button.setMinHeight(dp(44));
         button.setOnClickListener(listener);
-        attachButtonAnimation(button, LIGHT_CREAM, BORDER);
+        attachButtonAnimation(button, Colors.LIGHT_CREAM, Colors.BORDER);
         return button;
     }
 
@@ -247,19 +242,19 @@ public class MainActivity extends Activity {
         button.setText(label);
         button.setAllCaps(false);
         button.setTextSize(14);
-        button.setTextColor(selected ? CREAM : ESPRESSO);
+        button.setTextColor(selected ? Colors.CREAM : Colors.ESPRESSO);
         button.setGravity(Gravity.CENTER);
         button.setSingleLine(false);
         button.setMinHeight(dp(48));
-        button.setBackground(roundedBackground(selected ? MOCHA : LIGHT_CREAM, selected ? MOCHA : BORDER));
-        attachButtonAnimation(button, selected ? MOCHA : LIGHT_CREAM, selected ? MOCHA : BORDER);
+        button.setBackground(roundedBackground(selected ? Colors.MOCHA : Colors.LIGHT_CREAM, selected ? Colors.MOCHA : Colors.BORDER));
+        attachButtonAnimation(button, selected ? Colors.MOCHA : Colors.LIGHT_CREAM, selected ? Colors.MOCHA : Colors.BORDER);
         return button;
     }
 
     private void attachButtonAnimation(View view, int normalFill, int normalBorder) {
         view.setOnTouchListener((pressedView, event) -> {
             if (event.getAction() == android.view.MotionEvent.ACTION_DOWN) {
-                pressedView.setBackground(roundedBackground(VIOLET, VIOLET_DARK));
+                pressedView.setBackground(roundedBackground(Colors.VIOLET, Colors.VIOLET_DARK));
                 pressedView.setTranslationY(dp(2));
                 pressedView.postDelayed(() -> {
                     if (pressedView.isPressed()) {
@@ -284,7 +279,7 @@ public class MainActivity extends Activity {
         column.setOrientation(LinearLayout.VERTICAL);
         TextView caption = new TextView(this);
         caption.setText(label);
-        caption.setTextColor(MOCHA);
+        caption.setTextColor(Colors.MOCHA);
         caption.setTextSize(12);
         column.addView(caption);
         column.addView(value);
@@ -294,7 +289,7 @@ public class MainActivity extends Activity {
     private TextView metricValue() {
         TextView value = new TextView(this);
         value.setText("-");
-        value.setTextColor(ESPRESSO);
+        value.setTextColor(Colors.ESPRESSO);
         value.setTextSize(21);
         value.setTypeface(null, 1);
         value.setPadding(0, dp(2), 0, 0);
@@ -313,7 +308,7 @@ public class MainActivity extends Activity {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setPadding(dp(14), dp(12), dp(14), dp(12));
-        card.setBackground(roundedBackground(CREAM, BORDER));
+        card.setBackground(roundedBackground(Colors.CREAM, Colors.BORDER));
         card.setElevation(dp(2));
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -331,13 +326,13 @@ public class MainActivity extends Activity {
             button.setText(tab);
             button.setAllCaps(false);
             button.setTextSize(13);
-            button.setTextColor(selected ? CREAM : ESPRESSO);
-            button.setBackground(roundedBackground(selected ? ESPRESSO : CREAM, selected ? ESPRESSO : BORDER));
+            button.setTextColor(selected ? Colors.CREAM : Colors.ESPRESSO);
+            button.setBackground(roundedBackground(selected ? Colors.ESPRESSO : Colors.CREAM, selected ? Colors.ESPRESSO : Colors.BORDER));
             button.setOnClickListener(v -> {
                 currentTab = tab;
                 showCurrentTab();
             });
-            attachButtonAnimation(button, selected ? ESPRESSO : CREAM, selected ? ESPRESSO : BORDER);
+            attachButtonAnimation(button, selected ? Colors.ESPRESSO : Colors.CREAM, selected ? Colors.ESPRESSO : Colors.BORDER);
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(46), 1);
             params.setMargins(dp(3), 0, dp(3), 0);
             tabBar.addView(button, params);
@@ -398,7 +393,7 @@ public class MainActivity extends Activity {
         bookCard.addView(sectionTitle("Choose a book"));
         if (section.books.isEmpty()) {
             TextView empty = label("Add a book in the Books tab before logging a session.");
-            empty.setTextColor(MOCHA);
+            empty.setTextColor(Colors.MOCHA);
             bookCard.addView(empty);
         } else {
             addSessionBookButtons(bookCard, section);
@@ -436,11 +431,11 @@ public class MainActivity extends Activity {
                 );
             }
             metrics.setBackground(roundedBackground(
-                    complete ? TARGET_COMPLETE : LIGHT_CREAM,
-                    complete ? TARGET_COMPLETE_DARK : BORDER
+                    complete ? Colors.TARGET_COMPLETE : Colors.LIGHT_CREAM,
+                    complete ? Colors.TARGET_COMPLETE_DARK : Colors.BORDER
             ));
-            targetValue.setTextColor(complete ? CREAM : ESPRESSO);
-            paceValue.setTextColor(complete ? CREAM : ESPRESSO);
+            targetValue.setTextColor(complete ? Colors.CREAM : Colors.ESPRESSO);
+            paceValue.setTextColor(complete ? Colors.CREAM : Colors.ESPRESSO);
         };
         Runnable updateTarget = () -> {
             Book book = selectedSessionBook();
@@ -546,10 +541,10 @@ public class MainActivity extends Activity {
         LinearLayout panel = new LinearLayout(this);
         panel.setOrientation(LinearLayout.VERTICAL);
         panel.setPadding(dp(20), dp(12), dp(20), dp(20));
-        panel.setBackgroundColor(CREAM);
+        panel.setBackgroundColor(Colors.CREAM);
 
         View handle = new View(this);
-        handle.setBackground(roundedBackground(BORDER, BORDER));
+        handle.setBackground(roundedBackground(Colors.BORDER, Colors.BORDER));
         LinearLayout.LayoutParams handleParams = new LinearLayout.LayoutParams(dp(44), dp(5));
         handleParams.gravity = Gravity.CENTER_HORIZONTAL;
         handleParams.setMargins(0, 0, 0, dp(12));
@@ -568,7 +563,7 @@ public class MainActivity extends Activity {
         List<SessionEntry> entries = allSessionEntries();
         if (entries.isEmpty()) {
             TextView empty = label("No reading entries yet. Add your first session from the Session tab.");
-            empty.setTextColor(MOCHA);
+            empty.setTextColor(Colors.MOCHA);
             empty.setPadding(0, dp(24), 0, dp(24));
             entriesBox.addView(empty);
         } else {
@@ -578,7 +573,7 @@ public class MainActivity extends Activity {
                 title.setPadding(0, 0, 0, dp(4));
                 card.addView(title);
                 TextView details = label(entry.session.date + "  •  " + entry.section.label + "\n" + sessionEntryProgress(entry));
-                details.setTextColor(MOCHA);
+                details.setTextColor(Colors.MOCHA);
                 card.addView(details);
                 Button delete = secondaryButton("Delete", v -> confirmDeleteEntry(sheet, entry));
                 card.addView(delete);
@@ -590,7 +585,7 @@ public class MainActivity extends Activity {
         sheet.setContentView(panel);
         Window window = sheet.getWindow();
         if (window != null) {
-            window.setBackgroundDrawable(new ColorDrawable(CREAM));
+            window.setBackgroundDrawable(new ColorDrawable(Colors.CREAM));
             window.setGravity(Gravity.BOTTOM);
         }
         sheet.show();
@@ -700,7 +695,7 @@ public class MainActivity extends Activity {
             }));
         } else {
             TextView hint = label("Your current plan is active. Press New plan to choose start and finish dates.");
-            hint.setTextColor(MOCHA);
+            hint.setTextColor(Colors.MOCHA);
             box.addView(hint);
             box.addView(actionButton("Recalculate current plan", v -> {
                 recalculateBaselineSchedules(sections, startDate, endDate);
@@ -1010,7 +1005,7 @@ public class MainActivity extends Activity {
         }));
         box.addView(header);
         TextView helper = label("Start with five key metrics, then add the details you want to explore.");
-        helper.setTextColor(MOCHA);
+        helper.setTextColor(Colors.MOCHA);
         box.addView(helper);
         box.addView(secondaryButton(showMetricBreakdown ? "Hide summary metrics" : "Add summary metrics", v -> {
             showMetricBreakdown = !showMetricBreakdown;
@@ -1086,7 +1081,7 @@ public class MainActivity extends Activity {
         LinearLayout panel = new LinearLayout(this);
         panel.setOrientation(LinearLayout.VERTICAL);
         panel.setPadding(dp(18), dp(14), dp(18), dp(18));
-        panel.setBackgroundColor(CREAM);
+        panel.setBackgroundColor(Colors.CREAM);
 
         LinearLayout header = row();
         header.addView(heading("Charts"), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
@@ -1118,7 +1113,7 @@ public class MainActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1
         ));
         TextView chartDetails = label(chartDetails(charts.get(0)));
-        chartDetails.setTextColor(MOCHA);
+        chartDetails.setTextColor(Colors.MOCHA);
         panel.addView(chartDetails);
 
         bookSpinner.setOnItemSelectedListener(new SimpleItemSelectedListener(() -> {
@@ -1132,7 +1127,7 @@ public class MainActivity extends Activity {
         dialog.setContentView(panel);
         Window window = dialog.getWindow();
         if (window != null) {
-            window.setBackgroundDrawable(new ColorDrawable(CREAM));
+            window.setBackgroundDrawable(new ColorDrawable(Colors.CREAM));
             window.setGravity(Gravity.CENTER);
         }
         dialog.show();
@@ -1151,7 +1146,7 @@ public class MainActivity extends Activity {
             SectionPlan plan = sectionPlanByLabel(summary.sectionPlans, sectionLabel);
             for (BookDeadline deadline : plan.deadlines) {
                 if (deadline.book.pages() > 0) {
-                    charts.add(new ChartData(sectionLabel, deadline.book, deadline));
+                    charts.add(new ChartData(sectionLabel, deadline.book, deadline, restDays));
                 }
             }
         }
@@ -1167,194 +1162,6 @@ public class MainActivity extends Activity {
                 + " | " + projection;
     }
 
-    private class ChartView extends View {
-        private ChartData chart;
-        private boolean projectionVisible = true;
-
-        ChartView(android.content.Context context, ChartData chart) {
-            super(context);
-            this.chart = chart;
-            setBackgroundColor(CREAM);
-            setMinimumHeight(dp(300));
-        }
-
-        void setChartData(ChartData chart) {
-            this.chart = chart;
-            invalidate();
-        }
-
-        void setProjectionVisible(boolean visible) {
-            projectionVisible = visible;
-            invalidate();
-        }
-
-        @Override
-        protected void onDraw(Canvas canvas) {
-            super.onDraw(canvas);
-            if (chart == null || chart.dates.isEmpty()) {
-                return;
-            }
-
-            float left = dp(54);
-            float top = dp(42);
-            float right = getWidth() - dp(48);
-            float bottom = getHeight() - dp(52);
-            if (right <= left || bottom <= top) {
-                return;
-            }
-            float plotWidth = right - left;
-            float plotHeight = bottom - top;
-            Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-            paint.setTextSize(dp(11));
-            paint.setColor(MOCHA);
-
-            for (int tick = 0; tick <= 4; tick++) {
-                int value = (int) Math.ceil(chart.yMax * tick / 4.0 - 1e-9);
-                float y = bottom - plotHeight * tick / 4f;
-                paint.setColor(BORDER);
-                paint.setStrokeWidth(dp(1));
-                canvas.drawLine(left, y, right, y, paint);
-                paint.setColor(MOCHA);
-                canvas.drawText(String.valueOf(value), dp(8), y + dp(4), paint);
-            }
-
-            paint.setColor(ESPRESSO);
-            paint.setStrokeWidth(dp(2));
-            canvas.drawLine(left, top, left, bottom, paint);
-            canvas.drawLine(left, bottom, right, bottom, paint);
-            paint.setColor(CARAMEL);
-            canvas.drawLine(right, top, right, bottom, paint);
-            for (int tick = 0; tick <= 4; tick++) {
-                int value = (int) Math.ceil(chart.dailyYMax * tick / 4.0 - 1e-9);
-                float y = bottom - plotHeight * tick / 4f;
-                canvas.drawText(String.valueOf(value), right + dp(5), y + dp(4), paint);
-            }
-            canvas.drawText("Pages/day", right - dp(42), top - dp(10), paint);
-
-            drawSeries(canvas, chart.plannedPages, left, top, plotWidth, plotHeight, MOCHA, dp(3), chart.yMax, null);
-            drawSeries(canvas, chart.actualPages, left, top, plotWidth, plotHeight, SUCCESS, dp(2), chart.yMax, null);
-            drawSeries(
-                    canvas,
-                    chart.dailyTargetPages,
-                    left,
-                    top,
-                    plotWidth,
-                    plotHeight,
-                    CARAMEL,
-                    dp(2),
-                    chart.dailyYMax,
-                    new DashPathEffect(new float[]{dp(7), dp(5)}, 0)
-            );
-            if (projectionVisible) {
-                drawSeries(
-                        canvas,
-                        chart.projectionPages,
-                        left,
-                        top,
-                        plotWidth,
-                        plotHeight,
-                        VIOLET,
-                        dp(2),
-                        chart.yMax,
-                        new DashPathEffect(new float[]{dp(4), dp(4)}, 0)
-                );
-            }
-
-            float todayX = xForIndex(chart.todayIndex, chart.dates.size(), left, plotWidth);
-            paint.setColor(ERROR);
-            paint.setStrokeWidth(dp(2));
-            paint.setPathEffect(new DashPathEffect(new float[]{dp(6), dp(4)}, 0));
-            canvas.drawLine(todayX, top, todayX, bottom, paint);
-            paint.setPathEffect(null);
-            paint.setTextSize(dp(11));
-            canvas.drawText("Today", Math.max(left, todayX - dp(17)), top - dp(10), paint);
-
-            int labelStep = Math.max(1, (chart.dates.size() - 1) / 4);
-            for (int index = 0; index < chart.dates.size(); index += labelStep) {
-                drawDateLabel(canvas, chart.dates.get(index), index, chart.dates.size(), left, right, bottom, paint);
-            }
-            int last = chart.dates.size() - 1;
-            if (last % labelStep != 0) {
-                drawDateLabel(canvas, chart.dates.get(last), last, chart.dates.size(), left, right, bottom, paint);
-            }
-
-            paint.setColor(MOCHA);
-            canvas.drawText("Plan", left, dp(18), paint);
-            paint.setColor(SUCCESS);
-            canvas.drawText("Actual", left + dp(60), dp(18), paint);
-            paint.setColor(CARAMEL);
-            canvas.drawText("Daily target", left + dp(120), dp(18), paint);
-            if (projectionVisible) {
-                paint.setColor(VIOLET);
-                canvas.drawText("Projection", left + dp(210), dp(18), paint);
-            }
-            canvas.save();
-            canvas.rotate(-90, dp(15), (top + bottom) / 2);
-            paint.setColor(MOCHA);
-            canvas.drawText("Pages", dp(15), (top + bottom) / 2, paint);
-            canvas.restore();
-        }
-
-        private void drawSeries(
-                Canvas canvas,
-                List<Integer> values,
-                float left,
-                float top,
-                float width,
-                float height,
-                int color,
-                float strokeWidth,
-                int valueMax,
-                DashPathEffect pathEffect
-        ) {
-            if (values.isEmpty()) {
-                return;
-            }
-            Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-            paint.setColor(color);
-            paint.setStyle(Paint.Style.STROKE);
-            paint.setStrokeWidth(strokeWidth);
-            paint.setPathEffect(pathEffect);
-            Path path = new Path();
-            boolean hasPoint = false;
-            for (int index = 0; index < values.size(); index++) {
-                if (values.get(index) < 0) {
-                    hasPoint = false;
-                    continue;
-                }
-                float x = xForIndex(index, values.size(), left, width);
-                float y = top + height - height * values.get(index) / valueMax;
-                if (!hasPoint) {
-                    path.moveTo(x, y);
-                } else {
-                    path.lineTo(x, y);
-                }
-                hasPoint = true;
-            }
-            canvas.drawPath(path, paint);
-            paint.setPathEffect(null);
-        }
-
-        private void drawDateLabel(
-                Canvas canvas,
-                LocalDate date,
-                int index,
-                int count,
-                float left,
-                float right,
-                float bottom,
-                Paint paint
-        ) {
-            String text = String.format(Locale.US, "%02d-%02d", date.getMonthValue(), date.getDayOfMonth());
-            float x = xForIndex(index, count, left, right - left);
-            paint.setColor(MOCHA);
-            canvas.drawText(text, Math.min(x - dp(17), right - dp(34)), bottom + dp(22), paint);
-        }
-
-        private float xForIndex(int index, int count, float left, float width) {
-            return count <= 1 ? left : left + width * index / (count - 1);
-        }
-    }
 
     private void addMetricRow(TableLayout table, String area, String metric, String value, String details) {
         addTableRow(table, false, Arrays.asList(area, metric, value, details), -1);
@@ -1497,18 +1304,18 @@ public class MainActivity extends Activity {
             TextView cell = new TextView(this);
             cell.setText(value);
             cell.setTextSize(13);
-            cell.setTextColor(rowColor == CARAMEL ? CREAM : ESPRESSO);
+            cell.setTextColor(rowColor == Colors.CARAMEL ? Colors.CREAM : Colors.ESPRESSO);
             cell.setPadding(dp(10), dp(8), dp(10), dp(8));
             cell.setGravity(Gravity.CENTER_VERTICAL);
             cell.setSingleLine(false);
             cell.setMinWidth(dp(96));
             if (header) {
                 cell.setTypeface(null, 1);
-                cell.setBackgroundColor(LIGHT_CREAM);
+                cell.setBackgroundColor(Colors.LIGHT_CREAM);
             } else if (rowColor != -1) {
                 cell.setBackgroundColor(rowColor);
             } else {
-                cell.setBackgroundColor(CREAM);
+                cell.setBackgroundColor(Colors.CREAM);
             }
             row.addView(cell);
         }
@@ -1549,7 +1356,7 @@ public class MainActivity extends Activity {
     private TextView label(String text) {
         TextView view = new TextView(this);
         view.setText(text);
-        view.setTextColor(ESPRESSO);
+        view.setTextColor(Colors.ESPRESSO);
         view.setTextSize(14);
         view.setPadding(0, dp(4), 0, dp(4));
         return view;
@@ -1560,34 +1367,34 @@ public class MainActivity extends Activity {
         view.setTextSize(13);
         view.setTypeface(android.graphics.Typeface.MONOSPACE);
         view.setPadding(dp(12), dp(12), dp(12), dp(12));
-        view.setBackground(roundedBackground(LIGHT_CREAM, BORDER));
+        view.setBackground(roundedBackground(Colors.LIGHT_CREAM, Colors.BORDER));
         return view;
     }
 
     private EditText editText(String value, int inputType) {
         EditText edit = new EditText(this);
         edit.setText(value);
-        edit.setTextColor(ESPRESSO);
+        edit.setTextColor(Colors.ESPRESSO);
         edit.setTextSize(16);
         edit.setSingleLine(true);
         edit.setInputType(inputType);
         edit.setSelectAllOnFocus(false);
         edit.setPadding(dp(12), 0, dp(12), 0);
         edit.setMinHeight(dp(50));
-        edit.setBackground(roundedBackground(CREAM, BORDER));
+        edit.setBackground(roundedBackground(Colors.CREAM, Colors.BORDER));
         return edit;
     }
 
     private CheckBox checkBox(String label, boolean checked) {
         CheckBox box = new CheckBox(this);
         box.setText(label);
-        box.setTextColor(ESPRESSO);
+        box.setTextColor(Colors.ESPRESSO);
         box.setChecked(checked);
         box.setMinHeight(dp(44));
         return box;
     }
     private Spinner spinner(List<String> values, String selected) {
-        return spinner(values, selected, -1, ESPRESSO);
+        return spinner(values, selected, -1, Colors.ESPRESSO);
     }
 
     private Spinner spinner(List<String> values, String selected, int backgroundColor, int selectedTextColor) {
@@ -1607,15 +1414,15 @@ public class MainActivity extends Activity {
             @Override
             public View getDropDownView(int position, View convertView, ViewGroup parent) {
                 View view = super.getDropDownView(position, convertView, parent);
-                styleSpinnerText(view, ESPRESSO);
-                view.setBackgroundColor(CREAM);
+                styleSpinnerText(view, Colors.ESPRESSO);
+                view.setBackgroundColor(Colors.CREAM);
                 return view;
             }
         };
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinner.setAdapter(adapter);
         spinner.setMinimumHeight(dp(48));
-        spinner.setBackground(roundedBackground(backgroundColor == -1 ? CREAM : backgroundColor, BORDER));
+        spinner.setBackground(roundedBackground(backgroundColor == -1 ? Colors.CREAM : backgroundColor, Colors.BORDER));
         spinner.setPadding(dp(8), 0, dp(8), 0);
         int index = values.indexOf(selected);
         if (index >= 0) {
@@ -1643,8 +1450,8 @@ public class MainActivity extends Activity {
             return;
         }
         jsonStatusButton.setText("JSON");
-        jsonStatusButton.setTextColor(CREAM);
-        jsonStatusButton.setBackground(roundedBackground(healthy ? SUCCESS : ERROR, healthy ? SUCCESS_DARK : ERROR_DARK));
+        jsonStatusButton.setTextColor(Colors.CREAM);
+        jsonStatusButton.setBackground(roundedBackground(healthy ? Colors.SUCCESS : Colors.ERROR, healthy ? Colors.SUCCESS_DARK : Colors.ERROR_DARK));
         jsonStatusButton.setContentDescription(healthy ? "JSON loaded" : "JSON not loaded");
     }
 
@@ -3644,6 +3451,29 @@ public class MainActivity extends Activity {
         return false;
     }
 
+    private static boolean isRestDay(LocalDate value, List<RestDayRange> restDays) {
+        for (RestDayRange range : restDays) {
+            if (!value.isBefore(range.startDate) && !value.isAfter(range.endDate)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static List<LocalDate> availableReadingDays(LocalDate start, LocalDate end, List<RestDayRange> restDays) {
+        List<LocalDate> dates = new ArrayList<>();
+        for (LocalDate current = start; !current.isAfter(end); current = current.plusDays(1)) {
+            if (!isRestDay(current, restDays)) {
+                dates.add(current);
+            }
+        }
+        return dates;
+    }
+
+    private static int availableReadingDaysCount(LocalDate start, LocalDate end, List<RestDayRange> restDays) {
+        return availableReadingDays(start, end, restDays).size();
+    }
+
     private List<LocalDate> availableReadingDays(LocalDate start, LocalDate end) {
         List<LocalDate> dates = new ArrayList<>();
         for (LocalDate current = start; !current.isAfter(end); current = current.plusDays(1)) {
@@ -3889,64 +3719,7 @@ public class MainActivity extends Activity {
         return index < row.size() ? row.get(index).trim() : "";
     }
 
-    private static class SimpleTextWatcher implements TextWatcher {
-        private final Runnable callback;
-
-        SimpleTextWatcher(Runnable callback) {
-            this.callback = callback;
-        }
-
-        @Override
-        public void beforeTextChanged(CharSequence s, int start, int count, int after) {
-        }
-
-        @Override
-        public void onTextChanged(CharSequence s, int start, int before, int count) {
-        }
-
-        @Override
-        public void afterTextChanged(Editable s) {
-            callback.run();
-        }
-    }
-
-    private static class SimpleItemSelectedListener implements android.widget.AdapterView.OnItemSelectedListener {
-        private final Runnable callback;
-        private boolean firstSelection = true;
-
-        SimpleItemSelectedListener(Runnable callback) {
-            this.callback = callback;
-        }
-
-        @Override
-        public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
-            if (firstSelection) {
-                firstSelection = false;
-                return;
-            }
-            callback.run();
-        }
-
-        @Override
-        public void onNothingSelected(android.widget.AdapterView<?> parent) {
-        }
-    }
-
-    private interface PageCounter {
-        int pages(Book book);
-    }
-
-    private static class SessionTarget {
-        final String value;
-        final String dailyPace;
-
-        SessionTarget(String value, String dailyPace) {
-            this.value = value;
-            this.dailyPace = dailyPace;
-        }
-    }
-
-    private class ChartData {
+    public static class ChartData {
         final String sectionLabel;
         final Book book;
         final LocalDate startDate;
@@ -3961,10 +3734,13 @@ public class MainActivity extends Activity {
         final int todayIndex;
         final int yMax;
         final int dailyYMax;
+        final List<RestDayRange> restDays;
 
-        ChartData(String sectionLabel, Book book, BookDeadline deadline) {
+        ChartData(String sectionLabel, Book book, BookDeadline deadline, List<RestDayRange> restDays) {
+            Objects.requireNonNull(restDays, "restDays must not be null");
             this.sectionLabel = sectionLabel;
             this.book = book;
+            this.restDays = restDays;
             BaselineSchedule baseline = book.baselineSchedule;
             this.startDate = baseline == null ? deadline.startDate : baseline.startDate;
             this.plannedDeadline = baseline == null ? deadline.deadline : baseline.deadline;
@@ -3989,7 +3765,7 @@ public class MainActivity extends Activity {
             this.deadline = chartDeadline;
             for (LocalDate date = startDate; !date.isAfter(this.deadline); date = date.plusDays(1)) {
                 dates.add(date);
-                if (!isRestDay(date)) {
+                if (!isRestDay(date, restDays)) {
                     readingDays++;
                 }
                 int planned = Math.min(
@@ -4016,8 +3792,8 @@ public class MainActivity extends Activity {
                 actual = Math.min(Math.max(actual, 0), totalUnits(book, sectionLabel));
                 actualPages.add(actual);
                 int dailyTargetForDate = 0;
-                if (!isRestDay(date) && !date.isAfter(this.plannedDeadline)) {
-                    int daysRemaining = availableReadingDaysCount(date, this.deadline);
+                if (!isRestDay(date, restDays) && !date.isAfter(this.plannedDeadline)) {
+                    int daysRemaining = availableReadingDaysCount(date, this.deadline, restDays);
                     int progress = !date.isBefore(today) && book.currentPage != null
                             ? completedUnits(book, sectionLabel)
                             : sessionActual;
@@ -4029,7 +3805,7 @@ public class MainActivity extends Activity {
                 dailyTargetPages.add(dailyTargetForDate);
                 int projected = -1;
                 if (!date.isBefore(today) && actualPace > 0.0) {
-                    int projectedReadingDays = availableReadingDaysCount(today, date);
+                    int projectedReadingDays = availableReadingDaysCount(today, date, restDays);
                     projected = Math.min(
                             totalUnits(book, sectionLabel),
                             completedUnits(book, sectionLabel)
@@ -4057,7 +3833,7 @@ public class MainActivity extends Activity {
                     firstSession = session.date;
                 }
             }
-            int elapsedReadingDays = availableReadingDaysCount(firstSession, today);
+            int elapsedReadingDays = availableReadingDaysCount(firstSession, today, restDays);
             return elapsedReadingDays <= 0
                     ? 0.0
                     : (double) completedUnits(book, sectionLabel) / elapsedReadingDays;
@@ -4074,7 +3850,7 @@ public class MainActivity extends Activity {
             int readingDays = 0;
             LocalDate date = today;
             while (completed + (int) Math.ceil(pace * readingDays - 1e-9) < total) {
-                if (!isRestDay(date)) {
+                if (!isRestDay(date, restDays)) {
                     readingDays++;
                 }
                 date = date.plusDays(1);
@@ -4083,266 +3859,4 @@ public class MainActivity extends Activity {
         }
     }
 
-    private static class SessionEntry {
-        final int sectionIndex;
-        final int bookIndex;
-        final int sessionIndex;
-        final BookSection section;
-        final Book book;
-        final ReadingSession session;
-
-        SessionEntry(int sectionIndex, int bookIndex, int sessionIndex, BookSection section, Book book, ReadingSession session) {
-            this.sectionIndex = sectionIndex;
-            this.bookIndex = bookIndex;
-            this.sessionIndex = sessionIndex;
-            this.section = section;
-            this.book = book;
-            this.session = session;
-        }
-    }
-    private static class ReadingSession {
-        final LocalDate date;
-        final int currentPage;
-        final int pagesRead;
-
-        ReadingSession(LocalDate date, int currentPage, int pagesRead) {
-            this.date = date;
-            this.currentPage = currentPage;
-            this.pagesRead = pagesRead;
-        }
-    }
-
-    private static class RestDayRange {
-        final LocalDate startDate;
-        final LocalDate endDate;
-
-        RestDayRange(LocalDate startDate, LocalDate endDate) {
-            this.startDate = startDate;
-            this.endDate = endDate;
-        }
-    }
-
-    private static class BaselineSchedule {
-        final LocalDate startDate;
-        final LocalDate deadline;
-        final double dailyTarget;
-
-        BaselineSchedule(LocalDate startDate, LocalDate deadline, double dailyTarget) {
-            this.startDate = startDate;
-            this.deadline = deadline;
-            this.dailyTarget = dailyTarget;
-        }
-    }
-
-    private static class Book {
-        int number;
-        final String title;
-        final int startPage;
-        final int endPage;
-        Integer currentPage;
-        final List<ReadingSession> readingSessions;
-        BaselineSchedule baselineSchedule;
-        LocalDate deadlineOverride;
-        LocalDate startDateOverride;
-        String targetCompletedDate;
-
-        Book(int number, String title, int startPage, int endPage) {
-            this(number, title, startPage, endPage, null, new ArrayList<>(), null, null, null);
-        }
-
-        Book(int number, String title, int startPage, int endPage, Integer currentPage, List<ReadingSession> readingSessions) {
-            this(number, title, startPage, endPage, currentPage, readingSessions, null, null, null);
-        }
-
-        Book(
-                int number,
-                String title,
-                int startPage,
-                int endPage,
-                Integer currentPage,
-                List<ReadingSession> readingSessions,
-                BaselineSchedule baselineSchedule
-        ) {
-            this(number, title, startPage, endPage, currentPage, readingSessions, baselineSchedule, null, null);
-        }
-
-        Book(
-                int number,
-                String title,
-                int startPage,
-                int endPage,
-                Integer currentPage,
-                List<ReadingSession> readingSessions,
-                BaselineSchedule baselineSchedule,
-                LocalDate deadlineOverride
-        ) {
-            this(number, title, startPage, endPage, currentPage, readingSessions, baselineSchedule, deadlineOverride, null);
-        }
-
-        Book(
-                int number,
-                String title,
-                int startPage,
-                int endPage,
-                Integer currentPage,
-                List<ReadingSession> readingSessions,
-                BaselineSchedule baselineSchedule,
-                LocalDate deadlineOverride,
-                LocalDate startDateOverride
-        ) {
-            this(number, title, startPage, endPage, currentPage, readingSessions, baselineSchedule, deadlineOverride, startDateOverride, null);
-        }
-
-        Book(
-                int number,
-                String title,
-                int startPage,
-                int endPage,
-                Integer currentPage,
-                List<ReadingSession> readingSessions,
-                BaselineSchedule baselineSchedule,
-                LocalDate deadlineOverride,
-                LocalDate startDateOverride,
-                String targetCompletedDate
-        ) {
-            this.number = number;
-            this.title = title;
-            this.startPage = startPage;
-            this.endPage = endPage;
-            this.currentPage = currentPage;
-            this.readingSessions = readingSessions;
-            this.baselineSchedule = baselineSchedule;
-            this.deadlineOverride = deadlineOverride;
-            this.startDateOverride = startDateOverride;
-            this.targetCompletedDate = targetCompletedDate;
-        }
-        int pages() {
-            return endPage - startPage + 1;
-        }
-
-        int pagesRead() {
-            if (currentPage == null) {
-                return 0;
-            }
-            return Math.min(Math.max(currentPage - startPage + 1, 0), pages());
-        }
-    }
-    private static class BookSection {
-        final String label;
-        final List<Book> books = new ArrayList<>();
-        List<List<Integer>> simultaneousGroups = new ArrayList<>();
-        boolean baselineNeedsRecalculation;
-
-        BookSection(String label) {
-            this.label = label;
-        }
-    }
-
-    private static class BookDeadline {
-        final Book book;
-        final int cumulativePages;
-        final LocalDate startDate;
-        final LocalDate deadline;
-        final int daysAllocated;
-        final double dailyPages;
-        final String status;
-
-        BookDeadline(Book book, int cumulativePages, LocalDate startDate, LocalDate deadline, int daysAllocated, double dailyPages, String status) {
-            this.book = book;
-            this.cumulativePages = cumulativePages;
-            this.startDate = startDate;
-            this.deadline = deadline;
-            this.daysAllocated = daysAllocated;
-            this.dailyPages = dailyPages;
-            this.status = status;
-        }
-    }
-
-    private static class SectionPlan {
-        final BookSection section;
-        final List<BookDeadline> deadlines;
-        final double dailyPace;
-        final int totalPages;
-        final double requiredPace;
-        final String overallStatus;
-
-        SectionPlan(BookSection section, List<BookDeadline> deadlines, double dailyPace, int totalPages, double requiredPace, String overallStatus) {
-            this.section = section;
-            this.deadlines = deadlines;
-            this.dailyPace = dailyPace;
-            this.totalPages = totalPages;
-            this.requiredPace = requiredPace;
-            this.overallStatus = overallStatus;
-        }
-    }
-
-    private static class PlanSummary {
-        final List<SectionPlan> sectionPlans;
-        final int totalPages;
-        final double highestDailyPace;
-        final String overallStatus;
-
-        PlanSummary(List<SectionPlan> sectionPlans, int totalPages, double highestDailyPace, String overallStatus) {
-            this.sectionPlans = sectionPlans;
-            this.totalPages = totalPages;
-            this.highestDailyPace = highestDailyPace;
-            this.overallStatus = overallStatus;
-        }
-    }
-
-    private static class StatsOptions {
-        final boolean bookCounts;
-        final boolean pageShare;
-        final boolean averagePages;
-        final boolean readingPeriod;
-        final boolean paceDriver;
-
-        StatsOptions(boolean bookCounts, boolean pageShare, boolean averagePages, boolean readingPeriod, boolean paceDriver) {
-            this.bookCounts = bookCounts;
-            this.pageShare = pageShare;
-            this.averagePages = averagePages;
-            this.readingPeriod = readingPeriod;
-            this.paceDriver = paceDriver;
-        }
-    }
-
-    private static class CsvPlan {
-        final List<BookSection> sections;
-        final LocalDate startDate;
-        final LocalDate endDate;
-        final String endLabel;
-        final StatsOptions statsOptions;
-        final List<RestDayRange> restDays;
-
-        CsvPlan(List<BookSection> sections, LocalDate startDate, LocalDate endDate, String endLabel, StatsOptions statsOptions, List<RestDayRange> restDays) {
-            this.sections = sections;
-            this.startDate = startDate;
-            this.endDate = endDate;
-            this.endLabel = endLabel;
-            this.statsOptions = statsOptions;
-            this.restDays = restDays;
-        }
-    }
-
-    private static class ParseTableResult {
-        final List<Book> books;
-        final int nextIndex;
-
-        ParseTableResult(List<Book> books, int nextIndex) {
-            this.books = books;
-            this.nextIndex = nextIndex;
-        }
-    }
-
-    private static class BookFields {
-        final String title;
-        final int startPage;
-        final int endPage;
-
-        BookFields(String title, int startPage, int endPage) {
-            this.title = title;
-            this.startPage = startPage;
-            this.endPage = endPage;
-        }
-    }
 }
