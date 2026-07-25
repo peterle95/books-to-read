@@ -25,17 +25,18 @@
           "number": 1,
           "title": "capital",
           "baseline_schedule": {
-            "start_date": "2026-07-05",
+            "start_date": "2024-01-01",
             "deadline": "2026-09-13",
-            "daily_target": 0.803921568627451
+            "daily_target": 0.8367346938775511
           },
           "deadline_override": "2026-09-13",
-          "start_date_override": null,
+          "start_date_override": "2024-01-01",
+          "target_completed_date": null,
           "start_page": 1,
           "end_page": 1041,
-          "current_page": 1000,
+          "current_page": 1041,
           "pages": 1041,
-          "pages_read": 1000,
+          "pages_read": 1041,
           "reading_sessions": [
             {
               "date": "2026-07-06",
@@ -53,12 +54,12 @@
           "number": 2,
           "title": "wild swans",
           "baseline_schedule": {
-            "start_date": "2026-07-01",
+            "start_date": "2026-06-01",
             "deadline": "2026-09-13",
-            "daily_target": 7.122448979591836
+            "daily_target": 7.270833333333333
           },
           "deadline_override": "2026-09-13",
-          "start_date_override": "2026-07-01",
+          "start_date_override": "2026-06-01",
           "target_completed_date": "2026-07-22",
           "start_page": 1,
           "end_page": 669,
@@ -221,12 +222,12 @@
           },
           "deadline_override": null,
           "start_date_override": "2026-07-01",
-          "target_completed_date": "2026-07-23",
+          "target_completed_date": "2026-07-24",
           "start_page": 1,
           "end_page": 350,
-          "current_page": 89,
+          "current_page": 120,
           "pages": 350,
-          "pages_read": 89,
+          "pages_read": 120,
           "reading_sessions": [
             {
               "date": "2026-07-06",
@@ -247,6 +248,26 @@
               "date": "2026-07-19",
               "current_page": 89,
               "pages_read": 6
+            },
+            {
+              "date": "2026-07-21",
+              "current_page": 101,
+              "pages_read": 12
+            },
+            {
+              "date": "2026-07-22",
+              "current_page": 105,
+              "pages_read": 4
+            },
+            {
+              "date": "2026-07-23",
+              "current_page": 111,
+              "pages_read": 6
+            },
+            {
+              "date": "2026-07-24",
+              "current_page": 120,
+              "pages_read": 9
             }
           ]
         }
