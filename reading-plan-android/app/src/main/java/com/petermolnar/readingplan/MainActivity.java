@@ -79,30 +79,33 @@ public class MainActivity extends Activity {
             DIGITAL_BOOKS_LABEL,
             AUDIOBOOKS_LABEL
     );
-    private static final int LATTE = 0xfff1e4d4;
-    private static final int CREAM = 0xfffff8f0;
-    private static final int LIGHT_CREAM = 0xfff7ede2;
-    private static final int ESPRESSO = 0xff3a241a;
-    private static final int MOCHA = 0xff6f4e37;
-    private static final int CARAMEL = 0xffb56b3c;
-    private static final int CARAMEL_DARK = 0xff87421e;
-    private static final int BORDER = 0xffd6baa1;
-    private static final int SUCCESS = 0xff3d6b4f;
-    private static final int SUCCESS_DARK = 0xff28513a;
-    private static final int ERROR = 0xff9f3a2b;
-    private static final int ERROR_DARK = 0xff6f231a;
-    private static final int VIOLET = 0xff7c3aed;
-    private static final int VIOLET_DARK = 0xff5b21b6;
+    static final int LATTE = 0xfff1e4d4;
+    static final int CREAM = 0xfffff8f0;
+    static final int LIGHT_CREAM = 0xfff7ede2;
+    static final int ESPRESSO = 0xff3a241a;
+    static final int MOCHA = 0xff6f4e37;
+    static final int CARAMEL = 0xffb56b3c;
+    static final int CARAMEL_DARK = 0xff87421e;
+    static final int BORDER = 0xffd6baa1;
+    static final int SUCCESS = 0xff3d6b4f;
+    static final int SUCCESS_DARK = 0xff28513a;
+    static final int ERROR = 0xff9f3a2b;
+    static final int ERROR_DARK = 0xff6f231a;
+    static final int VIOLET = 0xff7c3aed;
+    static final int VIOLET_DARK = 0xff5b21b6;
     private static final int TARGET_COMPLETE = 0xff00ba40;
     private static final int TARGET_COMPLETE_DARK = 0xff00832d;
 
     private LinearLayout root;
     private LinearLayout tabBar;
     private FrameLayout content;
-    private Button jsonStatusButton;
+    Button jsonStatusButton;
     private boolean jsonLoaded;
 
-    private final List<BookSection> sections = blankSections();
+    final List<BookSection> sections = blankSections();
+    private final ReadingPlanUi ui = new ReadingPlanUi(this);
+    private final ReadingPlanTables tables = new ReadingPlanTables(this);
+    private final ReadingSessionEntries sessionEntries = new ReadingSessionEntries(this);
     private StatsOptions statsOptions = new StatsOptions(true, true, true, true, true);
     private LocalDate startDate;
     private LocalDate endDate;
@@ -213,119 +216,14 @@ public class MainActivity extends Activity {
         root.requestApplyInsets();
     }
 
-    private Button actionButton(String label, View.OnClickListener listener) {
-        Button button = new Button(this);
-        button.setText(label);
-        button.setAllCaps(false);
-        button.setTextColor(CREAM);
-        button.setTextSize(15);
-        button.setBackground(roundedBackground(CARAMEL, CARAMEL_DARK));
-        button.setOnClickListener(listener);
-        button.setMinHeight(dp(48));
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-        );
-        params.setMargins(0, 0, dp(8), dp(4));
-        button.setLayoutParams(params);
-        attachButtonAnimation(button, CARAMEL, CARAMEL_DARK);
-        return button;
-    }
-
-    private Button secondaryButton(String label, View.OnClickListener listener) {
-        Button button = new Button(this);
-        button.setText(label);
-        button.setAllCaps(false);
-        button.setTextColor(ESPRESSO);
-        button.setTextSize(14);
-        button.setBackground(roundedBackground(LIGHT_CREAM, BORDER));
-        button.setMinHeight(dp(44));
-        button.setOnClickListener(listener);
-        attachButtonAnimation(button, LIGHT_CREAM, BORDER);
-        return button;
-    }
-
-    private Button selectionButton(String label, boolean selected) {
-        Button button = new Button(this);
-        button.setText(label);
-        button.setAllCaps(false);
-        button.setTextSize(14);
-        button.setTextColor(selected ? CREAM : ESPRESSO);
-        button.setGravity(Gravity.CENTER);
-        button.setSingleLine(false);
-        button.setMinHeight(dp(48));
-        button.setBackground(roundedBackground(selected ? MOCHA : LIGHT_CREAM, selected ? MOCHA : BORDER));
-        attachButtonAnimation(button, selected ? MOCHA : LIGHT_CREAM, selected ? MOCHA : BORDER);
-        return button;
-    }
-
-    private void attachButtonAnimation(View view, int normalFill, int normalBorder) {
-        view.setOnTouchListener((pressedView, event) -> {
-            if (event.getAction() == android.view.MotionEvent.ACTION_DOWN) {
-                pressedView.setBackground(roundedBackground(VIOLET, VIOLET_DARK));
-                pressedView.setTranslationY(dp(2));
-                pressedView.postDelayed(() -> {
-                    if (pressedView.isPressed()) {
-                        pressedView.animate().translationY(-dp(2)).setDuration(90).start();
-                    }
-                }, 70);
-            } else if (event.getAction() == android.view.MotionEvent.ACTION_UP
-                    || event.getAction() == android.view.MotionEvent.ACTION_CANCEL) {
-                if (pressedView == jsonStatusButton) {
-                    updateJsonStatus();
-                } else {
-                    pressedView.setBackground(roundedBackground(normalFill, normalBorder));
-                }
-                pressedView.animate().translationY(0).setDuration(90).start();
-            }
-            return false;
-        });
-    }
-
-    private LinearLayout metricColumn(String label, TextView value) {
-        LinearLayout column = new LinearLayout(this);
-        column.setOrientation(LinearLayout.VERTICAL);
-        TextView caption = new TextView(this);
-        caption.setText(label);
-        caption.setTextColor(MOCHA);
-        caption.setTextSize(12);
-        column.addView(caption);
-        column.addView(value);
-        return column;
-    }
-
-    private TextView metricValue() {
-        TextView value = new TextView(this);
-        value.setText("-");
-        value.setTextColor(ESPRESSO);
-        value.setTextSize(21);
-        value.setTypeface(null, 1);
-        value.setPadding(0, dp(2), 0, 0);
-        return value;
-    }
-    private GradientDrawable roundedBackground(int fillColor, int borderColor) {
-        GradientDrawable drawable = new GradientDrawable();
-        drawable.setShape(GradientDrawable.RECTANGLE);
-        drawable.setColor(fillColor);
-        drawable.setCornerRadius(dp(14));
-        drawable.setStroke(dp(1), borderColor);
-        return drawable;
-    }
-
-    private LinearLayout surfaceCard() {
-        LinearLayout card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(14), dp(12), dp(14), dp(12));
-        card.setBackground(roundedBackground(CREAM, BORDER));
-        card.setElevation(dp(2));
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-        );
-        params.setMargins(0, 0, 0, dp(12));
-        card.setLayoutParams(params);
-        return card;
-    }
+    private Button actionButton(String label, View.OnClickListener listener) { return ui.actionButton(label, listener); }
+    Button secondaryButton(String label, View.OnClickListener listener) { return ui.secondaryButton(label, listener); }
+    private Button selectionButton(String label, boolean selected) { return ui.selectionButton(label, selected); }
+    private void attachButtonAnimation(View view, int normalFill, int normalBorder) { ui.attachButtonAnimation(view, normalFill, normalBorder); }
+    private LinearLayout metricColumn(String label, TextView value) { return ui.metricColumn(label, value); }
+    private TextView metricValue() { return ui.metricValue(); }
+    GradientDrawable roundedBackground(int fillColor, int borderColor) { return ui.roundedBackground(fillColor, borderColor); }
+    LinearLayout surfaceCard() { return ui.surfaceCard(); }
     private void renderTabBar() {
         tabBar.removeAllViews();
         for (String tab : Arrays.asList("Session", "Plan", "Books", "Charts")) {
@@ -563,97 +461,7 @@ public class MainActivity extends Activity {
     }
 
     private void showEntriesSheet() {
-        Dialog sheet = new Dialog(this);
-        LinearLayout panel = new LinearLayout(this);
-        panel.setOrientation(LinearLayout.VERTICAL);
-        panel.setPadding(dp(20), dp(12), dp(20), dp(20));
-        panel.setBackgroundColor(CREAM);
-
-        View handle = new View(this);
-        handle.setBackground(roundedBackground(BORDER, BORDER));
-        LinearLayout.LayoutParams handleParams = new LinearLayout.LayoutParams(dp(44), dp(5));
-        handleParams.gravity = Gravity.CENTER_HORIZONTAL;
-        handleParams.setMargins(0, 0, 0, dp(12));
-        panel.addView(handle, handleParams);
-
-        LinearLayout header = row();
-        header.addView(heading("Entries"), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
-        Button close = secondaryButton("Close", v -> sheet.dismiss());
-        header.addView(close);
-        panel.addView(header);
-
-        ScrollView scroll = new ScrollView(this);
-        LinearLayout entriesBox = new LinearLayout(this);
-        entriesBox.setOrientation(LinearLayout.VERTICAL);
-        scroll.addView(entriesBox);
-        List<SessionEntry> entries = allSessionEntries();
-        if (entries.isEmpty()) {
-            TextView empty = label("No reading entries yet. Add your first session from the Session tab.");
-            empty.setTextColor(MOCHA);
-            empty.setPadding(0, dp(24), 0, dp(24));
-            entriesBox.addView(empty);
-        } else {
-            for (SessionEntry entry : entries) {
-                LinearLayout card = surfaceCard();
-                TextView title = sectionTitle(entry.book.number + ". " + entry.book.title);
-                title.setPadding(0, 0, 0, dp(4));
-                card.addView(title);
-                TextView details = label(entry.session.date + "  •  " + entry.section.label + "\n" + sessionEntryProgress(entry));
-                details.setTextColor(MOCHA);
-                card.addView(details);
-                Button delete = secondaryButton("Delete", v -> confirmDeleteEntry(sheet, entry));
-                card.addView(delete);
-                entriesBox.addView(card);
-            }
-        }
-        panel.addView(scroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
-
-        sheet.setContentView(panel);
-        Window window = sheet.getWindow();
-        if (window != null) {
-            window.setBackgroundDrawable(new ColorDrawable(CREAM));
-            window.setGravity(Gravity.BOTTOM);
-        }
-        sheet.show();
-        if (sheet.getWindow() != null) {
-            sheet.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, (int) (getResources().getDisplayMetrics().heightPixels * 0.86f));
-        }
-    }
-
-    private List<SessionEntry> allSessionEntries() {
-        List<SessionEntry> entries = new ArrayList<>();
-        for (int sectionIndex = 0; sectionIndex < sections.size(); sectionIndex++) {
-            BookSection section = sections.get(sectionIndex);
-            for (int bookIndex = 0; bookIndex < section.books.size(); bookIndex++) {
-                Book book = section.books.get(bookIndex);
-                for (int sessionIndex = 0; sessionIndex < book.readingSessions.size(); sessionIndex++) {
-                    entries.add(new SessionEntry(sectionIndex, bookIndex, sessionIndex, section, book, book.readingSessions.get(sessionIndex)));
-                }
-            }
-        }
-        Collections.sort(entries, (left, right) -> right.session.date.compareTo(left.session.date));
-        return entries;
-    }
-
-    private String sessionEntryProgress(SessionEntry entry) {
-        if (isAudiobookSection(entry.section.label)) {
-            return "Time left " + formatDuration(remainingTimeAt(entry.book, entry.session.currentPage)) + "  •  listened " + formatDuration(entry.session.pagesRead);
-        }
-        return "Current page " + entry.session.currentPage + "  •  read +" + entry.session.pagesRead + " pages";
-    }
-
-    private void confirmDeleteEntry(Dialog sheet, SessionEntry entry) {
-        new AlertDialog.Builder(this)
-                .setTitle("Delete entry?")
-                .setMessage("This session will be removed and the book progress recalculated.")
-                .setPositiveButton("Delete", (dialog, which) -> {
-                    removeReadingSession(sections.get(entry.sectionIndex).books.get(entry.bookIndex), entry.sessionIndex);
-                    sheet.dismiss();
-                    afterStateChange("Session deleted");
-                    showEntriesSheet();
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
+        sessionEntries.show();
     }
     private View buildSettingsView() {
         ScrollView scroll = new ScrollView(this);
@@ -1108,21 +916,21 @@ public class MainActivity extends Activity {
         }));
         box.addView(header);
 
-        List<ChartData> charts = chartData();
+        List<ReadingPlanChartData> charts = chartData();
         if (charts.isEmpty()) {
             box.addView(label("Add a book to see its chart."));
             return scroll;
         }
 
         List<String> choices = new ArrayList<>();
-        for (ChartData chart : charts) {
+        for (ReadingPlanChartData chart : charts) {
             choices.add(chart.sectionLabel + " - " + chart.book.number + ". " + chart.book.title);
         }
         box.addView(label("Book"));
         Spinner bookSpinner = spinner(choices, choices.get(0));
         box.addView(bookSpinner);
 
-        ChartView chartView = new ChartView(this, charts.get(0));
+        ReadingPlanChartView chartView = new ReadingPlanChartView(this, charts.get(0));
         chartView.setProjectionVisible(showActualPaceProjection);
         CheckBox projectionToggle = checkBox(
                 "Show projection based on actual reading pace",
@@ -1150,21 +958,21 @@ public class MainActivity extends Activity {
         return scroll;
     }
 
-    private List<ChartData> chartData() {
+    private List<ReadingPlanChartData> chartData() {
         PlanSummary summary = buildRemainingPlans();
-        List<ChartData> charts = new ArrayList<>();
+        List<ReadingPlanChartData> charts = new ArrayList<>();
         for (String sectionLabel : BOOK_SECTION_LABELS) {
             SectionPlan plan = sectionPlanByLabel(summary.sectionPlans, sectionLabel);
             for (BookDeadline deadline : plan.deadlines) {
                 if (totalUnits(deadline.book, sectionLabel) > 0) {
-                    charts.add(new ChartData(sectionLabel, deadline.book, deadline));
+                    charts.add(new ReadingPlanChartData(this, sectionLabel, deadline.book, deadline));
                 }
             }
         }
         return charts;
     }
 
-    private String chartDetails(ChartData chart) {
+    private String chartDetails(ReadingPlanChartData chart) {
         boolean audiobook = isAudiobookSection(chart.sectionLabel);
         String projection = chart.actualPace <= 0.0
                 ? "no actual pace yet"
@@ -1178,223 +986,12 @@ public class MainActivity extends Activity {
                 + " | " + projection;
     }
 
-    private class ChartView extends View {
-        private ChartData chart;
-        private boolean projectionVisible = true;
-
-        ChartView(android.content.Context context, ChartData chart) {
-            super(context);
-            this.chart = chart;
-            setBackgroundColor(CREAM);
-            setMinimumHeight(dp(300));
-        }
-
-        void setChartData(ChartData chart) {
-            this.chart = chart;
-            invalidate();
-        }
-
-        void setProjectionVisible(boolean visible) {
-            projectionVisible = visible;
-            invalidate();
-        }
-
-        @Override
-        protected void onDraw(Canvas canvas) {
-            super.onDraw(canvas);
-            if (chart == null || chart.dates.isEmpty()) {
-                return;
-            }
-
-            float left = dp(54);
-            float top = dp(42);
-            float right = getWidth() - dp(48);
-            float bottom = getHeight() - dp(52);
-            if (right <= left || bottom <= top) {
-                return;
-            }
-            float plotWidth = right - left;
-            float plotHeight = bottom - top;
-            Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-            paint.setTextSize(dp(11));
-            paint.setColor(MOCHA);
-            boolean audiobook = isAudiobookSection(chart.sectionLabel);
-
-            for (int tick = 0; tick <= 4; tick++) {
-                int value = (int) Math.ceil(chart.yMax * tick / 4.0 - 1e-9);
-                float y = bottom - plotHeight * tick / 4f;
-                paint.setColor(BORDER);
-                paint.setStrokeWidth(dp(1));
-                canvas.drawLine(left, y, right, y, paint);
-                paint.setColor(MOCHA);
-                canvas.drawText(chartValue(value, audiobook), dp(8), y + dp(4), paint);
-            }
-
-            paint.setColor(ESPRESSO);
-            paint.setStrokeWidth(dp(2));
-            canvas.drawLine(left, top, left, bottom, paint);
-            canvas.drawLine(left, bottom, right, bottom, paint);
-            paint.setColor(CARAMEL);
-            canvas.drawLine(right, top, right, bottom, paint);
-            for (int tick = 0; tick <= 4; tick++) {
-                int value = (int) Math.ceil(chart.dailyYMax * tick / 4.0 - 1e-9);
-                float y = bottom - plotHeight * tick / 4f;
-                canvas.drawText(chartValue(value, audiobook), right + dp(5), y + dp(4), paint);
-            }
-            canvas.drawText(audiobook ? "Time/day" : "Pages/day", right - dp(42), top - dp(10), paint);
-
-            drawSeries(canvas, chart.plannedPages, left, top, plotWidth, plotHeight, MOCHA, dp(3), chart.yMax, null);
-            drawSeries(canvas, chart.actualPages, left, top, plotWidth, plotHeight, SUCCESS, dp(2), chart.yMax, null);
-            drawSeries(
-                    canvas,
-                    chart.dailyTargetPages,
-                    left,
-                    top,
-                    plotWidth,
-                    plotHeight,
-                    CARAMEL,
-                    dp(2),
-                    chart.dailyYMax,
-                    new DashPathEffect(new float[]{dp(7), dp(5)}, 0)
-            );
-            if (projectionVisible) {
-                drawSeries(
-                        canvas,
-                        chart.projectionPages,
-                        left,
-                        top,
-                        plotWidth,
-                        plotHeight,
-                        VIOLET,
-                        dp(2),
-                        chart.yMax,
-                        new DashPathEffect(new float[]{dp(4), dp(4)}, 0)
-                );
-            }
-
-            float todayX = xForIndex(chart.todayIndex, chart.dates.size(), left, plotWidth);
-            paint.setColor(ERROR);
-            paint.setStrokeWidth(dp(2));
-            paint.setPathEffect(new DashPathEffect(new float[]{dp(6), dp(4)}, 0));
-            canvas.drawLine(todayX, top, todayX, bottom, paint);
-            paint.setPathEffect(null);
-            paint.setTextSize(dp(11));
-            canvas.drawText("Today", Math.max(left, todayX - dp(17)), top - dp(10), paint);
-
-            int labelStep = Math.max(1, (chart.dates.size() - 1) / 4);
-            for (int index = 0; index < chart.dates.size(); index += labelStep) {
-                drawDateLabel(canvas, chart.dates.get(index), index, chart.dates.size(), left, right, bottom, paint);
-            }
-            int last = chart.dates.size() - 1;
-            if (last % labelStep != 0) {
-                drawDateLabel(canvas, chart.dates.get(last), last, chart.dates.size(), left, right, bottom, paint);
-            }
-
-            paint.setColor(MOCHA);
-            canvas.drawText("Plan", left, dp(18), paint);
-            paint.setColor(SUCCESS);
-            canvas.drawText("Actual", left + dp(60), dp(18), paint);
-            paint.setColor(CARAMEL);
-            canvas.drawText("Daily target", left + dp(120), dp(18), paint);
-            if (projectionVisible) {
-                paint.setColor(VIOLET);
-                canvas.drawText("Projection", left + dp(210), dp(18), paint);
-            }
-            canvas.save();
-            canvas.rotate(-90, dp(15), (top + bottom) / 2);
-            paint.setColor(MOCHA);
-            canvas.drawText(audiobook ? "Time" : "Pages", dp(15), (top + bottom) / 2, paint);
-            canvas.restore();
-        }
-
-        private void drawSeries(
-                Canvas canvas,
-                List<Integer> values,
-                float left,
-                float top,
-                float width,
-                float height,
-                int color,
-                float strokeWidth,
-                int valueMax,
-                DashPathEffect pathEffect
-        ) {
-            if (values.isEmpty()) {
-                return;
-            }
-            Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-            paint.setColor(color);
-            paint.setStyle(Paint.Style.STROKE);
-            paint.setStrokeWidth(strokeWidth);
-            paint.setPathEffect(pathEffect);
-            Path path = new Path();
-            boolean hasPoint = false;
-            for (int index = 0; index < values.size(); index++) {
-                if (values.get(index) < 0) {
-                    hasPoint = false;
-                    continue;
-                }
-                float x = xForIndex(index, values.size(), left, width);
-                float y = top + height - height * values.get(index) / valueMax;
-                if (!hasPoint) {
-                    path.moveTo(x, y);
-                } else {
-                    path.lineTo(x, y);
-                }
-                hasPoint = true;
-            }
-            canvas.drawPath(path, paint);
-            paint.setPathEffect(null);
-        }
-
-        private void drawDateLabel(
-                Canvas canvas,
-                LocalDate date,
-                int index,
-                int count,
-                float left,
-                float right,
-                float bottom,
-                Paint paint
-        ) {
-            String text = String.format(Locale.US, "%02d-%02d", date.getMonthValue(), date.getDayOfMonth());
-            float x = xForIndex(index, count, left, right - left);
-            paint.setColor(MOCHA);
-            canvas.drawText(text, Math.min(x - dp(17), right - dp(34)), bottom + dp(22), paint);
-        }
-
-        private float xForIndex(int index, int count, float left, float width) {
-            return count <= 1 ? left : left + width * index / (count - 1);
-        }
-    }
-
     private void addMetricRow(TableLayout table, String area, String metric, String value, String details) {
-        addTableRow(table, false, Arrays.asList(area, metric, value, details), -1);
+        tables.addMetricRow(table, area, metric, value, details);
     }
 
     private HorizontalScrollView bookScheduleTable(SectionPlan sectionPlan) {
-        HorizontalScrollView scroll = new HorizontalScrollView(this);
-        TableLayout table = new TableLayout(this);
-        scroll.addView(table);
-        boolean audiobookSection = isAudiobookSection(sectionPlan.section.label);
-        addTableRow(table, true, Arrays.asList("Book", "Daily", "Remaining", "Deadline", "Status"), -1);
-        for (BookDeadline deadline : sectionPlan.deadlines) {
-            Book book = deadline.book;
-            String daily = audiobookSection
-                    ? formatDuration(deadline.dailyPages)
-                    : format2(deadline.dailyPages) + " pages";
-            String remaining = audiobookSection
-                    ? formatDuration(unitsRemaining(book, sectionPlan.section.label))
-                    : pagesRemaining(book) + " pages";
-            addTableRow(table, false, Arrays.asList(
-                    book.number + ". " + book.title,
-                    daily,
-                    remaining,
-                    deadline.deadline.toString(),
-                    deadline.status
-            ), -1);
-        }
-        return scroll;
+        return tables.bookScheduleTable(sectionPlan);
     }
 
     private void showBookPicker(BookSection section) {
@@ -1478,204 +1075,29 @@ public class MainActivity extends Activity {
     }
 
     private HorizontalScrollView planTable(SectionPlan sectionPlan) {
-        HorizontalScrollView scroll = new HorizontalScrollView(this);
-        TableLayout table = new TableLayout(this);
-        scroll.addView(table);
-        boolean audiobookSection = isAudiobookSection(sectionPlan.section.label);
-        List<String> headers = audiobookSection
-                ? Arrays.asList(
-                        "Book", "Title", "Daily time", "Remaining time", "Start time", "End time",
-                        "Duration", "Start date", "Deadline", "Days allocated", "Status"
-                )
-                : Arrays.asList(
-                        "Book", "Title", "Daily pages", "Remaining", "Start page", "End page",
-                        "Current page", "Pages", "Start date",
-                        "Deadline", "Days allocated", "Status"
-                );
-        addTableRow(table, true, headers, -1);
-        for (BookDeadline deadline : sectionPlan.deadlines) {
-            Book book = deadline.book;
-            List<String> row = audiobookSection
-                    ? Arrays.asList(
-                            String.valueOf(book.number),
-                            book.title,
-                            formatDuration(deadline.dailyPages),
-                            formatDuration(unitsRemaining(book, sectionPlan.section.label)),
-                            formatDuration(book.startPage),
-                            formatDuration(book.endPage),
-                            formatDuration(totalUnits(book, sectionPlan.section.label)),
-                            deadline.startDate.toString(),
-                            deadline.deadline.toString(),
-                            String.valueOf(deadline.daysAllocated),
-                            deadline.status
-                    )
-                    : Arrays.asList(
-                            String.valueOf(book.number),
-                            book.title,
-                            format2(deadline.dailyPages),
-                            String.valueOf(pagesRemaining(book)),
-                            String.valueOf(book.startPage),
-                            String.valueOf(book.endPage),
-                            book.currentPage == null ? "" : String.valueOf(book.currentPage),
-                            String.valueOf(book.pages()),
-                            deadline.startDate.toString(),
-                            deadline.deadline.toString(),
-                            String.valueOf(deadline.daysAllocated),
-                            deadline.status
-                    );
-            addTableRow(table, false, row, -1);
-        }
-        return scroll;
+        return tables.planTable(sectionPlan);
     }
 
     private TableRow addTableRow(TableLayout table, boolean header, List<String> values, int rowColor) {
-        TableRow row = new TableRow(this);
-        table.addView(row);
-        for (String value : values) {
-            TextView cell = new TextView(this);
-            cell.setText(value);
-            cell.setTextSize(13);
-            cell.setTextColor(rowColor == CARAMEL ? CREAM : ESPRESSO);
-            cell.setPadding(dp(10), dp(8), dp(10), dp(8));
-            cell.setGravity(Gravity.CENTER_VERTICAL);
-            cell.setSingleLine(false);
-            cell.setMinWidth(dp(96));
-            if (header) {
-                cell.setTypeface(null, 1);
-                cell.setBackgroundColor(LIGHT_CREAM);
-            } else if (rowColor != -1) {
-                cell.setBackgroundColor(rowColor);
-            } else {
-                cell.setBackgroundColor(CREAM);
-            }
-            row.addView(cell);
-        }
-        return row;
+        return tables.addTableRow(table, header, values, rowColor);
     }
 
-    private LinearLayout verticalBox() {
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(16), dp(12), dp(16), dp(20));
-        return box;
-    }
-
-    private LinearLayout row() {
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(0, dp(4), 0, dp(4));
-        return row;
-    }
-
-    private TextView heading(String text) {
-        TextView view = label(text);
-        view.setTextSize(24);
-        view.setTypeface(null, 1);
-        view.setPadding(0, dp(4), 0, dp(12));
-        return view;
-    }
-
-    private TextView sectionTitle(String text) {
-        TextView view = label(text);
-        view.setTextSize(16);
-        view.setTypeface(null, 1);
-        view.setPadding(0, dp(12), 0, dp(8));
-        return view;
-    }
-
-    private TextView label(String text) {
-        TextView view = new TextView(this);
-        view.setText(text);
-        view.setTextColor(ESPRESSO);
-        view.setTextSize(14);
-        view.setPadding(0, dp(4), 0, dp(4));
-        return view;
-    }
-
-    private TextView monoText(String text) {
-        TextView view = label(text);
-        view.setTextSize(13);
-        view.setTypeface(android.graphics.Typeface.MONOSPACE);
-        view.setPadding(dp(12), dp(12), dp(12), dp(12));
-        view.setBackground(roundedBackground(LIGHT_CREAM, BORDER));
-        return view;
-    }
-
-    private EditText editText(String value, int inputType) {
-        EditText edit = new EditText(this);
-        edit.setText(value);
-        edit.setTextColor(ESPRESSO);
-        edit.setTextSize(16);
-        edit.setSingleLine(true);
-        edit.setInputType(inputType);
-        edit.setSelectAllOnFocus(false);
-        edit.setPadding(dp(12), 0, dp(12), 0);
-        edit.setMinHeight(dp(50));
-        edit.setBackground(roundedBackground(CREAM, BORDER));
-        return edit;
-    }
-
-    private CheckBox checkBox(String label, boolean checked) {
-        CheckBox box = new CheckBox(this);
-        box.setText(label);
-        box.setTextColor(ESPRESSO);
-        box.setChecked(checked);
-        box.setMinHeight(dp(44));
-        return box;
-    }
-    private Spinner spinner(List<String> values, String selected) {
-        return spinner(values, selected, -1, ESPRESSO);
-    }
-
-    private Spinner spinner(List<String> values, String selected, int backgroundColor, int selectedTextColor) {
-        Spinner spinner = new Spinner(this);
-        ArrayAdapter<String> adapter = new ArrayAdapter<String>(
-                this,
-                android.R.layout.simple_spinner_item,
-                values
-        ) {
-            @Override
-            public View getView(int position, View convertView, ViewGroup parent) {
-                View view = super.getView(position, convertView, parent);
-                styleSpinnerText(view, selectedTextColor);
-                return view;
-            }
-
-            @Override
-            public View getDropDownView(int position, View convertView, ViewGroup parent) {
-                View view = super.getDropDownView(position, convertView, parent);
-                styleSpinnerText(view, ESPRESSO);
-                view.setBackgroundColor(CREAM);
-                return view;
-            }
-        };
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spinner.setAdapter(adapter);
-        spinner.setMinimumHeight(dp(48));
-        spinner.setBackground(roundedBackground(backgroundColor == -1 ? CREAM : backgroundColor, BORDER));
-        spinner.setPadding(dp(8), 0, dp(8), 0);
-        int index = values.indexOf(selected);
-        if (index >= 0) {
-            spinner.setSelection(index);
-        }
-        return spinner;
-    }
-
-    private void styleSpinnerText(View view, int color) {
-        if (view instanceof TextView) {
-            TextView text = (TextView) view;
-            text.setTextColor(color);
-            text.setTextSize(15);
-            text.setPadding(dp(12), dp(8), dp(12), dp(8));
-        }
-    }
+    LinearLayout verticalBox() { return ui.verticalBox(); }
+    LinearLayout row() { return ui.row(); }
+    TextView heading(String text) { return ui.heading(text); }
+    TextView sectionTitle(String text) { return ui.sectionTitle(text); }
+    TextView label(String text) { return ui.label(text); }
+    private TextView monoText(String text) { return ui.monoText(text); }
+    private EditText editText(String value, int inputType) { return ui.editText(value, inputType); }
+    private CheckBox checkBox(String label, boolean checked) { return ui.checkBox(label, checked); }
+    private Spinner spinner(List<String> values, String selected) { return ui.spinner(values, selected); }
+    private Spinner spinner(List<String> values, String selected, int backgroundColor, int selectedTextColor) { return ui.spinner(values, selected, backgroundColor, selectedTextColor); }
 
     private String fileLocationText() {
         return jsonUri == null ? "Not connected" : jsonUri.toString();
     }
 
-    private void updateJsonStatus() {
+    void updateJsonStatus() {
         boolean healthy = jsonLoaded && jsonUri != null;
         if (jsonStatusButton == null) {
             return;
@@ -1695,7 +1117,7 @@ public class MainActivity extends Activity {
         updateJsonStatus();
     }
 
-    private void afterStateChange(String message) {
+    void afterStateChange(String message) {
         autosaveJson(message);
         showCurrentTab();
     }
@@ -3139,7 +2561,7 @@ public class MainActivity extends Activity {
         book.readingSessions.add(new ReadingSession(sessionDate, currentPage, pagesRead));
     }
 
-    private void removeReadingSession(Book book, int index) {
+    void removeReadingSession(Book book, int index) {
         if (index < 0 || index >= book.readingSessions.size()) {
             throw new IllegalArgumentException("reading session not found");
         }
@@ -3300,7 +2722,7 @@ public class MainActivity extends Activity {
         return start.plusMonths(3).minusDays(1);
     }
 
-    private boolean isRestDay(LocalDate value) {
+    boolean isRestDay(LocalDate value) {
         for (RestDayRange range : restDays) {
             if (!value.isBefore(range.startDate) && !value.isAfter(range.endDate)) {
                 return true;
@@ -3309,7 +2731,7 @@ public class MainActivity extends Activity {
         return false;
     }
 
-    private List<LocalDate> availableReadingDays(LocalDate start, LocalDate end) {
+    List<LocalDate> availableReadingDays(LocalDate start, LocalDate end) {
         List<LocalDate> dates = new ArrayList<>();
         for (LocalDate current = start; !current.isAfter(end); current = current.plusDays(1)) {
             if (!isRestDay(current)) {
@@ -3319,7 +2741,7 @@ public class MainActivity extends Activity {
         return dates;
     }
 
-    private int availableReadingDaysCount(LocalDate start, LocalDate end) {
+    int availableReadingDaysCount(LocalDate start, LocalDate end) {
         return availableReadingDays(start, end).size();
     }
 
@@ -3398,11 +2820,11 @@ public class MainActivity extends Activity {
         return "You finish " + lateDays + " day" + (lateDays == 1 ? "" : "s") + " after the " + endName + ".";
     }
 
-    private static int clamp(int value, int min, int max) {
+    static int clamp(int value, int min, int max) {
         return Math.min(Math.max(value, min), max);
     }
 
-    private int dp(int value) {
+    int dp(int value) {
         float density = getResources().getDisplayMetrics().density;
         return Math.round(value * density);
     }
@@ -3411,7 +2833,7 @@ public class MainActivity extends Activity {
         return String.format(Locale.US, "%.1f", value);
     }
 
-    private static String format2(double value) {
+    static String format2(double value) {
         return String.format(Locale.US, "%.2f", value);
     }
 
@@ -3490,143 +2912,6 @@ public class MainActivity extends Activity {
 
         @Override
         public void onNothingSelected(android.widget.AdapterView<?> parent) {
-        }
-    }
-
-    private class ChartData {
-        final String sectionLabel;
-        final Book book;
-        final LocalDate startDate;
-        final LocalDate plannedDeadline;
-        final LocalDate deadline;
-        final List<LocalDate> dates = new ArrayList<>();
-        final List<Integer> plannedPages = new ArrayList<>();
-        final List<Integer> actualPages = new ArrayList<>();
-        final List<Integer> dailyTargetPages = new ArrayList<>();
-        final List<Integer> projectionPages = new ArrayList<>();
-        final double actualPace;
-        final int todayIndex;
-        final int yMax;
-        final int dailyYMax;
-
-        ChartData(String sectionLabel, Book book, BookDeadline deadline) {
-            this.sectionLabel = sectionLabel;
-            this.book = book;
-            BaselineSchedule baseline = book.baselineSchedule;
-            this.startDate = baseline == null ? deadline.startDate : baseline.startDate;
-            this.plannedDeadline = baseline == null ? deadline.deadline : baseline.deadline;
-            double dailyTarget = baseline == null ? deadline.dailyPages : baseline.dailyTarget;
-
-            int plannedMaximum = 0;
-            int actualMaximum = 0;
-            int dailyMaximum = 0;
-            int readingDays = 0;
-            int sessionActual = 0;
-            LocalDate today = LocalDate.now();
-            this.actualPace = actualReadingPace(book, sectionLabel, today);
-            LocalDate projectedDeadline = projectedCompletionDate(
-                    book, sectionLabel, today, actualPace
-            );
-            LocalDate chartDeadline = this.plannedDeadline.isAfter(projectedDeadline)
-                    ? this.plannedDeadline
-                    : projectedDeadline;
-            if (chartDeadline.isBefore(today)) {
-                chartDeadline = today;
-            }
-            this.deadline = chartDeadline;
-            for (LocalDate date = startDate; !date.isAfter(this.deadline); date = date.plusDays(1)) {
-                dates.add(date);
-                if (!isRestDay(date)) {
-                    readingDays++;
-                }
-                int planned = Math.min(
-                        totalUnits(book, sectionLabel),
-                        date.isAfter(this.plannedDeadline)
-                                ? totalUnits(book, sectionLabel)
-                                : (int) Math.ceil(dailyTarget * readingDays - 1e-9)
-                );
-                plannedPages.add(planned);
-                for (ReadingSession session : book.readingSessions) {
-                    if (!session.date.isAfter(date)) {
-                        sessionActual = Math.max(
-                                sessionActual,
-                                isAudiobookSection(sectionLabel)
-                                        ? session.currentPage - book.startPage
-                                        : session.currentPage - book.startPage + 1
-                        );
-                    }
-                }
-                int actual = sessionActual;
-                if (!date.isBefore(today) && book.currentPage != null) {
-                    actual = Math.max(actual, completedUnits(book, sectionLabel));
-                }
-                actual = Math.min(Math.max(actual, 0), totalUnits(book, sectionLabel));
-                actualPages.add(actual);
-                int dailyTargetForDate = 0;
-                if (!isRestDay(date) && !date.isAfter(this.plannedDeadline)) {
-                    int daysRemaining = availableReadingDaysCount(date, this.deadline);
-                    int progress = !date.isBefore(today) && book.currentPage != null
-                            ? completedUnits(book, sectionLabel)
-                            : sessionActual;
-                    int remaining = Math.max(totalUnits(book, sectionLabel) - progress, 0);
-                    dailyTargetForDate = daysRemaining == 0
-                            ? 0
-                            : (int) Math.ceil((double) remaining / daysRemaining - 1e-9);
-                }
-                dailyTargetPages.add(dailyTargetForDate);
-                int projected = -1;
-                if (!date.isBefore(today) && actualPace > 0.0) {
-                    int projectedReadingDays = availableReadingDaysCount(today, date);
-                    projected = Math.min(
-                            totalUnits(book, sectionLabel),
-                            completedUnits(book, sectionLabel)
-                                    + (int) Math.ceil(actualPace * projectedReadingDays - 1e-9)
-                    );
-                }
-                projectionPages.add(projected);
-                plannedMaximum = Math.max(plannedMaximum, planned);
-                actualMaximum = Math.max(actualMaximum, actual);
-                dailyMaximum = Math.max(dailyMaximum, dailyTargetForDate);
-            }
-            int dayOffset = (int) ChronoUnit.DAYS.between(startDate, today);
-            todayIndex = clamp(dayOffset, 0, Math.max(dates.size() - 1, 0));
-            yMax = Math.max(1, Math.max(totalUnits(book, sectionLabel), Math.max(plannedMaximum, actualMaximum)));
-            dailyYMax = Math.max(1, dailyMaximum);
-        }
-
-        private double actualReadingPace(Book book, String sectionLabel, LocalDate today) {
-            if (book.readingSessions.isEmpty() || completedUnits(book, sectionLabel) <= 0) {
-                return 0.0;
-            }
-            LocalDate firstSession = book.readingSessions.get(0).date;
-            for (ReadingSession session : book.readingSessions) {
-                if (session.date.isBefore(firstSession)) {
-                    firstSession = session.date;
-                }
-            }
-            int elapsedReadingDays = availableReadingDaysCount(firstSession, today);
-            return elapsedReadingDays <= 0
-                    ? 0.0
-                    : (double) completedUnits(book, sectionLabel) / elapsedReadingDays;
-        }
-
-        private LocalDate projectedCompletionDate(
-                Book book, String sectionLabel, LocalDate today, double pace
-        ) {
-            int total = totalUnits(book, sectionLabel);
-            int completed = completedUnits(book, sectionLabel);
-            if (pace <= 0.0 || completed >= total) {
-                return today;
-            }
-            int readingDays = 0;
-            LocalDate date = today;
-            while (completed + (int) Math.ceil(pace * readingDays - 1e-9) < total) {
-                if (!isRestDay(date)) {
-                    readingDays++;
-                }
-                date = date.plusDays(1);
-            }
-            return date.minusDays(1);
         }
     }
 
