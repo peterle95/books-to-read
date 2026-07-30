@@ -61,16 +61,20 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
+import static com.petermolnar.readingplan.BookCollections.*;
+import static com.petermolnar.readingplan.CsvSupport.*;
+import static com.petermolnar.readingplan.PlanPrimitives.*;
+
 public class MainActivity extends Activity {
     private static final String PREFS = "reading_plan_prefs";
     private static final String PREF_JSON_URI = "json_uri";
     private static final int REQUEST_OPEN_JSON = 100;
     private static final int REQUEST_OPEN_CSV = 101;
     private static final int REQUEST_CREATE_CSV = 102;
-    private static final String PHYSICAL_BOOKS_LABEL = "Physical books";
-    private static final String DIGITAL_BOOKS_LABEL = "Digital books";
-    private static final String AUDIOBOOKS_LABEL = "Audiobooks";
-    private static final List<String> BOOK_SECTION_LABELS = Arrays.asList(
+    static final String PHYSICAL_BOOKS_LABEL = "Physical books";
+    static final String DIGITAL_BOOKS_LABEL = "Digital books";
+    static final String AUDIOBOOKS_LABEL = "Audiobooks";
+    static final List<String> BOOK_SECTION_LABELS = Arrays.asList(
             PHYSICAL_BOOKS_LABEL,
             DIGITAL_BOOKS_LABEL,
             AUDIOBOOKS_LABEL
@@ -1174,10 +1178,6 @@ public class MainActivity extends Activity {
                 + " | " + projection;
     }
 
-    private static String chartValue(double value, boolean audiobook) {
-        return audiobook ? formatDuration(value) : String.valueOf((int) Math.ceil(value - 1e-9));
-    }
-
     private class ChartView extends View {
         private ChartData chart;
         private boolean projectionVisible = true;
@@ -1402,7 +1402,7 @@ public class MainActivity extends Activity {
             showError("Add a book first");
             return;
         }
-        String[] choices = bookChoices(section).toArray(new String[0]);
+            String[] choices = Book.bookChoices(section).toArray(new String[0]);
         new AlertDialog.Builder(this)
                 .setTitle("Choose a book to edit")
                 .setSingleChoiceItems(choices, selectedBookIndex, (dialog, which) -> {
@@ -1419,7 +1419,7 @@ public class MainActivity extends Activity {
             showError("Add at least two books first");
             return;
         }
-        String[] choices = bookChoices(section).toArray(new String[0]);
+        String[] choices = Book.bookChoices(section).toArray(new String[0]);
         boolean[] checked = new boolean[section.books.size()];
         int selectedGroup = -1;
         for (int groupIndex = 0; groupIndex < section.simultaneousGroups.size(); groupIndex++) {
@@ -2234,26 +2234,6 @@ public class MainActivity extends Activity {
         }
     }
 
-    private static List<RestDayRange> restDayRangesFromCsv(String raw) {
-        List<RestDayRange> ranges = new ArrayList<>();
-        if (raw == null || raw.trim().isEmpty()) {
-            return ranges;
-        }
-        for (String value : raw.split(";")) {
-            String[] dates = value.trim().split("/", 2);
-            if (dates.length != 2) {
-                throw new IllegalArgumentException("invalid rest-day range");
-            }
-            LocalDate start = parseDate(dates[0]);
-            LocalDate end = parseDate(dates[1]);
-            if (end.isBefore(start)) {
-                throw new IllegalArgumentException("rest-day end date must be on or after the start date");
-            }
-            ranges.add(new RestDayRange(start, end));
-        }
-        return ranges;
-    }
-
     private static List<RestDayRange> restDayRangesFromJson(JSONArray raw) throws JSONException {
         List<RestDayRange> ranges = new ArrayList<>();
         if (raw == null) {
@@ -2539,7 +2519,7 @@ public class MainActivity extends Activity {
         for (SectionPlan sectionPlan : summary.sectionPlans) {
             writeCsvRow(out, Collections.emptyList());
             writeCsvRow(out, Collections.singletonList(sectionPlan.section.label));
-            writeCsvRow(out, Arrays.asList("Daily pace", csvDailyPace(sectionPlan)));
+            writeCsvRow(out, Arrays.asList("Daily pace", SectionPlan.csvDailyPace(sectionPlan)));
             if (!sectionPlan.section.simultaneousGroups.isEmpty()) {
                 writeCsvRow(out, Arrays.asList("Simultaneous groups", groupsCompact(sectionPlan.section.simultaneousGroups)));
             }
@@ -2549,65 +2529,6 @@ public class MainActivity extends Activity {
             }
         }
         return out.toString();
-    }
-
-    private static String csvDailyPace(SectionPlan sectionPlan) {
-        if (isAudiobookSection(sectionPlan.section.label)) {
-            return formatDuration(sectionPlan.dailyPace) + "/day";
-        }
-        return format15(sectionPlan.dailyPace) + " pages/day";
-    }
-
-    private static List<String> csvHeaders(String sectionLabel) {
-        if (isAudiobookSection(sectionLabel)) {
-            return Arrays.asList(
-                    "Book", "Title", "Start time", "End time", "Remaining time", "Duration",
-                    "Daily time", "Cumulative remaining time",
-                    "Start date", "Deadline", "Days allocated", "Status"
-            );
-        }
-        return Arrays.asList(
-                "Book", "Title", "Start page", "End page", "Current page", "Pages",
-                "Read pages", "Remaining pages", "Daily pages",
-                "Cumulative remaining pages",
-                "Start date", "Deadline", "Days allocated", "Status"
-        );
-    }
-
-    private static List<String> csvRow(BookDeadline deadline, String sectionLabel) {
-        Book book = deadline.book;
-        if (isAudiobookSection(sectionLabel)) {
-            return Arrays.asList(
-                    String.valueOf(book.number),
-                    book.title,
-                    formatDuration(book.startPage),
-                    formatDuration(book.endPage),
-                    formatDuration(unitsRemaining(book, sectionLabel)),
-                    formatDuration(totalUnits(book, sectionLabel)),
-                    formatDuration(deadline.dailyPages),
-                    formatDuration(deadline.cumulativePages),
-                    deadline.startDate.toString(),
-                    deadline.deadline.toString(),
-                    String.valueOf(deadline.daysAllocated),
-                    deadline.status
-            );
-        }
-        return Arrays.asList(
-                String.valueOf(book.number),
-                book.title,
-                String.valueOf(book.startPage),
-                String.valueOf(book.endPage),
-                book.currentPage == null ? "" : String.valueOf(book.currentPage),
-                String.valueOf(book.pages()),
-                String.valueOf(book.pagesRead()),
-                String.valueOf(pagesRemaining(book)),
-                format15(deadline.dailyPages),
-                String.valueOf(deadline.cumulativePages),
-                deadline.startDate.toString(),
-                deadline.deadline.toString(),
-                String.valueOf(deadline.daysAllocated),
-                deadline.status
-        );
     }
 
     private static String sectionDailyPace(SectionPlan sectionPlan) {
@@ -2745,22 +2666,6 @@ public class MainActivity extends Activity {
 
     private static String sessionDailyPaceValue(String sectionLabel, double dailyPages) {
         return isAudiobookSection(sectionLabel) ? formatDuration(dailyPages) : String.valueOf(roundedUpPageTarget(dailyPages));
-    }
-
-    private static int roundedUpPageTarget(double dailyPages) {
-        return Math.max(0, (int) Math.ceil(dailyPages - 1e-9));
-    }
-
-    private static String sessionText(String sectionLabel, Book book, ReadingSession session) {
-        if (isAudiobookSection(sectionLabel)) {
-            return session.date + " | " + sectionLabel + " | "
-                    + book.number + ". " + book.title + " | time left "
-                    + formatDuration(remainingTimeAt(book, session.currentPage)) + " | +"
-                    + formatDuration(session.pagesRead);
-        }
-        return session.date + " | " + sectionLabel + " | "
-                + book.number + ". " + book.title + " | page "
-                + session.currentPage + " | +" + session.pagesRead;
     }
 
     private String summaryText(PlanSummary summary, boolean includeSectionDetails) {
@@ -3317,124 +3222,6 @@ public class MainActivity extends Activity {
         return new int[]{index, index};
     }
 
-    private List<List<Integer>> remapGroupsByBookIdentity(List<Book> books, List<List<Book>> oldGroups) {
-        IdentityHashMap<Book, Integer> ids = new IdentityHashMap<>();
-        for (Book book : books) {
-            ids.put(book, book.number);
-        }
-        List<List<Integer>> groups = new ArrayList<>();
-        for (List<Book> oldGroup : oldGroups) {
-            List<Integer> group = new ArrayList<>();
-            for (Book book : oldGroup) {
-                group.add(ids.get(book));
-            }
-            Collections.sort(group);
-            groups.add(group);
-        }
-        return validateSimultaneousGroups(books, groups);
-    }
-
-    private static List<List<Integer>> validateSimultaneousGroups(List<Book> books, List<List<Integer>> groups) {
-        return validateSimultaneousGroups(books, groups, true);
-    }
-
-    private static List<List<Integer>> validateSimultaneousGroups(List<Book> books, List<List<Integer>> groups, boolean requireConsecutive) {
-        Set<Integer> usedIds = new HashSet<>();
-        List<List<Integer>> valid = new ArrayList<>();
-        for (List<Integer> rawGroup : groups) {
-            List<Integer> group = new ArrayList<>(rawGroup);
-            Collections.sort(group);
-            if (group.size() < 2) {
-                throw new IllegalArgumentException("choose at least two Book IDs");
-            }
-            Set<Integer> unique = new HashSet<>(group);
-            if (unique.size() != group.size()) {
-                throw new IllegalArgumentException("each Book ID can appear only once in a group");
-            }
-            if (group.get(0) < 1 || group.get(group.size() - 1) > books.size()) {
-                throw new IllegalArgumentException("Book IDs must be from 1 to " + books.size());
-            }
-            for (int i = 0; i < group.size(); i++) {
-                if (requireConsecutive && group.get(i) != group.get(0) + i) {
-                    throw new IllegalArgumentException("Book IDs read together must be consecutive");
-                }
-            }
-            for (Integer id : group) {
-                if (usedIds.contains(id)) {
-                    throw new IllegalArgumentException("a book can belong to only one simultaneous group");
-                }
-            }
-            usedIds.addAll(group);
-            valid.add(group);
-        }
-        return valid;
-    }
-
-    private List<List<Integer>> remapGroupsAfterDeletion(List<List<Integer>> groups, int deletedBookId, List<Book> books) {
-        List<List<Integer>> remapped = new ArrayList<>();
-        for (List<Integer> group : groups) {
-            List<Integer> newGroup = new ArrayList<>();
-            for (Integer id : group) {
-                if (id == deletedBookId) {
-                    continue;
-                }
-                newGroup.add(id > deletedBookId ? id - 1 : id);
-            }
-            if (newGroup.size() >= 2) {
-                remapped.add(newGroup);
-            }
-        }
-        return validateSimultaneousGroups(books, remapped);
-    }
-
-    private List<List<Integer>> remapGroupsAfterAddition(List<List<Integer>> groups, int newBookPosition, List<Book> books) {
-        List<List<Integer>> remapped = new ArrayList<>();
-        for (List<Integer> group : groups) {
-            List<Integer> newGroup = new ArrayList<>();
-            for (Integer id : group) {
-                newGroup.add(id >= newBookPosition ? id + 1 : id);
-            }
-            remapped.add(newGroup);
-        }
-        return validateSimultaneousGroups(books, remapped);
-    }
-
-    private List<Integer> insertionSplitsSimultaneousGroup(int position, List<List<Integer>> groups) {
-        for (List<Integer> group : groups) {
-            if (group.get(0) < position && position <= group.get(group.size() - 1)) {
-                return group;
-            }
-        }
-        return null;
-    }
-
-    private List<List<Integer>> parseGroupText(String rawText) {
-        List<List<Integer>> groups = new ArrayList<>();
-        for (String rawGroup : rawText.split(";")) {
-            rawGroup = rawGroup.trim();
-            if (rawGroup.isEmpty()) {
-                continue;
-            }
-            List<Integer> group = new ArrayList<>();
-            for (String rawId : rawGroup.split(",")) {
-                rawId = rawId.trim();
-                if (!rawId.isEmpty()) {
-                    group.add(Integer.parseInt(rawId));
-                }
-            }
-            groups.add(group);
-        }
-        return groups;
-    }
-
-    private List<List<Integer>> parseCsvGroups(List<Book> books, String rawGroups, String label) {
-        try {
-            return validateSimultaneousGroups(books, parseGroupText(rawGroups));
-        } catch (IllegalArgumentException ex) {
-            throw new IllegalArgumentException("invalid " + label + " simultaneous groups: " + ex.getMessage());
-        }
-    }
-
     private BookFields readBookFields(String sectionLabel, EditText titleInput, EditText startPageInput, EditText endPageInput, String defaultTitle, Integer defaultStart, Integer defaultEnd) {
         try {
             String title = titleInput.getText().toString().trim();
@@ -3463,14 +3250,6 @@ public class MainActivity extends Activity {
             showError(ex.getMessage());
             return null;
         }
-    }
-
-    private List<String> bookChoices(BookSection section) {
-        List<String> choices = new ArrayList<>();
-        for (Book book : section.books) {
-            choices.add(book.number + ". " + book.title);
-        }
-        return choices;
     }
 
     private Book selectedBookFromSpinner(String sectionLabel, Spinner spinner) {
@@ -3505,168 +3284,6 @@ public class MainActivity extends Activity {
 
     private BookSection sectionByLabel(String label) {
         return sectionByLabelFromList(sections, label);
-    }
-
-    private static BookSection sectionByLabelFromList(List<BookSection> list, String label) {
-        for (BookSection section : list) {
-            if (section.label.equals(label)) {
-                return section;
-            }
-        }
-        throw new IllegalArgumentException("unknown section: " + label);
-    }
-
-    private static SectionPlan sectionPlanByLabel(List<SectionPlan> plans, String label) {
-        for (SectionPlan plan : plans) {
-            if (plan.section.label.equals(label)) {
-                return plan;
-            }
-        }
-        throw new IllegalArgumentException("unknown section: " + label);
-    }
-
-    private static List<BookSection> blankSections() {
-        List<BookSection> list = new ArrayList<>();
-        list.add(new BookSection(PHYSICAL_BOOKS_LABEL));
-        list.add(new BookSection(DIGITAL_BOOKS_LABEL));
-        list.add(new BookSection(AUDIOBOOKS_LABEL));
-        return list;
-    }
-
-    private static void renumberBooks(List<Book> books) {
-        for (int i = 0; i < books.size(); i++) {
-            books.get(i).number = i + 1;
-        }
-    }
-
-    private static int pagesRemaining(Book book) {
-        return Math.max(book.pages() - book.pagesRead(), 0);
-    }
-
-    private static boolean isAudiobookSection(String label) {
-        return AUDIOBOOKS_LABEL.equals(label);
-    }
-
-    private static String canonicalSectionLabel(String rawLabel, String defaultLabel) {
-        String label = rawLabel == null ? "" : rawLabel.trim();
-        if (label.isEmpty()) {
-            label = defaultLabel;
-        }
-        String normalized = label.toLowerCase(Locale.US).replaceAll("[^a-z0-9]", "");
-        switch (normalized) {
-            case "physical":
-            case "physicalbook":
-            case "physicalbooks":
-            case "paperbook":
-            case "paperbooks":
-            case "printbook":
-            case "printbooks":
-                return PHYSICAL_BOOKS_LABEL;
-            case "digital":
-            case "digitalbook":
-            case "digitalbooks":
-            case "ebook":
-            case "ebooks":
-            case "kindlebook":
-            case "kindlebooks":
-                return DIGITAL_BOOKS_LABEL;
-            case "audio":
-            case "audiobook":
-            case "audiobooks":
-                return AUDIOBOOKS_LABEL;
-            default:
-                if (BOOK_SECTION_LABELS.contains(defaultLabel) && !BOOK_SECTION_LABELS.contains(label)) {
-                    return defaultLabel;
-                }
-                return label;
-        }
-    }
-
-    private static int parseBookUnit(String sectionLabel, String value) {
-        return isAudiobookSection(sectionLabel)
-                ? parseDuration(value)
-                : Integer.parseInt(value);
-    }
-
-    private static int parseDuration(String value) {
-        String[] parts = value.trim().split(":");
-        if (parts.length != 2 && parts.length != 3) {
-            throw new IllegalArgumentException("time must be HH:MM or HH:MM:SS");
-        }
-        int hours = Integer.parseInt(parts[0]);
-        int minutes = Integer.parseInt(parts[1]);
-        int seconds = parts.length == 3 ? Integer.parseInt(parts[2]) : 0;
-        if (hours < 0 || minutes < 0 || seconds < 0) {
-            throw new IllegalArgumentException("time cannot be negative");
-        }
-        if (minutes >= 60 || seconds >= 60) {
-            throw new IllegalArgumentException("minutes and seconds must be below 60");
-        }
-        return hours * 3600 + minutes * 60 + seconds;
-    }
-
-    private static String formatDuration(double rawSeconds) {
-        int totalSeconds = Math.max(0, (int) Math.round(rawSeconds));
-        int hours = totalSeconds / 3600;
-        int remainder = totalSeconds % 3600;
-        int minutes = remainder / 60;
-        int seconds = remainder % 60;
-        if (seconds == 0) {
-            return String.format(Locale.US, "%d:%02d", hours, minutes);
-        }
-        return String.format(Locale.US, "%d:%02d:%02d", hours, minutes, seconds);
-    }
-
-    private static String displayValue(String sectionLabel, Integer value) {
-        if (value == null) {
-            return "";
-        }
-        return isAudiobookSection(sectionLabel) ? formatDuration(value) : String.valueOf(value);
-    }
-
-    private static int totalUnits(Book book, String sectionLabel) {
-        return isAudiobookSection(sectionLabel) ? book.endPage - book.startPage : book.pages();
-    }
-
-    private static int completedUnits(Book book, String sectionLabel) {
-        if (book.currentPage == null) {
-            return 0;
-        }
-        if (isAudiobookSection(sectionLabel)) {
-            return Math.min(Math.max(book.currentPage - book.startPage, 0), totalUnits(book, sectionLabel));
-        }
-        return book.pagesRead();
-    }
-
-    private static int unitsRemaining(Book book, String sectionLabel) {
-        return Math.max(totalUnits(book, sectionLabel) - completedUnits(book, sectionLabel), 0);
-    }
-
-    private static int remainingTimeAt(Book book, int currentTime) {
-        return Math.max(book.endPage - currentTime, 0);
-    }
-
-    private static int currentTimeFromRemaining(Book book, int remainingTime) {
-        return currentTimeFromRemaining(book.startPage, book.endPage, remainingTime);
-    }
-
-    private static int currentTimeFromRemaining(int startTime, int endTime, int remainingTime) {
-        int duration = endTime - startTime;
-        if (remainingTime < 0) {
-            throw new IllegalArgumentException("remaining time cannot be negative");
-        }
-        if (remainingTime > duration) {
-            throw new IllegalArgumentException("remaining time cannot be greater than the audiobook duration");
-        }
-        return endTime - remainingTime;
-    }
-
-    private static LocalDate parseDate(String value) {
-        try {
-            return LocalDate.parse(value);
-        } catch (DateTimeParseException ex) {
-            throw new IllegalArgumentException("invalid date");
-        }
     }
 
     private static LocalDate nextQuarterStart(LocalDate today) {
@@ -3760,28 +3377,6 @@ public class MainActivity extends Activity {
         return end;
     }
 
-    private static void validatePageRange(int startPage, int endPage) {
-        if (startPage < 0) {
-            throw new IllegalArgumentException("start page cannot be negative");
-        }
-        if (endPage < startPage) {
-            throw new IllegalArgumentException("end page must be on or after the start page");
-        }
-    }
-
-    private static void validateBookRange(String sectionLabel, int start, int end) {
-        if (!isAudiobookSection(sectionLabel)) {
-            validatePageRange(start, end);
-            return;
-        }
-        if (start < 0) {
-            throw new IllegalArgumentException("start time cannot be negative");
-        }
-        if (end < start) {
-            throw new IllegalArgumentException("end time must be on or after the start time");
-        }
-    }
-
     private static double averagePages(SectionPlan plan) {
         int count = plan.section.books.size();
         return count == 0 ? 0.0 : (double) plan.totalPages / count;
@@ -3820,10 +3415,6 @@ public class MainActivity extends Activity {
         return String.format(Locale.US, "%.2f", value);
     }
 
-    private static String format15(double value) {
-        return String.format(Locale.US, "%.15g", value);
-    }
-
     private static String groupsToText(List<List<Integer>> groups) {
         List<String> groupTexts = new ArrayList<>();
         for (List<Integer> group : groups) {
@@ -3857,84 +3448,6 @@ public class MainActivity extends Activity {
         boolean needsQuotes = value.contains(",") || value.contains("\"") || value.contains("\n") || value.contains("\r");
         String escaped = value.replace("\"", "\"\"");
         return needsQuotes ? "\"" + escaped + "\"" : escaped;
-    }
-
-    private static List<List<String>> parseCsv(String raw) {
-        List<List<String>> rows = new ArrayList<>();
-        List<String> row = new ArrayList<>();
-        StringBuilder cell = new StringBuilder();
-        boolean inQuotes = false;
-        for (int i = 0; i < raw.length(); i++) {
-            char ch = raw.charAt(i);
-            if (inQuotes) {
-                if (ch == '"') {
-                    if (i + 1 < raw.length() && raw.charAt(i + 1) == '"') {
-                        cell.append('"');
-                        i++;
-                    } else {
-                        inQuotes = false;
-                    }
-                } else {
-                    cell.append(ch);
-                }
-            } else if (ch == '"') {
-                inQuotes = true;
-            } else if (ch == ',') {
-                row.add(cell.toString());
-                cell.setLength(0);
-            } else if (ch == '\n') {
-                row.add(cell.toString());
-                rows.add(row);
-                row = new ArrayList<>();
-                cell.setLength(0);
-            } else if (ch != '\r') {
-                cell.append(ch);
-            }
-        }
-        if (cell.length() > 0 || !row.isEmpty()) {
-            row.add(cell.toString());
-            rows.add(row);
-        }
-        return rows;
-    }
-
-    private static boolean isBlankRow(List<String> row) {
-        if (row.isEmpty()) {
-            return true;
-        }
-        for (String cell : row) {
-            if (!cell.trim().isEmpty()) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private static boolean startsWith(List<String> row, String... values) {
-        if (row.size() < values.length) {
-            return false;
-        }
-        for (int i = 0; i < values.length; i++) {
-            if (!values[i].equals(row.get(i))) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private static int intCell(List<String> row, int index) {
-        if (index >= row.size()) {
-            throw new IllegalArgumentException("book page fields must be whole numbers");
-        }
-        try {
-            return Integer.parseInt(row.get(index).trim());
-        } catch (NumberFormatException ex) {
-            throw new IllegalArgumentException("book page fields must be whole numbers");
-        }
-    }
-
-    private static String cell(List<String> row, int index) {
-        return index < row.size() ? row.get(index).trim() : "";
     }
 
     private static class SimpleTextWatcher implements TextWatcher {
@@ -3977,20 +3490,6 @@ public class MainActivity extends Activity {
 
         @Override
         public void onNothingSelected(android.widget.AdapterView<?> parent) {
-        }
-    }
-
-    private interface PageCounter {
-        int pages(Book book);
-    }
-
-    private static class SessionTarget {
-        final String value;
-        final String dailyPace;
-
-        SessionTarget(String value, String dailyPace) {
-            this.value = value;
-            this.dailyPace = dailyPace;
         }
     }
 
@@ -4131,266 +3630,4 @@ public class MainActivity extends Activity {
         }
     }
 
-    private static class SessionEntry {
-        final int sectionIndex;
-        final int bookIndex;
-        final int sessionIndex;
-        final BookSection section;
-        final Book book;
-        final ReadingSession session;
-
-        SessionEntry(int sectionIndex, int bookIndex, int sessionIndex, BookSection section, Book book, ReadingSession session) {
-            this.sectionIndex = sectionIndex;
-            this.bookIndex = bookIndex;
-            this.sessionIndex = sessionIndex;
-            this.section = section;
-            this.book = book;
-            this.session = session;
-        }
-    }
-    private static class ReadingSession {
-        final LocalDate date;
-        final int currentPage;
-        final int pagesRead;
-
-        ReadingSession(LocalDate date, int currentPage, int pagesRead) {
-            this.date = date;
-            this.currentPage = currentPage;
-            this.pagesRead = pagesRead;
-        }
-    }
-
-    private static class RestDayRange {
-        final LocalDate startDate;
-        final LocalDate endDate;
-
-        RestDayRange(LocalDate startDate, LocalDate endDate) {
-            this.startDate = startDate;
-            this.endDate = endDate;
-        }
-    }
-
-    private static class BaselineSchedule {
-        final LocalDate startDate;
-        final LocalDate deadline;
-        final double dailyTarget;
-
-        BaselineSchedule(LocalDate startDate, LocalDate deadline, double dailyTarget) {
-            this.startDate = startDate;
-            this.deadline = deadline;
-            this.dailyTarget = dailyTarget;
-        }
-    }
-
-    private static class Book {
-        int number;
-        final String title;
-        final int startPage;
-        final int endPage;
-        Integer currentPage;
-        final List<ReadingSession> readingSessions;
-        BaselineSchedule baselineSchedule;
-        LocalDate deadlineOverride;
-        LocalDate startDateOverride;
-        String targetCompletedDate;
-
-        Book(int number, String title, int startPage, int endPage) {
-            this(number, title, startPage, endPage, null, new ArrayList<>(), null, null, null);
-        }
-
-        Book(int number, String title, int startPage, int endPage, Integer currentPage, List<ReadingSession> readingSessions) {
-            this(number, title, startPage, endPage, currentPage, readingSessions, null, null, null);
-        }
-
-        Book(
-                int number,
-                String title,
-                int startPage,
-                int endPage,
-                Integer currentPage,
-                List<ReadingSession> readingSessions,
-                BaselineSchedule baselineSchedule
-        ) {
-            this(number, title, startPage, endPage, currentPage, readingSessions, baselineSchedule, null, null);
-        }
-
-        Book(
-                int number,
-                String title,
-                int startPage,
-                int endPage,
-                Integer currentPage,
-                List<ReadingSession> readingSessions,
-                BaselineSchedule baselineSchedule,
-                LocalDate deadlineOverride
-        ) {
-            this(number, title, startPage, endPage, currentPage, readingSessions, baselineSchedule, deadlineOverride, null);
-        }
-
-        Book(
-                int number,
-                String title,
-                int startPage,
-                int endPage,
-                Integer currentPage,
-                List<ReadingSession> readingSessions,
-                BaselineSchedule baselineSchedule,
-                LocalDate deadlineOverride,
-                LocalDate startDateOverride
-        ) {
-            this(number, title, startPage, endPage, currentPage, readingSessions, baselineSchedule, deadlineOverride, startDateOverride, null);
-        }
-
-        Book(
-                int number,
-                String title,
-                int startPage,
-                int endPage,
-                Integer currentPage,
-                List<ReadingSession> readingSessions,
-                BaselineSchedule baselineSchedule,
-                LocalDate deadlineOverride,
-                LocalDate startDateOverride,
-                String targetCompletedDate
-        ) {
-            this.number = number;
-            this.title = title;
-            this.startPage = startPage;
-            this.endPage = endPage;
-            this.currentPage = currentPage;
-            this.readingSessions = readingSessions;
-            this.baselineSchedule = baselineSchedule;
-            this.deadlineOverride = deadlineOverride;
-            this.startDateOverride = startDateOverride;
-            this.targetCompletedDate = targetCompletedDate;
-        }
-        int pages() {
-            return endPage - startPage + 1;
-        }
-
-        int pagesRead() {
-            if (currentPage == null) {
-                return 0;
-            }
-            return Math.min(Math.max(currentPage - startPage + 1, 0), pages());
-        }
-    }
-    private static class BookSection {
-        final String label;
-        final List<Book> books = new ArrayList<>();
-        List<List<Integer>> simultaneousGroups = new ArrayList<>();
-        boolean baselineNeedsRecalculation;
-
-        BookSection(String label) {
-            this.label = label;
-        }
-    }
-
-    private static class BookDeadline {
-        final Book book;
-        final int cumulativePages;
-        final LocalDate startDate;
-        final LocalDate deadline;
-        final int daysAllocated;
-        final double dailyPages;
-        final String status;
-
-        BookDeadline(Book book, int cumulativePages, LocalDate startDate, LocalDate deadline, int daysAllocated, double dailyPages, String status) {
-            this.book = book;
-            this.cumulativePages = cumulativePages;
-            this.startDate = startDate;
-            this.deadline = deadline;
-            this.daysAllocated = daysAllocated;
-            this.dailyPages = dailyPages;
-            this.status = status;
-        }
-    }
-
-    private static class SectionPlan {
-        final BookSection section;
-        final List<BookDeadline> deadlines;
-        final double dailyPace;
-        final int totalPages;
-        final double requiredPace;
-        final String overallStatus;
-
-        SectionPlan(BookSection section, List<BookDeadline> deadlines, double dailyPace, int totalPages, double requiredPace, String overallStatus) {
-            this.section = section;
-            this.deadlines = deadlines;
-            this.dailyPace = dailyPace;
-            this.totalPages = totalPages;
-            this.requiredPace = requiredPace;
-            this.overallStatus = overallStatus;
-        }
-    }
-
-    private static class PlanSummary {
-        final List<SectionPlan> sectionPlans;
-        final int totalPages;
-        final double highestDailyPace;
-        final String overallStatus;
-
-        PlanSummary(List<SectionPlan> sectionPlans, int totalPages, double highestDailyPace, String overallStatus) {
-            this.sectionPlans = sectionPlans;
-            this.totalPages = totalPages;
-            this.highestDailyPace = highestDailyPace;
-            this.overallStatus = overallStatus;
-        }
-    }
-
-    private static class StatsOptions {
-        final boolean bookCounts;
-        final boolean pageShare;
-        final boolean averagePages;
-        final boolean readingPeriod;
-        final boolean paceDriver;
-
-        StatsOptions(boolean bookCounts, boolean pageShare, boolean averagePages, boolean readingPeriod, boolean paceDriver) {
-            this.bookCounts = bookCounts;
-            this.pageShare = pageShare;
-            this.averagePages = averagePages;
-            this.readingPeriod = readingPeriod;
-            this.paceDriver = paceDriver;
-        }
-    }
-
-    private static class CsvPlan {
-        final List<BookSection> sections;
-        final LocalDate startDate;
-        final LocalDate endDate;
-        final String endLabel;
-        final StatsOptions statsOptions;
-        final List<RestDayRange> restDays;
-
-        CsvPlan(List<BookSection> sections, LocalDate startDate, LocalDate endDate, String endLabel, StatsOptions statsOptions, List<RestDayRange> restDays) {
-            this.sections = sections;
-            this.startDate = startDate;
-            this.endDate = endDate;
-            this.endLabel = endLabel;
-            this.statsOptions = statsOptions;
-            this.restDays = restDays;
-        }
-    }
-
-    private static class ParseTableResult {
-        final List<Book> books;
-        final int nextIndex;
-
-        ParseTableResult(List<Book> books, int nextIndex) {
-            this.books = books;
-            this.nextIndex = nextIndex;
-        }
-    }
-
-    private static class BookFields {
-        final String title;
-        final int startPage;
-        final int endPage;
-
-        BookFields(String title, int startPage, int endPage) {
-            this.title = title;
-            this.startPage = startPage;
-            this.endPage = endPage;
-        }
-    }
 }
