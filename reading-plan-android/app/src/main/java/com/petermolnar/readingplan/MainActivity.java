@@ -106,14 +106,13 @@ public class MainActivity extends Activity {
     private final List<RestDayRange> restDays = new ArrayList<>();
     private Uri jsonUri;
     private String currentTab = "Session";
+    private boolean metricsSubview = false;
+    private String metricDetail = null;
     private String previousTabBeforeSettings = "Session";
     private String selectedBookSection = PHYSICAL_BOOKS_LABEL;
     private int selectedBookIndex = -1;
     private int selectedSessionBookNumber = -1;
     private boolean showPlanDateFields = false;
-    private boolean showMetricBreakdown = false;
-    private boolean showMetricSchedule = false;
-    private boolean showMetricBookDetails = false;
     private boolean showActualPaceProjection = true;
     private boolean restoring = false;
 
@@ -325,7 +324,7 @@ public class MainActivity extends Activity {
     }
     private void renderTabBar() {
         tabBar.removeAllViews();
-        for (String tab : Arrays.asList("Session", "Plan", "Books", "Metrics")) {
+        for (String tab : Arrays.asList("Session", "Plan", "Books", "Charts")) {
             boolean selected = tab.equals(currentTab);
             Button button = new Button(this);
             button.setText(tab);
@@ -335,6 +334,10 @@ public class MainActivity extends Activity {
             button.setBackground(roundedBackground(selected ? ESPRESSO : CREAM, selected ? ESPRESSO : BORDER));
             button.setOnClickListener(v -> {
                 currentTab = tab;
+                if ("Charts".equals(tab)) {
+                    metricsSubview = false;
+                    metricDetail = null;
+                }
                 showCurrentTab();
             });
             attachButtonAnimation(button, selected ? ESPRESSO : CREAM, selected ? ESPRESSO : BORDER);
@@ -353,8 +356,8 @@ public class MainActivity extends Activity {
             content.addView(buildPlanView());
         } else if ("Books".equals(currentTab)) {
             content.addView(buildBooksView());
-        } else if ("Metrics".equals(currentTab)) {
-            content.addView(buildMetricsView());
+        } else if ("Charts".equals(currentTab)) {
+            content.addView(metricsSubview ? buildMetricsView() : buildChartsTab());
         } else if ("Settings".equals(currentTab)) {
             content.addView(buildSettingsView());
         }
@@ -396,12 +399,13 @@ public class MainActivity extends Activity {
         Book selected = selectedSessionBook();
         LinearLayout bookCard = surfaceCard();
         bookCard.addView(sectionTitle("Choose a book"));
-        if (section.books.isEmpty()) {
-            TextView empty = label("Add a book in the Books tab before logging a session.");
+        List<Book> sessionBooks = sessionBooks(section);
+        if (sessionBooks.isEmpty()) {
+            TextView empty = label("No books are available to read today.");
             empty.setTextColor(MOCHA);
             bookCard.addView(empty);
         } else {
-            addSessionBookButtons(bookCard, section);
+            addSessionBookButtons(bookCard, sessionBooks);
         }
         box.addView(bookCard);
 
@@ -506,11 +510,11 @@ public class MainActivity extends Activity {
         container.addView(button, params);
     }
 
-    private void addSessionBookButtons(LinearLayout container, BookSection section) {
-        for (int start = 0; start < section.books.size(); start += 2) {
+    private void addSessionBookButtons(LinearLayout container, List<Book> books) {
+        for (int start = 0; start < books.size(); start += 2) {
             LinearLayout bookRow = row();
-            for (int index = start; index < Math.min(start + 2, section.books.size()); index++) {
-                Book book = section.books.get(index);
+            for (int index = start; index < Math.min(start + 2, books.size()); index++) {
+                Book book = books.get(index);
                 Button button = selectionButton(book.number + ". " + book.title, book.number == selectedSessionBookNumber);
                 int bookNumber = book.number;
                 button.setOnClickListener(v -> {
@@ -518,7 +522,7 @@ public class MainActivity extends Activity {
                     showCurrentTab();
                 });
                 LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
-                params.setMargins(0, 0, index + 1 < section.books.size() ? dp(6) : 0, dp(6));
+                params.setMargins(0, 0, index + 1 < books.size() ? dp(6) : 0, dp(6));
                 bookRow.addView(button, params);
             }
             container.addView(bookRow);
@@ -527,18 +531,31 @@ public class MainActivity extends Activity {
 
     private Book selectedSessionBook() {
         BookSection section = sectionByLabel(selectedBookSection);
-        for (Book book : section.books) {
+        List<Book> books = sessionBooks(section);
+        for (Book book : books) {
             if (book.number == selectedSessionBookNumber) {
                 return book;
             }
         }
-        if (section.books.isEmpty()) {
+        if (books.isEmpty()) {
             selectedSessionBookNumber = -1;
             return null;
         }
-        Book first = section.books.get(0);
+        Book first = books.get(0);
         selectedSessionBookNumber = first.number;
         return first;
+    }
+
+    private List<Book> sessionBooks(BookSection section) {
+        List<Book> available = new ArrayList<>();
+        LocalDate today = LocalDate.now();
+        for (Book book : section.books) {
+            if (unitsRemaining(book, section.label) > 0
+                    && (book.baselineSchedule == null || !book.baselineSchedule.startDate.isAfter(today))) {
+                available.add(book);
+            }
+        }
+        return available;
     }
 
     private void showEntriesSheet() {
@@ -1000,47 +1017,56 @@ public class MainActivity extends Activity {
         scroll.addView(box);
 
         LinearLayout header = row();
-        header.addView(heading("Metrics"), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
-        header.addView(secondaryButton("Charts", v -> showChartsDialog()));
-        header.addView(secondaryButton("Reset view", v -> {
-            showMetricBreakdown = false;
-            showMetricSchedule = false;
-            showMetricBookDetails = false;
-            showCurrentTab();
-        }));
+        header.addView(heading(metricDetail == null ? "Metrics" : metricDetail), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        if (metricDetail == null) {
+            header.addView(secondaryButton("Back to charts", v -> {
+                metricsSubview = false;
+                showCurrentTab();
+            }));
+        } else {
+            header.addView(secondaryButton("Back to metrics", v -> {
+                metricDetail = null;
+                showCurrentTab();
+            }));
+        }
         box.addView(header);
-        TextView helper = label("Start with five key metrics, then add the details you want to explore.");
+        TextView helper = label(metricDetail == null
+                ? "Your current book schedules."
+                : "Choose Back to metrics to return to the schedules.");
         helper.setTextColor(MOCHA);
         box.addView(helper);
-        box.addView(secondaryButton(showMetricBreakdown ? "Hide summary metrics" : "Add summary metrics", v -> {
-            showMetricBreakdown = !showMetricBreakdown;
-            showCurrentTab();
-        }));
-        box.addView(secondaryButton(showMetricSchedule ? "Hide schedule information" : "Add schedule information", v -> {
-            showMetricSchedule = !showMetricSchedule;
-            showCurrentTab();
-        }));
-        box.addView(secondaryButton(showMetricBookDetails ? "Hide book schedules" : "Add book schedules", v -> {
-            showMetricBookDetails = !showMetricBookDetails;
-            showCurrentTab();
-        }));
-
         PlanSummary summary = buildRemainingPlans();
+        if (metricDetail == null) {
+            for (SectionPlan sectionPlan : summary.sectionPlans) {
+                LinearLayout scheduleCard = surfaceCard();
+                scheduleCard.addView(sectionTitle(sectionPlan.section.label));
+                if (sectionPlan.deadlines.isEmpty()) {
+                    scheduleCard.addView(label("No scheduled books."));
+                } else {
+                    scheduleCard.addView(bookScheduleTable(sectionPlan));
+                }
+                box.addView(scheduleCard);
+            }
+            box.addView(secondaryButton("Summary metrics", v -> openMetricDetail("Summary metrics")));
+            box.addView(secondaryButton("Schedule information", v -> openMetricDetail("Schedule information")));
+            box.addView(secondaryButton("Key metrics", v -> openMetricDetail("Key metrics")));
+            return scroll;
+        }
+
         SectionPlan audiobook = sectionPlanByLabel(summary.sectionPlans, AUDIOBOOKS_LABEL);
         TableLayout table = new TableLayout(this);
         addTableRow(table, true, Arrays.asList("Area", "Metric", "Value", "Details"), -1);
-        addMetricRow(table, "Overview", "Remaining pages", String.valueOf(summary.totalPages), "Physical + digital");
-        addMetricRow(table, "Overview", "Audiobook remaining time", formatDuration(audiobook.totalPages), "All audiobook titles");
-        addMetricRow(table, "Plan", "Reading days", String.valueOf(availableReadingDaysCount(startDate, endDate)), "Rest days excluded");
-        addMetricRow(table, "Plan", "Highest daily pace", format2(summary.highestDailyPace) + " pages/day", "Physical and digital");
-        addMetricRow(table, "Plan", "Status", summary.overallStatus, "Current plan");
-
-        if (showMetricBreakdown) {
+        if ("Key metrics".equals(metricDetail)) {
+            addMetricRow(table, "Overview", "Remaining pages", String.valueOf(summary.totalPages), "Physical + digital");
+            addMetricRow(table, "Overview", "Audiobook remaining time", formatDuration(audiobook.totalPages), "All audiobook titles");
+            addMetricRow(table, "Plan", "Reading days", String.valueOf(availableReadingDaysCount(startDate, endDate)), "Rest days excluded");
+            addMetricRow(table, "Plan", "Highest daily pace", format2(summary.highestDailyPace) + " pages/day", "Physical and digital");
+            addMetricRow(table, "Plan", "Status", summary.overallStatus, "Current plan");
+        } else if ("Summary metrics".equals(metricDetail)) {
             for (String[] metric : allOptionalSummaryRows(summary.sectionPlans, summary.highestDailyPace)) {
                 addMetricRow(table, "Summary", metric[0], metric[1], "Optional metric");
             }
-        }
-        if (showMetricSchedule) {
+        } else if ("Schedule information".equals(metricDetail)) {
             addMetricRow(table, "Schedule", "Plan period", startDate + " to " + endDate, endLabel);
             for (SectionPlan sectionPlan : summary.sectionPlans) {
                 String pace = sectionDailyPace(sectionPlan);
@@ -1050,23 +1076,8 @@ public class MainActivity extends Activity {
                                 sectionPlan.deadlines.get(sectionPlan.deadlines.size() - 1).deadline,
                                 endDate,
                                 endName()
-                        );
+                );
                 addMetricRow(table, sectionPlan.section.label, "Daily pace", pace, result);
-            }
-        }
-        if (showMetricBookDetails) {
-            for (SectionPlan sectionPlan : summary.sectionPlans) {
-                boolean audiobookSection = isAudiobookSection(sectionPlan.section.label);
-                for (BookDeadline deadline : sectionPlan.deadlines) {
-                    Book book = deadline.book;
-                    String remaining = audiobookSection
-                            ? formatDuration(unitsRemaining(book, sectionPlan.section.label))
-                            : String.valueOf(pagesRemaining(book)) + " pages";
-                    String details = "Daily " + (audiobookSection ? "time " + formatDuration(deadline.dailyPages) : "pages " + format2(deadline.dailyPages))
-                            + " | " + deadline.startDate + " to " + deadline.deadline
-                            + " | " + deadline.daysAllocated + " days | " + deadline.status;
-                    addMetricRow(table, sectionPlan.section.label, book.number + ". " + book.title, remaining, details);
-                }
             }
         }
         HorizontalScrollView tableScroll = new HorizontalScrollView(this);
@@ -1075,35 +1086,40 @@ public class MainActivity extends Activity {
         return scroll;
     }
 
-    private void showChartsDialog() {
-        List<ChartData> charts = chartData();
-        if (charts.isEmpty()) {
-            showError("Add a physical or digital book first");
-            return;
-        }
+    private void openMetricDetail(String detail) {
+        metricDetail = detail;
+        showCurrentTab();
+    }
 
-        Dialog dialog = new Dialog(this);
-        LinearLayout panel = new LinearLayout(this);
-        panel.setOrientation(LinearLayout.VERTICAL);
-        panel.setPadding(dp(18), dp(14), dp(18), dp(18));
-        panel.setBackgroundColor(CREAM);
-
+    private View buildChartsTab() {
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout box = verticalBox();
+        scroll.addView(box);
         LinearLayout header = row();
         header.addView(heading("Charts"), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
-        header.addView(secondaryButton("Close", v -> dialog.dismiss()));
-        panel.addView(header);
+        header.addView(secondaryButton("Metrics", v -> {
+            metricsSubview = true;
+            metricDetail = null;
+            showCurrentTab();
+        }));
+        box.addView(header);
+
+        List<ChartData> charts = chartData();
+        if (charts.isEmpty()) {
+            box.addView(label("Add a book to see its chart."));
+            return scroll;
+        }
 
         List<String> choices = new ArrayList<>();
         for (ChartData chart : charts) {
             choices.add(chart.sectionLabel + " - " + chart.book.number + ". " + chart.book.title);
         }
-        panel.addView(label("Book"));
+        box.addView(label("Book"));
         Spinner bookSpinner = spinner(choices, choices.get(0));
-        panel.addView(bookSpinner);
+        box.addView(bookSpinner);
 
         ChartView chartView = new ChartView(this, charts.get(0));
         chartView.setProjectionVisible(showActualPaceProjection);
-
         CheckBox projectionToggle = checkBox(
                 "Show projection based on actual reading pace",
                 showActualPaceProjection
@@ -1112,15 +1128,14 @@ public class MainActivity extends Activity {
             showActualPaceProjection = checked;
             chartView.setProjectionVisible(checked);
         });
-        panel.addView(projectionToggle);
-
-        panel.addView(chartView, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1
+        box.addView(projectionToggle);
+        box.addView(chartView, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(420)
         ));
+
         TextView chartDetails = label(chartDetails(charts.get(0)));
         chartDetails.setTextColor(MOCHA);
-        panel.addView(chartDetails);
-
+        box.addView(chartDetails);
         bookSpinner.setOnItemSelectedListener(new SimpleItemSelectedListener(() -> {
             int index = bookSpinner.getSelectedItemPosition();
             if (index >= 0 && index < charts.size()) {
@@ -1128,29 +1143,16 @@ public class MainActivity extends Activity {
                 chartDetails.setText(chartDetails(charts.get(index)));
             }
         }));
-
-        dialog.setContentView(panel);
-        Window window = dialog.getWindow();
-        if (window != null) {
-            window.setBackgroundDrawable(new ColorDrawable(CREAM));
-            window.setGravity(Gravity.CENTER);
-        }
-        dialog.show();
-        if (dialog.getWindow() != null) {
-            dialog.getWindow().setLayout(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    (int) (getResources().getDisplayMetrics().heightPixels * 0.9f)
-            );
-        }
+        return scroll;
     }
 
     private List<ChartData> chartData() {
         PlanSummary summary = buildRemainingPlans();
         List<ChartData> charts = new ArrayList<>();
-        for (String sectionLabel : Arrays.asList(PHYSICAL_BOOKS_LABEL, DIGITAL_BOOKS_LABEL)) {
+        for (String sectionLabel : BOOK_SECTION_LABELS) {
             SectionPlan plan = sectionPlanByLabel(summary.sectionPlans, sectionLabel);
             for (BookDeadline deadline : plan.deadlines) {
-                if (deadline.book.pages() > 0) {
+                if (totalUnits(deadline.book, sectionLabel) > 0) {
                     charts.add(new ChartData(sectionLabel, deadline.book, deadline));
                 }
             }
@@ -1159,12 +1161,21 @@ public class MainActivity extends Activity {
     }
 
     private String chartDetails(ChartData chart) {
+        boolean audiobook = isAudiobookSection(chart.sectionLabel);
         String projection = chart.actualPace <= 0.0
                 ? "no actual pace yet"
-                : "actual pace " + format2(chart.actualPace) + " pages/day";
+                : "actual pace " + (audiobook ? formatDuration(chart.actualPace) : format2(chart.actualPace))
+                + (audiobook ? "/day" : " pages/day");
         return chart.startDate + " to " + chart.plannedDeadline
-                + " | today " + chart.dailyTargetPages.get(chart.todayIndex) + " pages/day"
+                + " | today " + (audiobook
+                ? formatDuration(chart.dailyTargetPages.get(chart.todayIndex))
+                : chart.dailyTargetPages.get(chart.todayIndex))
+                + (audiobook ? "/day" : " pages/day")
                 + " | " + projection;
+    }
+
+    private static String chartValue(double value, boolean audiobook) {
+        return audiobook ? formatDuration(value) : String.valueOf((int) Math.ceil(value - 1e-9));
     }
 
     private class ChartView extends View {
@@ -1207,6 +1218,7 @@ public class MainActivity extends Activity {
             Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
             paint.setTextSize(dp(11));
             paint.setColor(MOCHA);
+            boolean audiobook = isAudiobookSection(chart.sectionLabel);
 
             for (int tick = 0; tick <= 4; tick++) {
                 int value = (int) Math.ceil(chart.yMax * tick / 4.0 - 1e-9);
@@ -1215,7 +1227,7 @@ public class MainActivity extends Activity {
                 paint.setStrokeWidth(dp(1));
                 canvas.drawLine(left, y, right, y, paint);
                 paint.setColor(MOCHA);
-                canvas.drawText(String.valueOf(value), dp(8), y + dp(4), paint);
+                canvas.drawText(chartValue(value, audiobook), dp(8), y + dp(4), paint);
             }
 
             paint.setColor(ESPRESSO);
@@ -1227,9 +1239,9 @@ public class MainActivity extends Activity {
             for (int tick = 0; tick <= 4; tick++) {
                 int value = (int) Math.ceil(chart.dailyYMax * tick / 4.0 - 1e-9);
                 float y = bottom - plotHeight * tick / 4f;
-                canvas.drawText(String.valueOf(value), right + dp(5), y + dp(4), paint);
+                canvas.drawText(chartValue(value, audiobook), right + dp(5), y + dp(4), paint);
             }
-            canvas.drawText("Pages/day", right - dp(42), top - dp(10), paint);
+            canvas.drawText(audiobook ? "Time/day" : "Pages/day", right - dp(42), top - dp(10), paint);
 
             drawSeries(canvas, chart.plannedPages, left, top, plotWidth, plotHeight, MOCHA, dp(3), chart.yMax, null);
             drawSeries(canvas, chart.actualPages, left, top, plotWidth, plotHeight, SUCCESS, dp(2), chart.yMax, null);
@@ -1291,7 +1303,7 @@ public class MainActivity extends Activity {
             canvas.save();
             canvas.rotate(-90, dp(15), (top + bottom) / 2);
             paint.setColor(MOCHA);
-            canvas.drawText("Pages", dp(15), (top + bottom) / 2, paint);
+            canvas.drawText(audiobook ? "Time" : "Pages", dp(15), (top + bottom) / 2, paint);
             canvas.restore();
         }
 
@@ -1359,6 +1371,32 @@ public class MainActivity extends Activity {
     private void addMetricRow(TableLayout table, String area, String metric, String value, String details) {
         addTableRow(table, false, Arrays.asList(area, metric, value, details), -1);
     }
+
+    private HorizontalScrollView bookScheduleTable(SectionPlan sectionPlan) {
+        HorizontalScrollView scroll = new HorizontalScrollView(this);
+        TableLayout table = new TableLayout(this);
+        scroll.addView(table);
+        boolean audiobookSection = isAudiobookSection(sectionPlan.section.label);
+        addTableRow(table, true, Arrays.asList("Book", "Daily", "Remaining", "Deadline", "Status"), -1);
+        for (BookDeadline deadline : sectionPlan.deadlines) {
+            Book book = deadline.book;
+            String daily = audiobookSection
+                    ? formatDuration(deadline.dailyPages)
+                    : format2(deadline.dailyPages) + " pages";
+            String remaining = audiobookSection
+                    ? formatDuration(unitsRemaining(book, sectionPlan.section.label))
+                    : pagesRemaining(book) + " pages";
+            addTableRow(table, false, Arrays.asList(
+                    book.number + ". " + book.title,
+                    daily,
+                    remaining,
+                    deadline.deadline.toString(),
+                    deadline.status
+            ), -1);
+        }
+        return scroll;
+    }
+
     private void showBookPicker(BookSection section) {
         if (section.books.isEmpty()) {
             showError("Add a book first");
@@ -1671,6 +1709,16 @@ public class MainActivity extends Activity {
     }
     @Override
     public void onBackPressed() {
+        if ("Charts".equals(currentTab) && metricsSubview) {
+            if (metricDetail != null) {
+                metricDetail = null;
+                showCurrentTab();
+                return;
+            }
+            metricsSubview = false;
+            showCurrentTab();
+            return;
+        }
         if ("Settings".equals(currentTab)) {
             closeSettings();
             return;
@@ -3085,7 +3133,7 @@ public class MainActivity extends Activity {
                 deadline = end;
                 groupStart = end;
             } else {
-                deadline = readingDates.get(Math.min(cumulativeDays, readingDates.size()) - 1);
+                deadline = readingDates.get(Math.max(0, Math.min(cumulativeDays, readingDates.size()) - 1));
                 groupStart = daysAllocated == 0 ? deadline : readingDates.get(previousCumulativeDays);
             }
             String status;

@@ -24,7 +24,7 @@ For fewer sync conflicts, enable Syncthing file versioning and avoid editing the
 - Session tab: log reading sessions by format, book, date, current page, or audiobook time left.
 - Plan tab: manage plan-wide rest-day ranges and recalculate; start and finish dates appear after pressing New plan.
 - Books tab: view today's reading targets with planned starts and deadlines, and add, insert, replace, delete, reorder, and group physical, digital, or audiobook entries. Audiobook times use `HH:MM` and also accept `HH:MM:SS`.
-- Metrics tab: view five key metrics in one table, then add summary metrics, schedule information, or book schedules with buttons.
+- Charts tab: view charts directly, then open Metrics to see key metrics or one focused detail view at a time.
 - CSV import/export is included for compatibility with the desktop program's CSV flow.
 
 ## Build

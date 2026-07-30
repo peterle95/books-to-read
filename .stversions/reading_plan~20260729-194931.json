@@ -25,18 +25,18 @@
           "number": 1,
           "title": "capital",
           "baseline_schedule": {
-            "start_date": "2024-01-01",
+            "start_date": "2026-07-05",
             "deadline": "2026-09-13",
-            "daily_target": 0.8367346938775511
+            "daily_target": 0.803921568627451
           },
           "deadline_override": "2026-09-13",
-          "start_date_override": "2024-01-01",
+          "start_date_override": null,
           "target_completed_date": null,
           "start_page": 1,
           "end_page": 1041,
-          "current_page": 1000,
+          "current_page": 1041,
           "pages": 1041,
-          "pages_read": 1000,
+          "pages_read": 1041,
           "reading_sessions": [
             {
               "date": "2026-07-06",
@@ -56,16 +56,16 @@
           "baseline_schedule": {
             "start_date": "2026-07-01",
             "deadline": "2026-09-13",
-            "daily_target": 7.163265306122449
+            "daily_target": 7.7555555555555555
           },
           "deadline_override": "2026-09-13",
           "start_date_override": "2026-07-01",
-          "target_completed_date": "2026-07-22",
+          "target_completed_date": "2026-07-28",
           "start_page": 1,
           "end_page": 669,
-          "current_page": 318,
+          "current_page": 354,
           "pages": 669,
-          "pages_read": 318,
+          "pages_read": 354,
           "reading_sessions": [
             {
               "date": "2026-07-06",
@@ -114,8 +114,18 @@
             },
             {
               "date": "2026-07-22",
-              "current_page": 318,
-              "pages_read": 8
+              "current_page": 320,
+              "pages_read": 10
+            },
+            {
+              "date": "2026-07-26",
+              "current_page": 340,
+              "pages_read": 20
+            },
+            {
+              "date": "2026-07-28",
+              "current_page": 354,
+              "pages_read": 14
             }
           ]
         },
@@ -129,12 +139,12 @@
           },
           "deadline_override": "2026-09-13",
           "start_date_override": "2026-07-01",
-          "target_completed_date": "2026-07-22",
+          "target_completed_date": "2026-07-26",
           "start_page": 1,
           "end_page": 559,
-          "current_page": 178,
+          "current_page": 193,
           "pages": 559,
-          "pages_read": 178,
+          "pages_read": 193,
           "reading_sessions": [
             {
               "date": "2026-07-06",
@@ -160,6 +170,11 @@
               "date": "2026-07-20",
               "current_page": 178,
               "pages_read": 20
+            },
+            {
+              "date": "2026-07-26",
+              "current_page": 193,
+              "pages_read": 15
             }
           ]
         },
@@ -222,12 +237,12 @@
           },
           "deadline_override": null,
           "start_date_override": "2026-07-01",
-          "target_completed_date": null,
+          "target_completed_date": "2026-07-28",
           "start_page": 1,
           "end_page": 350,
-          "current_page": 105,
+          "current_page": 131,
           "pages": 350,
-          "pages_read": 105,
+          "pages_read": 131,
           "reading_sessions": [
             {
               "date": "2026-07-06",
@@ -250,14 +265,19 @@
               "pages_read": 6
             },
             {
-              "date": "2026-07-21",
-              "current_page": 101,
-              "pages_read": 12
+              "date": "2026-07-26",
+              "current_page": 122,
+              "pages_read": 33
             },
             {
-              "date": "2026-07-22",
-              "current_page": 105,
+              "date": "2026-07-27",
+              "current_page": 126,
               "pages_read": 4
+            },
+            {
+              "date": "2026-07-28",
+              "current_page": 131,
+              "pages_read": 5
             }
           ]
         }
@@ -266,7 +286,7 @@
     },
     {
       "label": "Audiobooks",
-      "baseline_needs_recalculation": false,
+      "baseline_needs_recalculation": true,
       "books": [
         {
           "number": 1,
@@ -274,17 +294,17 @@
           "baseline_schedule": {
             "start_date": "2026-07-05",
             "deadline": "2026-07-31",
-            "daily_target": 1248
+            "daily_target": 798
           },
           "deadline_override": "2026-07-31",
           "start_date_override": null,
           "target_completed_date": "2026-07-22",
           "start_time_seconds": 0,
           "end_time_seconds": 29820,
-          "current_time_seconds": 21840,
+          "current_time_seconds": 29820,
           "duration_seconds": 29820,
-          "time_listened_seconds": 21840,
-          "remaining_time_seconds": 7980,
+          "time_listened_seconds": 29820,
+          "remaining_time_seconds": 0,
           "reading_sessions": [
             {
               "date": "2026-07-07",
@@ -332,22 +352,25 @@
         },
         {
           "number": 2,
-          "title": "Nuclear War",
-          "baseline_schedule": {
-            "start_date": "2026-07-25",
-            "deadline": "2026-09-30",
-            "daily_target": 641.4096385542168
-          },
+          "title": "Red Moon",
+          "baseline_schedule": null,
           "deadline_override": null,
           "start_date_override": null,
-          "target_completed_date": null,
+          "target_completed_date": "2026-07-27",
           "start_time_seconds": 0,
-          "end_time_seconds": 40757,
-          "current_time_seconds": null,
-          "duration_seconds": 40757,
-          "time_listened_seconds": 0,
-          "remaining_time_seconds": null,
-          "reading_sessions": []
+          "end_time_seconds": 60414,
+          "current_time_seconds": 1106,
+          "duration_seconds": 60414,
+          "time_listened_seconds": 1106,
+          "remaining_time_seconds": 59308,
+          "reading_sessions": [
+            {
+              "date": "2026-07-27",
+              "current_time_seconds": 1106,
+              "time_listened_seconds": 1106,
+              "remaining_time_seconds": 59308
+            }
+          ]
         }
       ],
       "simultaneous_groups": []
