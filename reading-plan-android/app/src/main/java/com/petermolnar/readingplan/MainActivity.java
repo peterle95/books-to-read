@@ -93,8 +93,8 @@ public class MainActivity extends Activity {
     static final int ERROR_DARK = 0xff6f231a;
     static final int VIOLET = 0xff7c3aed;
     static final int VIOLET_DARK = 0xff5b21b6;
-    private static final int TARGET_COMPLETE = 0xff00ba40;
-    private static final int TARGET_COMPLETE_DARK = 0xff00832d;
+    static final int TARGET_COMPLETE = 0xff00ba40;
+    static final int TARGET_COMPLETE_DARK = 0xff00832d;
 
     private LinearLayout root;
     private LinearLayout tabBar;
@@ -106,21 +106,26 @@ public class MainActivity extends Activity {
     private final ReadingPlanUi ui = new ReadingPlanUi(this);
     private final ReadingPlanTables tables = new ReadingPlanTables(this);
     private final ReadingSessionEntries sessionEntries = new ReadingSessionEntries(this);
+    private final ReadingPlanSessionView sessionView = new ReadingPlanSessionView(this);
+    private final ReadingPlanPlanView planView = new ReadingPlanPlanView(this);
+    private final ReadingPlanBooksView booksView = new ReadingPlanBooksView(this);
+    private final ReadingPlanMetricsView metricsView = new ReadingPlanMetricsView(this);
+    private final ReadingPlanChartsView chartsView = new ReadingPlanChartsView(this);
     private StatsOptions statsOptions = new StatsOptions(true, true, true, true, true);
-    private LocalDate startDate;
-    private LocalDate endDate;
-    private String endLabel = "Quarter end";
-    private final List<RestDayRange> restDays = new ArrayList<>();
+    LocalDate startDate;
+    LocalDate endDate;
+    String endLabel = "Quarter end";
+    final List<RestDayRange> restDays = new ArrayList<>();
     private Uri jsonUri;
     private String currentTab = "Session";
-    private boolean metricsSubview = false;
-    private String metricDetail = null;
+    boolean metricsSubview = false;
+    String metricDetail = null;
     private String previousTabBeforeSettings = "Session";
-    private String selectedBookSection = PHYSICAL_BOOKS_LABEL;
-    private int selectedBookIndex = -1;
-    private int selectedSessionBookNumber = -1;
-    private boolean showPlanDateFields = false;
-    private boolean showActualPaceProjection = true;
+    String selectedBookSection = PHYSICAL_BOOKS_LABEL;
+    int selectedBookIndex = -1;
+    int selectedSessionBookNumber = -1;
+    boolean showPlanDateFields = false;
+    boolean showActualPaceProjection = true;
     private boolean restoring = false;
 
     @Override
@@ -216,12 +221,12 @@ public class MainActivity extends Activity {
         root.requestApplyInsets();
     }
 
-    private Button actionButton(String label, View.OnClickListener listener) { return ui.actionButton(label, listener); }
+    Button actionButton(String label, View.OnClickListener listener) { return ui.actionButton(label, listener); }
     Button secondaryButton(String label, View.OnClickListener listener) { return ui.secondaryButton(label, listener); }
-    private Button selectionButton(String label, boolean selected) { return ui.selectionButton(label, selected); }
+    Button selectionButton(String label, boolean selected) { return ui.selectionButton(label, selected); }
     private void attachButtonAnimation(View view, int normalFill, int normalBorder) { ui.attachButtonAnimation(view, normalFill, normalBorder); }
-    private LinearLayout metricColumn(String label, TextView value) { return ui.metricColumn(label, value); }
-    private TextView metricValue() { return ui.metricValue(); }
+    LinearLayout metricColumn(String label, TextView value) { return ui.metricColumn(label, value); }
+    TextView metricValue() { return ui.metricValue(); }
     GradientDrawable roundedBackground(int fillColor, int borderColor) { return ui.roundedBackground(fillColor, borderColor); }
     LinearLayout surfaceCard() { return ui.surfaceCard(); }
     private void renderTabBar() {
@@ -248,7 +253,7 @@ public class MainActivity extends Activity {
             tabBar.addView(button, params);
         }
     }
-    private void showCurrentTab() {
+    void showCurrentTab() {
         refreshHeader();
         renderTabBar();
         content.removeAllViews();
@@ -278,189 +283,9 @@ public class MainActivity extends Activity {
         showCurrentTab();
     }
 
-    private View buildSessionView() {
-        ScrollView scroll = new ScrollView(this);
-        LinearLayout box = verticalBox();
-        scroll.addView(box);
+    private View buildSessionView() { return sessionView.build(); }
 
-        LinearLayout header = row();
-        header.addView(heading("Reading session"), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
-        header.addView(actionButton("Entries", v -> showEntriesSheet()));
-        box.addView(header);
-
-        LinearLayout formatCard = surfaceCard();
-        formatCard.addView(sectionTitle("Choose a format"));
-        LinearLayout formats = row();
-        addFormatButton(formats, "Physical", PHYSICAL_BOOKS_LABEL);
-        addFormatButton(formats, "Digital", DIGITAL_BOOKS_LABEL);
-        addFormatButton(formats, "Audiobooks", AUDIOBOOKS_LABEL);
-        formatCard.addView(formats);
-        box.addView(formatCard);
-
-        BookSection section = sectionByLabel(selectedBookSection);
-        Book selected = selectedSessionBook();
-        LinearLayout bookCard = surfaceCard();
-        bookCard.addView(sectionTitle("Choose a book"));
-        List<Book> sessionBooks = sessionBooks(section);
-        if (sessionBooks.isEmpty()) {
-            TextView empty = label("No books are available to read today.");
-            empty.setTextColor(MOCHA);
-            bookCard.addView(empty);
-        } else {
-            addSessionBookButtons(bookCard, sessionBooks);
-        }
-        box.addView(bookCard);
-
-        LinearLayout detailsCard = surfaceCard();
-        boolean audiobookSection = isAudiobookSection(selectedBookSection);
-        EditText dateInput = editText(LocalDate.now().toString(), InputType.TYPE_CLASS_TEXT);
-        EditText pageInput = editText("", audiobookSection ? InputType.TYPE_CLASS_TEXT : InputType.TYPE_CLASS_NUMBER);
-        detailsCard.addView(label("Date"));
-        detailsCard.addView(dateInput);
-        detailsCard.addView(label(audiobookSection ? "Time left" : "Current page"));
-        detailsCard.addView(pageInput);
-
-        LinearLayout metrics = row();
-        metrics.setPadding(dp(12), dp(10), dp(12), dp(10));
-        TextView targetValue = metricValue();
-        TextView paceValue = metricValue();
-        String targetLabel = audiobookSection ? "Target time left" : "Target page";
-        String paceLabel = audiobookSection ? "Time per day" : "Pages per day";
-        metrics.addView(metricColumn(targetLabel, targetValue), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
-        metrics.addView(metricColumn(paceLabel, paceValue), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
-        detailsCard.addView(metrics);
-        Runnable updateTargetCompletion = () -> {
-            Book book = selectedSessionBook();
-            boolean complete = book != null && isTargetCompleteToday(book)
-                    && LocalDate.now().toString().equals(dateInput.getText().toString().trim());
-            if (book != null && !complete) {
-                complete = markTargetCompletedIfReached(
-                        book,
-                        selectedBookSection,
-                        dateInput.getText().toString().trim(),
-                        pageInput.getText().toString().trim()
-                );
-            }
-            metrics.setBackground(roundedBackground(
-                    complete ? TARGET_COMPLETE : LIGHT_CREAM,
-                    complete ? TARGET_COMPLETE_DARK : BORDER
-            ));
-            targetValue.setTextColor(complete ? CREAM : ESPRESSO);
-            paceValue.setTextColor(complete ? CREAM : ESPRESSO);
-        };
-        Runnable updateTarget = () -> {
-            Book book = selectedSessionBook();
-            if (book == null) {
-                targetValue.setText("-");
-                paceValue.setText("-");
-                updateTargetCompletion.run();
-                return;
-            }
-            try {
-                SessionTarget target = sessionTarget(selectedBookSection, book, parseDate(dateInput.getText().toString().trim()));
-                targetValue.setText(target.value);
-                paceValue.setText(target.dailyPace);
-            } catch (IllegalArgumentException ex) {
-                targetValue.setText("-");
-                paceValue.setText("-");
-            }
-            updateTargetCompletion.run();
-        };
-        dateInput.addTextChangedListener(new SimpleTextWatcher(updateTarget));
-        pageInput.addTextChangedListener(new SimpleTextWatcher(updateTargetCompletion));
-        updateTarget.run();
-
-        Button add = actionButton("Add session", v -> {
-            Book book = selectedSessionBook();
-            if (book == null) {
-                showError("Select a book first");
-                return;
-            }
-            try {
-                LocalDate sessionDate = parseDate(dateInput.getText().toString().trim());
-                int currentPage = isAudiobookSection(selectedBookSection)
-                        ? currentTimeFromRemaining(book, parseDuration(pageInput.getText().toString().trim()))
-                        : Integer.parseInt(pageInput.getText().toString().trim());
-                boolean targetReached = targetReached(
-                        book, selectedBookSection, sessionDate, currentPage
-                );
-                addReadingSession(book, sessionDate, currentPage, selectedBookSection);
-                if (targetReached && sessionDate.equals(LocalDate.now())) {
-                    book.targetCompletedDate = sessionDate.toString();
-                }
-                selectedSessionBookNumber = book.number;
-                afterStateChange("Session added");
-            } catch (IllegalArgumentException ex) {
-                showError(ex.getMessage());
-            }
-        });
-        add.setEnabled(selected != null);
-        detailsCard.addView(add);
-        box.addView(detailsCard);
-        return scroll;
-    }
-
-    private void addFormatButton(LinearLayout container, String label, String sectionLabel) {
-        Button button = selectionButton(label, sectionLabel.equals(selectedBookSection));
-        button.setOnClickListener(v -> {
-            selectedBookSection = sectionLabel;
-            selectedSessionBookNumber = -1;
-            showCurrentTab();
-        });
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(48), 1);
-        params.setMargins(0, 0, dp(6), 0);
-        container.addView(button, params);
-    }
-
-    private void addSessionBookButtons(LinearLayout container, List<Book> books) {
-        for (int start = 0; start < books.size(); start += 2) {
-            LinearLayout bookRow = row();
-            for (int index = start; index < Math.min(start + 2, books.size()); index++) {
-                Book book = books.get(index);
-                Button button = selectionButton(book.number + ". " + book.title, book.number == selectedSessionBookNumber);
-                int bookNumber = book.number;
-                button.setOnClickListener(v -> {
-                    selectedSessionBookNumber = bookNumber;
-                    showCurrentTab();
-                });
-                LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
-                params.setMargins(0, 0, index + 1 < books.size() ? dp(6) : 0, dp(6));
-                bookRow.addView(button, params);
-            }
-            container.addView(bookRow);
-        }
-    }
-
-    private Book selectedSessionBook() {
-        BookSection section = sectionByLabel(selectedBookSection);
-        List<Book> books = sessionBooks(section);
-        for (Book book : books) {
-            if (book.number == selectedSessionBookNumber) {
-                return book;
-            }
-        }
-        if (books.isEmpty()) {
-            selectedSessionBookNumber = -1;
-            return null;
-        }
-        Book first = books.get(0);
-        selectedSessionBookNumber = first.number;
-        return first;
-    }
-
-    private List<Book> sessionBooks(BookSection section) {
-        List<Book> available = new ArrayList<>();
-        LocalDate today = LocalDate.now();
-        for (Book book : section.books) {
-            if (unitsRemaining(book, section.label) > 0
-                    && (book.baselineSchedule == null || !book.baselineSchedule.startDate.isAfter(today))) {
-                available.add(book);
-            }
-        }
-        return available;
-    }
-
-    private void showEntriesSheet() {
+    void showEntriesSheet() {
         sessionEntries.show();
     }
     private View buildSettingsView() {
@@ -492,593 +317,26 @@ public class MainActivity extends Activity {
         return scroll;
     }
 
-    private View buildPlanView() {
-        ScrollView scroll = new ScrollView(this);
-        LinearLayout box = verticalBox();
-        scroll.addView(box);
+    private View buildPlanView() { return planView.build(); }
+    private View buildBooksView() { return booksView.build(); }
 
-        LinearLayout header = row();
-        header.addView(heading("Plan"), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
-        header.addView(secondaryButton("New plan", v -> confirmNewPlan()));
-        box.addView(header);
+    private View buildMetricsView() { return metricsView.build(); }
 
-        if (showPlanDateFields) {
-            EditText startInput = editText(startDate.toString(), InputType.TYPE_CLASS_TEXT);
-            CheckBox customTarget = checkBox("Custom finish date", "Target finish date".equals(endLabel));
-            EditText endInput = editText(endDate.toString(), InputType.TYPE_CLASS_TEXT);
-            box.addView(label("Start date"));
-            box.addView(startInput);
-            box.addView(customTarget);
-            box.addView(label("Finish date"));
-            box.addView(endInput);
-            box.addView(actionButton("Create plan", v -> {
-                try {
-                    LocalDate parsedStart = parseDate(startInput.getText().toString().trim());
-                    LocalDate parsedEnd = parseDate(endInput.getText().toString().trim());
-                    if (parsedEnd.isBefore(parsedStart)) {
-                        throw new IllegalArgumentException("finish date must be on or after the start date");
-                    }
-                    startDate = parsedStart;
-                    endDate = customTarget.isChecked() ? parsedEnd : periodEndFromStart(startDate);
-                    endLabel = customTarget.isChecked() ? "Target finish date" : "Quarter end";
-                    recalculateBaselineSchedules(sections, startDate, endDate);
-                    afterStateChange("Plan recalculated");
-                } catch (IllegalArgumentException ex) {
-                    showError(ex.getMessage());
-                }
-            }));
-        } else {
-            TextView hint = label("Your current plan is active. Press New plan to choose start and finish dates.");
-            hint.setTextColor(MOCHA);
-            box.addView(hint);
-            box.addView(actionButton("Recalculate current plan", v -> {
-                recalculateBaselineSchedules(sections, startDate, endDate);
-                afterStateChange("Plan recalculated");
-            }));
-        }
+    private View buildChartsTab() { return chartsView.build(); }
 
-        box.addView(sectionTitle("Rest-day ranges"));
-        LinearLayout restRangeList = verticalBox();
-        renderRestDayRanges(restRangeList);
-        box.addView(restRangeList);
-        EditText restStartInput = editText("", InputType.TYPE_CLASS_TEXT);
-        restStartInput.setFocusable(false);
-        restStartInput.setOnClickListener(v -> {
-            DatePickerDialog picker = new DatePickerDialog(this, (view, y, m, d) -> {
-                restStartInput.setText(String.format(Locale.US, "%04d-%02d-%02d", y, m + 1, d));
-            }, LocalDate.now().getYear(), LocalDate.now().getMonthValue() - 1, LocalDate.now().getDayOfMonth());
-            picker.show();
-        });
-        EditText restEndInput = editText("", InputType.TYPE_CLASS_TEXT);
-        restEndInput.setFocusable(false);
-        restEndInput.setOnClickListener(v -> {
-            DatePickerDialog picker = new DatePickerDialog(this, (view, y, m, d) -> {
-                restEndInput.setText(String.format(Locale.US, "%04d-%02d-%02d", y, m + 1, d));
-            }, LocalDate.now().getYear(), LocalDate.now().getMonthValue() - 1, LocalDate.now().getDayOfMonth());
-            picker.show();
-        });
-        box.addView(label("Rest start date"));
-        box.addView(restStartInput);
-        box.addView(label("Rest end date"));
-        box.addView(restEndInput);
-        box.addView(actionButton("Add rest-day range", v -> {
-            try {
-                RestDayRange range = new RestDayRange(
-                        parseDate(restStartInput.getText().toString().trim()),
-                        parseDate(restEndInput.getText().toString().trim())
-                );
-                if (range.endDate.isBefore(range.startDate)) {
-                    throw new IllegalArgumentException("rest-day end date must be on or after the start date");
-                }
-                restDays.add(range);
-                normalizeRestDayRanges();
-                afterStateChange("Rest-day range added");
-            } catch (IllegalArgumentException ex) {
-                showError(ex.getMessage());
-            }
-        }));
-        return scroll;
-    }
-    private View buildBooksView() {
-        ScrollView scroll = new ScrollView(this);
-        LinearLayout box = verticalBox();
-        scroll.addView(box);
-
-        box.addView(heading("Books"));
-        Spinner sectionSpinner = spinner(BOOK_SECTION_LABELS, selectedBookSection);
-        box.addView(label("Format"));
-        box.addView(sectionSpinner);
-        sectionSpinner.setOnItemSelectedListener(new SimpleItemSelectedListener(() -> {
-            selectedBookSection = String.valueOf(sectionSpinner.getSelectedItem());
-            selectedBookIndex = -1;
-            showCurrentTab();
-        }));
-
-        BookSection section = sectionByLabel(selectedBookSection);
-        box.addView(actionButton("Choose book to edit", v -> showBookPicker(section)));
-        Book selected = selectedBook(section);
-        boolean audiobookSection = isAudiobookSection(section.label);
-        EditText titleInput = editText(selected == null ? "" : selected.title, InputType.TYPE_CLASS_TEXT);
-        EditText startPageInput = editText(
-                selected == null ? (audiobookSection ? "0:00" : "1") : displayValue(section.label, selected.startPage),
-                audiobookSection ? InputType.TYPE_CLASS_TEXT : InputType.TYPE_CLASS_NUMBER
-        );
-        EditText endPageInput = editText(
-                selected == null ? "" : displayValue(section.label, selected.endPage),
-                audiobookSection ? InputType.TYPE_CLASS_TEXT : InputType.TYPE_CLASS_NUMBER
-        );
-        EditText startDateInput = editText(
-                selected == null || selected.startDateOverride == null ? "" : selected.startDateOverride.toString(),
-                InputType.TYPE_CLASS_TEXT
-        );
-        startDateInput.setFocusable(false);
-        startDateInput.setOnClickListener(v -> {
-            LocalDate initial = selected != null && selected.startDateOverride != null
-                    ? selected.startDateOverride : LocalDate.now();
-            DatePickerDialog picker = new DatePickerDialog(this, (view, y, m, d) -> {
-                startDateInput.setText(String.format(Locale.US, "%04d-%02d-%02d", y, m + 1, d));
-            }, initial.getYear(), initial.getMonthValue() - 1, initial.getDayOfMonth());
-            picker.show();
-        });
-        EditText deadlineInput = editText(
-                selected == null || selected.deadlineOverride == null ? "" : selected.deadlineOverride.toString(),
-                InputType.TYPE_CLASS_TEXT
-        );
-        deadlineInput.setFocusable(false);
-        deadlineInput.setOnClickListener(v -> {
-            LocalDate initial = selected != null && selected.deadlineOverride != null
-                    ? selected.deadlineOverride : LocalDate.now();
-            DatePickerDialog picker = new DatePickerDialog(this, (view, y, m, d) -> {
-                deadlineInput.setText(String.format(Locale.US, "%04d-%02d-%02d", y, m + 1, d));
-            }, initial.getYear(), initial.getMonthValue() - 1, initial.getDayOfMonth());
-            picker.show();
-        });
-        box.addView(label("Title"));
-        box.addView(titleInput);
-        box.addView(label(audiobookSection ? "Start time" : "Start page"));
-        box.addView(startPageInput);
-        box.addView(label(audiobookSection ? "End time" : "End page"));
-        box.addView(endPageInput);
-        box.addView(label("Start date override"));
-        box.addView(startDateInput);
-        box.addView(actionButton("Set start date", v -> {
-            try {
-                if (selected == null) {
-                    throw new IllegalArgumentException("Select a book first");
-                }
-                String raw = startDateInput.getText().toString().trim();
-                LocalDate override = raw.isEmpty() ? null : parseDate(raw);
-                applyStartDateOverride(section, selected, override, startDate);
-                afterStateChange("Start date override updated");
-            } catch (IllegalArgumentException ex) {
-                showError(ex.getMessage());
-            }
-        }));
-        box.addView(label("Deadline override"));
-        box.addView(deadlineInput);
-        box.addView(actionButton("Set deadline", v -> {
-            try {
-                if (selected == null) {
-                    throw new IllegalArgumentException("Select a book first");
-                }
-                String raw = deadlineInput.getText().toString().trim();
-                LocalDate override = raw.isEmpty() ? null : parseDate(raw);
-                applyDeadlineOverride(section, selected, override, endDate);
-                afterStateChange("Deadline override updated");
-            } catch (IllegalArgumentException ex) {
-                showError(ex.getMessage());
-            }
-        }));
-
-        LinearLayout buttons1 = row();
-        buttons1.addView(actionButton("Add", v -> {
-            BookFields fields = readBookFields(
-                    section.label,
-                    titleInput,
-                    startPageInput,
-                    endPageInput,
-                    "Book " + (section.books.size() + 1),
-                    audiobookSection ? 0 : 1,
-                    null
-            );
-            if (fields == null) {
-                return;
-            }
-            section.books.add(new Book(section.books.size() + 1, fields.title, fields.startPage, fields.endPage));
-            renumberBooks(section.books);
-            selectedBookIndex = section.books.size() - 1;
-            invalidateBaselineSchedules(section);
-            afterStateChange("Book added");
-        }));
-        buttons1.addView(actionButton("Insert Before", v -> {
-            if (!hasSelectedBook(section)) {
-                showError("Select a book first");
-                return;
-            }
-            int position = selectedBookIndex + 1;
-            if (insertionSplitsSimultaneousGroup(position, section.simultaneousGroups) != null) {
-                showError("Insert before or after the simultaneous group instead");
-                return;
-            }
-            BookFields fields = readBookFields(
-                    section.label,
-                    titleInput,
-                    startPageInput,
-                    endPageInput,
-                    "Book " + position,
-                    audiobookSection ? 0 : 1,
-                    null
-            );
-            if (fields == null) {
-                return;
-            }
-            section.books.add(selectedBookIndex, new Book(position, fields.title, fields.startPage, fields.endPage));
-            renumberBooks(section.books);
-            try {
-                section.simultaneousGroups = remapGroupsAfterAddition(section.simultaneousGroups, position, section.books);
-            } catch (IllegalArgumentException ex) {
-                showError(ex.getMessage());
-                return;
-            }
-            invalidateBaselineSchedules(section);
-            afterStateChange("Book inserted");
-        }));
-        box.addView(buttons1);
-
-        LinearLayout buttons2 = row();
-        buttons2.addView(actionButton("Replace Selected", v -> {
-            if (!hasSelectedBook(section)) {
-                showError("Select a book first");
-                return;
-            }
-            Book oldBook = section.books.get(selectedBookIndex);
-            BookFields fields = readBookFields(section.label, titleInput, startPageInput, endPageInput, oldBook.title, oldBook.startPage, oldBook.endPage);
-            if (fields == null) {
-                return;
-            }
-            Integer currentPage = oldBook.currentPage;
-            if (currentPage != null && (currentPage < fields.startPage || currentPage > fields.endPage)) {
-                currentPage = null;
-            }
-            List<ReadingSession> sessions = oldBook.startPage == fields.startPage && oldBook.endPage == fields.endPage
-                    ? oldBook.readingSessions
-                    : new ArrayList<>();
-            section.books.set(selectedBookIndex, new Book(oldBook.number, fields.title, fields.startPage, fields.endPage, currentPage, sessions, oldBook.baselineSchedule, oldBook.deadlineOverride, oldBook.startDateOverride, oldBook.targetCompletedDate));
-            invalidateBaselineSchedules(section);
-            afterStateChange("Book replaced");
-        }));
-        buttons2.addView(actionButton("Delete Selected", v -> {
-            if (!hasSelectedBook(section)) {
-                showError("Select a book first");
-                return;
-            }
-            int deletedId = selectedBookIndex + 1;
-            section.books.remove(selectedBookIndex);
-            renumberBooks(section.books);
-            try {
-                section.simultaneousGroups = remapGroupsAfterDeletion(section.simultaneousGroups, deletedId, section.books);
-            } catch (IllegalArgumentException ex) {
-                showError(ex.getMessage());
-                return;
-            }
-            selectedBookIndex = Math.min(selectedBookIndex, section.books.size() - 1);
-            invalidateBaselineSchedules(section);
-            afterStateChange("Book deleted");
-        }));
-        Button complete = actionButton("Complete Selected", v -> {
-            if (!hasSelectedBook(section)) {
-                showError("Select a book first");
-                return;
-            }
-            Book book = section.books.get(selectedBookIndex);
-            if (completedUnits(book, section.label) >= totalUnits(book, section.label)) {
-                showError("Book is already complete");
-                return;
-            }
-            book.currentPage = book.endPage;
-            afterStateChange("Book completed");
-        });
-        box.addView(buttons2);
-        box.addView(complete);
-
-        LinearLayout buttons3 = row();
-        buttons3.addView(actionButton("Move Up", v -> moveSelectedBook(section, -1)));
-        buttons3.addView(actionButton("Move Down", v -> moveSelectedBook(section, 1)));
-        box.addView(buttons3);
-
-        box.addView(sectionTitle("Simultaneous groups"));
-        LinearLayout groupButtons = row();
-        groupButtons.addView(actionButton("Select simultaneous books", v -> showSimultaneousBookPicker(section)));
-        groupButtons.addView(secondaryButton("Clear groups", v -> {
-            section.simultaneousGroups = new ArrayList<>();
-            invalidateBaselineSchedules(section);
-            afterStateChange("Groups cleared");
-        }));
-        box.addView(groupButtons);
-
-        box.addView(sectionTitle("Today's reading"));
-        PlanSummary summary = buildRemainingPlans();
-        for (String sectionLabel : BOOK_SECTION_LABELS) {
-            SectionPlan todayPlan = sectionPlanByLabel(summary.sectionPlans, sectionLabel);
-            box.addView(sectionTitle(sectionLabel));
-            if (todayPlan.deadlines.isEmpty()) {
-                box.addView(label("No books in this format."));
-                continue;
-            }
-            HorizontalScrollView todayTableScroll = new HorizontalScrollView(this);
-            TableLayout todayTable = new TableLayout(this);
-            addTableRow(todayTable, true, Arrays.asList("Name", "Pages/time today", "Start", "Deadline"), -1);
-            for (BookDeadline deadline : todayPlan.deadlines) {
-                addTableRow(todayTable, false, Arrays.asList(
-                        deadline.book.title,
-                        todayTargetValue(sectionLabel, deadline),
-                        deadline.startDate.toString(),
-                        deadline.deadline.toString()
-                ), -1);
-            }
-            todayTableScroll.addView(todayTable);
-            box.addView(todayTableScroll);
-        }
-
-        return scroll;
-    }
-
-    private View buildMetricsView() {
-        ScrollView scroll = new ScrollView(this);
-        LinearLayout box = verticalBox();
-        scroll.addView(box);
-
-        LinearLayout header = row();
-        header.addView(heading(metricDetail == null ? "Metrics" : metricDetail), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
-        if (metricDetail == null) {
-            header.addView(secondaryButton("Back to charts", v -> {
-                metricsSubview = false;
-                showCurrentTab();
-            }));
-        } else {
-            header.addView(secondaryButton("Back to metrics", v -> {
-                metricDetail = null;
-                showCurrentTab();
-            }));
-        }
-        box.addView(header);
-        TextView helper = label(metricDetail == null
-                ? "Your current book schedules."
-                : "Choose Back to metrics to return to the schedules.");
-        helper.setTextColor(MOCHA);
-        box.addView(helper);
-        PlanSummary summary = buildRemainingPlans();
-        if (metricDetail == null) {
-            for (SectionPlan sectionPlan : summary.sectionPlans) {
-                LinearLayout scheduleCard = surfaceCard();
-                scheduleCard.addView(sectionTitle(sectionPlan.section.label));
-                if (sectionPlan.deadlines.isEmpty()) {
-                    scheduleCard.addView(label("No scheduled books."));
-                } else {
-                    scheduleCard.addView(bookScheduleTable(sectionPlan));
-                }
-                box.addView(scheduleCard);
-            }
-            box.addView(secondaryButton("Summary metrics", v -> openMetricDetail("Summary metrics")));
-            box.addView(secondaryButton("Schedule information", v -> openMetricDetail("Schedule information")));
-            box.addView(secondaryButton("Key metrics", v -> openMetricDetail("Key metrics")));
-            return scroll;
-        }
-
-        SectionPlan audiobook = sectionPlanByLabel(summary.sectionPlans, AUDIOBOOKS_LABEL);
-        TableLayout table = new TableLayout(this);
-        addTableRow(table, true, Arrays.asList("Area", "Metric", "Value", "Details"), -1);
-        if ("Key metrics".equals(metricDetail)) {
-            addMetricRow(table, "Overview", "Remaining pages", String.valueOf(summary.totalPages), "Physical + digital");
-            addMetricRow(table, "Overview", "Audiobook remaining time", formatDuration(audiobook.totalPages), "All audiobook titles");
-            addMetricRow(table, "Plan", "Reading days", String.valueOf(availableReadingDaysCount(startDate, endDate)), "Rest days excluded");
-            addMetricRow(table, "Plan", "Highest daily pace", format2(summary.highestDailyPace) + " pages/day", "Physical and digital");
-            addMetricRow(table, "Plan", "Status", summary.overallStatus, "Current plan");
-        } else if ("Summary metrics".equals(metricDetail)) {
-            for (String[] metric : allOptionalSummaryRows(summary.sectionPlans, summary.highestDailyPace)) {
-                addMetricRow(table, "Summary", metric[0], metric[1], "Optional metric");
-            }
-        } else if ("Schedule information".equals(metricDetail)) {
-            addMetricRow(table, "Schedule", "Plan period", startDate + " to " + endDate, endLabel);
-            for (SectionPlan sectionPlan : summary.sectionPlans) {
-                String pace = sectionDailyPace(sectionPlan);
-                String result = sectionPlan.deadlines.isEmpty()
-                        ? "No books"
-                        : finalResultMessage(
-                                sectionPlan.deadlines.get(sectionPlan.deadlines.size() - 1).deadline,
-                                endDate,
-                                endName()
-                );
-                addMetricRow(table, sectionPlan.section.label, "Daily pace", pace, result);
-            }
-        }
-        HorizontalScrollView tableScroll = new HorizontalScrollView(this);
-        tableScroll.addView(table);
-        box.addView(tableScroll);
-        return scroll;
-    }
-
-    private void openMetricDetail(String detail) {
-        metricDetail = detail;
-        showCurrentTab();
-    }
-
-    private View buildChartsTab() {
-        ScrollView scroll = new ScrollView(this);
-        LinearLayout box = verticalBox();
-        scroll.addView(box);
-        LinearLayout header = row();
-        header.addView(heading("Charts"), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
-        header.addView(secondaryButton("Metrics", v -> {
-            metricsSubview = true;
-            metricDetail = null;
-            showCurrentTab();
-        }));
-        box.addView(header);
-
-        List<ReadingPlanChartData> charts = chartData();
-        if (charts.isEmpty()) {
-            box.addView(label("Add a book to see its chart."));
-            return scroll;
-        }
-
-        List<String> choices = new ArrayList<>();
-        for (ReadingPlanChartData chart : charts) {
-            choices.add(chart.sectionLabel + " - " + chart.book.number + ". " + chart.book.title);
-        }
-        box.addView(label("Book"));
-        Spinner bookSpinner = spinner(choices, choices.get(0));
-        box.addView(bookSpinner);
-
-        ReadingPlanChartView chartView = new ReadingPlanChartView(this, charts.get(0));
-        chartView.setProjectionVisible(showActualPaceProjection);
-        CheckBox projectionToggle = checkBox(
-                "Show projection based on actual reading pace",
-                showActualPaceProjection
-        );
-        projectionToggle.setOnCheckedChangeListener((button, checked) -> {
-            showActualPaceProjection = checked;
-            chartView.setProjectionVisible(checked);
-        });
-        box.addView(projectionToggle);
-        box.addView(chartView, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(420)
-        ));
-
-        TextView chartDetails = label(chartDetails(charts.get(0)));
-        chartDetails.setTextColor(MOCHA);
-        box.addView(chartDetails);
-        bookSpinner.setOnItemSelectedListener(new SimpleItemSelectedListener(() -> {
-            int index = bookSpinner.getSelectedItemPosition();
-            if (index >= 0 && index < charts.size()) {
-                chartView.setChartData(charts.get(index));
-                chartDetails.setText(chartDetails(charts.get(index)));
-            }
-        }));
-        return scroll;
-    }
-
-    private List<ReadingPlanChartData> chartData() {
-        PlanSummary summary = buildRemainingPlans();
-        List<ReadingPlanChartData> charts = new ArrayList<>();
-        for (String sectionLabel : BOOK_SECTION_LABELS) {
-            SectionPlan plan = sectionPlanByLabel(summary.sectionPlans, sectionLabel);
-            for (BookDeadline deadline : plan.deadlines) {
-                if (totalUnits(deadline.book, sectionLabel) > 0) {
-                    charts.add(new ReadingPlanChartData(this, sectionLabel, deadline.book, deadline));
-                }
-            }
-        }
-        return charts;
-    }
-
-    private String chartDetails(ReadingPlanChartData chart) {
-        boolean audiobook = isAudiobookSection(chart.sectionLabel);
-        String projection = chart.actualPace <= 0.0
-                ? "no actual pace yet"
-                : "actual pace " + (audiobook ? formatDuration(chart.actualPace) : format2(chart.actualPace))
-                + (audiobook ? "/day" : " pages/day");
-        return chart.startDate + " to " + chart.plannedDeadline
-                + " | today " + (audiobook
-                ? formatDuration(chart.dailyTargetPages.get(chart.todayIndex))
-                : chart.dailyTargetPages.get(chart.todayIndex))
-                + (audiobook ? "/day" : " pages/day")
-                + " | " + projection;
-    }
-
-    private void addMetricRow(TableLayout table, String area, String metric, String value, String details) {
+    void addMetricRow(TableLayout table, String area, String metric, String value, String details) {
         tables.addMetricRow(table, area, metric, value, details);
     }
 
-    private HorizontalScrollView bookScheduleTable(SectionPlan sectionPlan) {
+    HorizontalScrollView bookScheduleTable(SectionPlan sectionPlan) {
         return tables.bookScheduleTable(sectionPlan);
-    }
-
-    private void showBookPicker(BookSection section) {
-        if (section.books.isEmpty()) {
-            showError("Add a book first");
-            return;
-        }
-            String[] choices = Book.bookChoices(section).toArray(new String[0]);
-        new AlertDialog.Builder(this)
-                .setTitle("Choose a book to edit")
-                .setSingleChoiceItems(choices, selectedBookIndex, (dialog, which) -> {
-                    selectedBookIndex = which;
-                    dialog.dismiss();
-                    showCurrentTab();
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
-    }
-
-    private void showSimultaneousBookPicker(BookSection section) {
-        if (section.books.size() < 2) {
-            showError("Add at least two books first");
-            return;
-        }
-        String[] choices = Book.bookChoices(section).toArray(new String[0]);
-        boolean[] checked = new boolean[section.books.size()];
-        int selectedGroup = -1;
-        for (int groupIndex = 0; groupIndex < section.simultaneousGroups.size(); groupIndex++) {
-            List<Integer> group = section.simultaneousGroups.get(groupIndex);
-            if (hasSelectedBook(section) && group.contains(selectedBookIndex + 1)) {
-                selectedGroup = groupIndex;
-                for (Integer bookId : group) {
-                    checked[bookId - 1] = true;
-                }
-                break;
-            }
-        }
-        final int groupToReplace = selectedGroup;
-        new AlertDialog.Builder(this)
-                .setTitle("Select books to read simultaneously")
-                .setMultiChoiceItems(choices, checked, (dialog, which, isChecked) -> checked[which] = isChecked)
-                .setPositiveButton("Apply", (dialog, which) -> {
-                    List<Integer> selectedIds = new ArrayList<>();
-                    for (int index = 0; index < checked.length; index++) {
-                        if (checked[index]) {
-                            selectedIds.add(index + 1);
-                        }
-                    }
-                    applySimultaneousSelection(section, selectedIds, groupToReplace);
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
-    }
-
-    private void applySimultaneousSelection(BookSection section, List<Integer> selectedIds, int groupToReplace) {
-        if (selectedIds.size() == 1) {
-            showError("Choose at least two books, or clear the selection");
-            return;
-        }
-        List<List<Integer>> updated = new ArrayList<>();
-        for (int index = 0; index < section.simultaneousGroups.size(); index++) {
-            List<Integer> group = section.simultaneousGroups.get(index);
-            boolean overlaps = index == groupToReplace;
-            for (Integer bookId : selectedIds) {
-                overlaps = overlaps || group.contains(bookId);
-            }
-            if (!overlaps) {
-                updated.add(new ArrayList<>(group));
-            }
-        }
-        if (selectedIds.size() >= 2) {
-            updated.add(new ArrayList<>(selectedIds));
-        }
-        try {
-            section.simultaneousGroups = validateSimultaneousGroups(section.books, updated);
-            invalidateBaselineSchedules(section);
-            afterStateChange("Groups updated");
-        } catch (IllegalArgumentException ex) {
-            showError(ex.getMessage());
-        }
     }
 
     private HorizontalScrollView planTable(SectionPlan sectionPlan) {
         return tables.planTable(sectionPlan);
     }
 
-    private TableRow addTableRow(TableLayout table, boolean header, List<String> values, int rowColor) {
+    TableRow addTableRow(TableLayout table, boolean header, List<String> values, int rowColor) {
         return tables.addTableRow(table, header, values, rowColor);
     }
 
@@ -1088,9 +346,9 @@ public class MainActivity extends Activity {
     TextView sectionTitle(String text) { return ui.sectionTitle(text); }
     TextView label(String text) { return ui.label(text); }
     private TextView monoText(String text) { return ui.monoText(text); }
-    private EditText editText(String value, int inputType) { return ui.editText(value, inputType); }
-    private CheckBox checkBox(String label, boolean checked) { return ui.checkBox(label, checked); }
-    private Spinner spinner(List<String> values, String selected) { return ui.spinner(values, selected); }
+    EditText editText(String value, int inputType) { return ui.editText(value, inputType); }
+    CheckBox checkBox(String label, boolean checked) { return ui.checkBox(label, checked); }
+    Spinner spinner(List<String> values, String selected) { return ui.spinner(values, selected); }
     private Spinner spinner(List<String> values, String selected, int backgroundColor, int selectedTextColor) { return ui.spinner(values, selected, backgroundColor, selectedTextColor); }
 
     private String fileLocationText() {
@@ -1126,7 +384,7 @@ public class MainActivity extends Activity {
         // Success and sync details are intentionally represented by the JSON indicator.
     }
 
-    private void showError(String message) {
+    void showError(String message) {
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
     }
     @Override
@@ -1148,7 +406,7 @@ public class MainActivity extends Activity {
         super.onBackPressed();
     }
 
-    private void confirmNewPlan() {
+    void confirmNewPlan() {
         showPlanDateFields = true;
         showCurrentTab();
         new AlertDialog.Builder(this)
@@ -1953,14 +1211,14 @@ public class MainActivity extends Activity {
         return out.toString();
     }
 
-    private static String sectionDailyPace(SectionPlan sectionPlan) {
+    static String sectionDailyPace(SectionPlan sectionPlan) {
         if (isAudiobookSection(sectionPlan.section.label)) {
             return formatDuration(sectionPlan.dailyPace) + "/day";
         }
         return format2(sectionPlan.dailyPace) + " pages/day";
     }
 
-    private SessionTarget sessionTarget(String sectionLabel, Book book, LocalDate targetDate) {
+    SessionTarget sessionTarget(String sectionLabel, Book book, LocalDate targetDate) {
         PlanSummary summary = buildRemainingPlans();
         SectionPlan sectionPlan = sectionPlanByLabel(summary.sectionPlans, sectionLabel);
         BookDeadline deadline = deadlineForBook(sectionPlan, book);
@@ -2007,7 +1265,7 @@ public class MainActivity extends Activity {
         return Math.min(Math.max(completed + scheduledUnits, completed), total);
     }
 
-    private String todayTargetValue(String sectionLabel, BookDeadline deadline) {
+    String todayTargetValue(String sectionLabel, BookDeadline deadline) {
         LocalDate today = LocalDate.now();
         if (today.isBefore(deadline.startDate)
                 || today.isAfter(deadline.deadline)
@@ -2029,11 +1287,11 @@ public class MainActivity extends Activity {
         return isAudiobookSection(sectionLabel) ? formatDuration(targetUnits) : String.valueOf(targetUnits);
     }
 
-    private boolean isTargetCompleteToday(Book book) {
+    boolean isTargetCompleteToday(Book book) {
         return LocalDate.now().toString().equals(book.targetCompletedDate);
     }
 
-    private boolean markTargetCompletedIfReached(
+    boolean markTargetCompletedIfReached(
             Book book, String sectionLabel, String dateText, String inputText
     ) {
         try {
@@ -2057,7 +1315,7 @@ public class MainActivity extends Activity {
         }
     }
 
-    private boolean targetReached(Book book, String sectionLabel, LocalDate targetDate, int currentPage) {
+    boolean targetReached(Book book, String sectionLabel, LocalDate targetDate, int currentPage) {
         if (!targetDate.equals(LocalDate.now())) {
             return false;
         }
@@ -2153,7 +1411,7 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void recalculateBaselineSchedules(
+    void recalculateBaselineSchedules(
             List<BookSection> planSections, LocalDate planStart, LocalDate planEnd
     ) {
         for (BookSection section : planSections) {
@@ -2182,7 +1440,7 @@ public class MainActivity extends Activity {
             section.baselineNeedsRecalculation = false;
         }
     }
-    private void applyDeadlineOverride(BookSection section, Book book, LocalDate override, LocalDate planEnd) {
+    void applyDeadlineOverride(BookSection section, Book book, LocalDate override, LocalDate planEnd) {
         if (book.baselineSchedule == null) {
             throw new IllegalArgumentException("calculate the plan before setting a deadline override");
         }
@@ -2250,7 +1508,7 @@ public class MainActivity extends Activity {
         section.baselineNeedsRecalculation = false;
     }
 
-    private void applyStartDateOverride(BookSection section, Book book, LocalDate override, LocalDate planStart) {
+    void applyStartDateOverride(BookSection section, Book book, LocalDate override, LocalDate planStart) {
         if (book.baselineSchedule == null) {
             throw new IllegalArgumentException("calculate the plan before setting a start date override");
         }
@@ -2282,7 +1540,7 @@ public class MainActivity extends Activity {
             }
         }
     }
-    private void invalidateBaselineSchedules(BookSection section) {
+    void invalidateBaselineSchedules(BookSection section) {
         section.baselineNeedsRecalculation = true;
     }
 
@@ -2292,7 +1550,7 @@ public class MainActivity extends Activity {
         }
     }
 
-    private PlanSummary buildRemainingPlans() {
+    PlanSummary buildRemainingPlans() {
         List<SectionPlan> plans = new ArrayList<>();
         for (BookSection section : sections) {
             plans.add(buildRemainingSectionPlan(section, startDate, endDate, LocalDate.now()));
@@ -2501,7 +1759,7 @@ public class MainActivity extends Activity {
         return deadlines;
     }
 
-    private List<String[]> allOptionalSummaryRows(List<SectionPlan> sectionPlans, double highestDailyPace) {
+    List<String[]> allOptionalSummaryRows(List<SectionPlan> sectionPlans, double highestDailyPace) {
         return optionalSummaryRows(sectionPlans, highestDailyPace, new StatsOptions(true, true, true, true, true));
     }
 
@@ -2549,7 +1807,7 @@ public class MainActivity extends Activity {
         return rows;
     }
 
-    private void addReadingSession(Book book, LocalDate sessionDate, int currentPage, String sectionLabel) {
+    void addReadingSession(Book book, LocalDate sessionDate, int currentPage, String sectionLabel) {
         int previousPagesRead = completedUnits(book, sectionLabel);
         setBookProgress(book, currentPage, sectionLabel);
         int pagesRead = completedUnits(book, sectionLabel) - previousPagesRead;
@@ -2591,7 +1849,7 @@ public class MainActivity extends Activity {
         book.currentPage = currentPage;
     }
 
-    private void moveSelectedBook(BookSection section, int offset) {
+    void moveSelectedBook(BookSection section, int offset) {
         if (!hasSelectedBook(section)) {
             showError("Select a book first");
             return;
@@ -2644,7 +1902,7 @@ public class MainActivity extends Activity {
         return new int[]{index, index};
     }
 
-    private BookFields readBookFields(String sectionLabel, EditText titleInput, EditText startPageInput, EditText endPageInput, String defaultTitle, Integer defaultStart, Integer defaultEnd) {
+    BookFields readBookFields(String sectionLabel, EditText titleInput, EditText startPageInput, EditText endPageInput, String defaultTitle, Integer defaultStart, Integer defaultEnd) {
         try {
             String title = titleInput.getText().toString().trim();
             if (title.isEmpty()) {
@@ -2693,18 +1951,18 @@ public class MainActivity extends Activity {
         return null;
     }
 
-    private Book selectedBook(BookSection section) {
+    Book selectedBook(BookSection section) {
         if (!hasSelectedBook(section)) {
             return null;
         }
         return section.books.get(selectedBookIndex);
     }
 
-    private boolean hasSelectedBook(BookSection section) {
+    boolean hasSelectedBook(BookSection section) {
         return selectedBookIndex >= 0 && selectedBookIndex < section.books.size();
     }
 
-    private BookSection sectionByLabel(String label) {
+    BookSection sectionByLabel(String label) {
         return sectionByLabelFromList(sections, label);
     }
 
@@ -2718,7 +1976,7 @@ public class MainActivity extends Activity {
         return LocalDate.of(today.getYear() + 1, 1, 1);
     }
 
-    private static LocalDate periodEndFromStart(LocalDate start) {
+    static LocalDate periodEndFromStart(LocalDate start) {
         return start.plusMonths(3).minusDays(1);
     }
 
@@ -2745,7 +2003,7 @@ public class MainActivity extends Activity {
         return availableReadingDays(start, end).size();
     }
 
-    private void normalizeRestDayRanges() {
+    void normalizeRestDayRanges() {
         restDays.sort((left, right) -> left.startDate.compareTo(right.startDate));
         List<RestDayRange> merged = new ArrayList<>();
         for (RestDayRange range : restDays) {
@@ -2762,22 +2020,6 @@ public class MainActivity extends Activity {
         }
         restDays.clear();
         restDays.addAll(merged);
-    }
-
-    private void renderRestDayRanges(LinearLayout container) {
-        container.removeAllViews();
-        for (int index = 0; index < restDays.size(); index++) {
-            final int rangeIndex = index;
-            RestDayRange range = restDays.get(index);
-            LinearLayout row = row();
-            row.addView(label(range.startDate + " ? " + range.endDate),
-                    new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
-            row.addView(secondaryButton("Remove", v -> {
-                restDays.remove(rangeIndex);
-                afterStateChange("Rest-day range removed");
-            }));
-            container.addView(row);
-        }
     }
 
     private static int inclusiveDaysBetween(LocalDate start, LocalDate end) {
@@ -2804,11 +2046,11 @@ public class MainActivity extends Activity {
         return count == 0 ? 0.0 : (double) plan.totalPages / count;
     }
 
-    private String endName() {
+    String endName() {
         return "Target finish date".equals(endLabel) ? "target finish date" : "quarter end date";
     }
 
-    private static String finalResultMessage(LocalDate finalDeadline, LocalDate endDate, String endName) {
+    static String finalResultMessage(LocalDate finalDeadline, LocalDate endDate, String endName) {
         long difference = ChronoUnit.DAYS.between(finalDeadline, endDate);
         if (difference > 0) {
             return "You finish " + difference + " day" + (difference == 1 ? "" : "s") + " before the " + endName + ".";
@@ -2872,7 +2114,7 @@ public class MainActivity extends Activity {
         return needsQuotes ? "\"" + escaped + "\"" : escaped;
     }
 
-    private static class SimpleTextWatcher implements TextWatcher {
+    static class SimpleTextWatcher implements TextWatcher {
         private final Runnable callback;
 
         SimpleTextWatcher(Runnable callback) {
@@ -2893,7 +2135,7 @@ public class MainActivity extends Activity {
         }
     }
 
-    private static class SimpleItemSelectedListener implements android.widget.AdapterView.OnItemSelectedListener {
+    static class SimpleItemSelectedListener implements android.widget.AdapterView.OnItemSelectedListener {
         private final Runnable callback;
         private boolean firstSelection = true;
 
