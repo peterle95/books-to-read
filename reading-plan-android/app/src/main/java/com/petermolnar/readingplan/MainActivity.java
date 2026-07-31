@@ -105,6 +105,11 @@ public class MainActivity extends Activity {
     final List<BookSection> sections = blankSections();
     private final ReadingPlanUi ui = new ReadingPlanUi(this);
     private final ReadingPlanTables tables = new ReadingPlanTables(this);
+    private final ReadingPlanCalendar calendar = new ReadingPlanCalendar(this);
+    private final ReadingPlanScheduler scheduler = new ReadingPlanScheduler(this);
+    private final ReadingPlanTargets targets = new ReadingPlanTargets(this);
+    private final ReadingPlanBookProgress bookProgress = new ReadingPlanBookProgress(this);
+    private final ReadingPlanCsvReport csvReport = new ReadingPlanCsvReport(this);
     private final ReadingSessionEntries sessionEntries = new ReadingSessionEntries(this);
     private final ReadingPlanSessionView sessionView = new ReadingPlanSessionView(this);
     private final ReadingPlanPlanView planView = new ReadingPlanPlanView(this);
@@ -515,7 +520,7 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void autosaveJson(String successMessage) {
+    void autosaveJson(String successMessage) {
         if (restoring) {
             return;
         }
@@ -1167,186 +1172,23 @@ public class MainActivity extends Activity {
         return new ParseTableResult(books, index);
     }
 
-    private String csvText(PlanSummary summary) {
-        StringBuilder out = new StringBuilder();
-        writeCsvRow(out, Collections.singletonList("Reading plan"));
-        writeCsvRow(out, Arrays.asList("Start date", startDate.toString()));
-        writeCsvRow(out, Arrays.asList(endLabel, endDate.toString()));
-        if (!restDays.isEmpty()) {
-            StringBuilder rawRestDays = new StringBuilder();
-            for (RestDayRange range : restDays) {
-                if (rawRestDays.length() > 0) {
-                    rawRestDays.append(';');
-                }
-                rawRestDays.append(range.startDate).append('/').append(range.endDate);
-            }
-            writeCsvRow(out, Arrays.asList("Rest days", rawRestDays.toString()));
-        }
-        SectionPlan physical = sectionPlanByLabel(summary.sectionPlans, PHYSICAL_BOOKS_LABEL);
-        SectionPlan digital = sectionPlanByLabel(summary.sectionPlans, DIGITAL_BOOKS_LABEL);
-        SectionPlan audiobook = sectionPlanByLabel(summary.sectionPlans, AUDIOBOOKS_LABEL);
-        writeCsvRow(out, Arrays.asList("Total remaining pages", String.valueOf(summary.totalPages)));
-        writeCsvRow(out, Arrays.asList("Physical remaining pages", String.valueOf(physical.totalPages)));
-        writeCsvRow(out, Arrays.asList("Digital remaining pages", String.valueOf(digital.totalPages)));
-        writeCsvRow(out, Arrays.asList("Audiobook remaining time", formatDuration(audiobook.totalPages)));
-        writeCsvRow(out, Arrays.asList("Highest daily pace", format15(summary.highestDailyPace) + " pages/day"));
-        writeCsvRow(out, Arrays.asList("Audiobook daily time", formatDuration(audiobook.dailyPace) + "/day"));
-        writeCsvRow(out, Arrays.asList("Status", summary.overallStatus));
-        for (String[] row : optionalSummaryRows(summary.sectionPlans, summary.highestDailyPace)) {
-            writeCsvRow(out, Arrays.asList(row[0], row[1]));
-        }
+    private String csvText(PlanSummary summary) { return csvReport.csvText(summary); }
 
-        for (SectionPlan sectionPlan : summary.sectionPlans) {
-            writeCsvRow(out, Collections.emptyList());
-            writeCsvRow(out, Collections.singletonList(sectionPlan.section.label));
-            writeCsvRow(out, Arrays.asList("Daily pace", SectionPlan.csvDailyPace(sectionPlan)));
-            if (!sectionPlan.section.simultaneousGroups.isEmpty()) {
-                writeCsvRow(out, Arrays.asList("Simultaneous groups", groupsCompact(sectionPlan.section.simultaneousGroups)));
-            }
-            writeCsvRow(out, csvHeaders(sectionPlan.section.label));
-            for (BookDeadline deadline : sectionPlan.deadlines) {
-                writeCsvRow(out, csvRow(deadline, sectionPlan.section.label));
-            }
-        }
-        return out.toString();
-    }
+    static String sectionDailyPace(SectionPlan sectionPlan) { return ReadingPlanCsvReport.sectionDailyPace(sectionPlan); }
 
-    static String sectionDailyPace(SectionPlan sectionPlan) {
-        if (isAudiobookSection(sectionPlan.section.label)) {
-            return formatDuration(sectionPlan.dailyPace) + "/day";
-        }
-        return format2(sectionPlan.dailyPace) + " pages/day";
-    }
+    SessionTarget sessionTarget(String sectionLabel, Book book, LocalDate targetDate) { return targets.sessionTarget(sectionLabel, book, targetDate); }
 
-    SessionTarget sessionTarget(String sectionLabel, Book book, LocalDate targetDate) {
-        PlanSummary summary = buildRemainingPlans();
-        SectionPlan sectionPlan = sectionPlanByLabel(summary.sectionPlans, sectionLabel);
-        BookDeadline deadline = deadlineForBook(sectionPlan, book);
-        if (deadline == null) {
-            throw new IllegalArgumentException("no target available");
-        }
-        String target = targetDisplayValue(
-                sectionLabel,
-                book,
-                targetUnitsForDate(book, sectionLabel, deadline, targetDate)
-        );
-        return new SessionTarget(target, sessionDailyPaceValue(sectionLabel, deadline.dailyPages));
-    }
-    private static BookDeadline deadlineForBook(SectionPlan sectionPlan, Book book) {
-        for (BookDeadline deadline : sectionPlan.deadlines) {
-            if (deadline.book == book) {
-                return deadline;
-            }
-        }
-        return null;
-    }
+    String todayTargetValue(String sectionLabel, BookDeadline deadline) { return targets.todayTargetValue(sectionLabel, deadline); }
 
-    private int targetUnitsForDate(Book book, String sectionLabel, BookDeadline deadline, LocalDate targetDate) {
-        int total = totalUnits(book, sectionLabel);
-        int completed = completedUnits(book, sectionLabel);
-        if (unitsRemaining(book, sectionLabel) <= 0 || targetDate.isAfter(deadline.deadline)) {
-            return total;
-        }
-        if (targetDate.isBefore(deadline.startDate) || deadline.dailyPages <= 0) {
-            return completed;
-        }
-
-        LocalDate paceStart = deadline.startDate;
-        if (book.currentPage != null && LocalDate.now().isAfter(paceStart)) {
-            paceStart = LocalDate.now();
-        }
-        if (targetDate.isBefore(paceStart)) {
-            return completed;
-        }
-
-        LocalDate activeDate = targetDate.isAfter(deadline.deadline) ? deadline.deadline : targetDate;
-        int elapsedDays = availableReadingDaysCount(paceStart, activeDate);
-        int scheduledUnits = (int) Math.ceil(deadline.dailyPages * elapsedDays - 1e-9);
-        return Math.min(Math.max(completed + scheduledUnits, completed), total);
-    }
-
-    String todayTargetValue(String sectionLabel, BookDeadline deadline) {
-        LocalDate today = LocalDate.now();
-        if (today.isBefore(deadline.startDate)
-                || today.isAfter(deadline.deadline)
-                || isRestDay(today)) {
-            return isAudiobookSection(sectionLabel) ? formatDuration(0) : "0";
-        }
-        if (!isAudiobookSection(sectionLabel)) {
-            LocalDate paceStart = deadline.startDate;
-            if (deadline.book.currentPage != null && today.isAfter(paceStart)) {
-                paceStart = today;
-            }
-            if (!today.isBefore(paceStart) && deadline.dailyPages > 0) {
-                return String.valueOf(roundedUpPageTarget(deadline.dailyPages));
-            }
-        }
-        int todayTarget = targetUnitsForDate(deadline.book, sectionLabel, deadline, today);
-        int yesterdayTarget = targetUnitsForDate(deadline.book, sectionLabel, deadline, today.minusDays(1));
-        int targetUnits = Math.max(todayTarget - yesterdayTarget, 0);
-        return isAudiobookSection(sectionLabel) ? formatDuration(targetUnits) : String.valueOf(targetUnits);
-    }
-
-    boolean isTargetCompleteToday(Book book) {
-        return LocalDate.now().toString().equals(book.targetCompletedDate);
-    }
-
-    boolean markTargetCompletedIfReached(
-            Book book, String sectionLabel, String dateText, String inputText
-    ) {
-        try {
-            LocalDate targetDate = parseDate(dateText);
-            if (!targetDate.equals(LocalDate.now()) || inputText.isEmpty()) {
-                return isTargetCompleteToday(book);
-            }
-            int currentPage = isAudiobookSection(sectionLabel)
-                    ? currentTimeFromRemaining(book, parseDuration(inputText))
-                    : Integer.parseInt(inputText);
-            if (!targetReached(book, sectionLabel, targetDate, currentPage)) {
-                return false;
-            }
-            if (!isTargetCompleteToday(book)) {
-                book.targetCompletedDate = targetDate.toString();
-                autosaveJson("Today's target completed");
-            }
-            return true;
-        } catch (IllegalArgumentException ex) {
-            return isTargetCompleteToday(book);
-        }
+    boolean markTargetCompletedIfReached(Book book, String sectionLabel, String dateText, String inputText) {
+        return targets.markTargetCompletedIfReached(book, sectionLabel, dateText, inputText);
     }
 
     boolean targetReached(Book book, String sectionLabel, LocalDate targetDate, int currentPage) {
-        if (!targetDate.equals(LocalDate.now())) {
-            return false;
-        }
-        PlanSummary summary = buildRemainingPlans();
-        BookDeadline deadline = deadlineForBook(
-                sectionPlanByLabel(summary.sectionPlans, sectionLabel), book
-        );
-        if (deadline == null) {
-            return false;
-        }
-        int completed = completedUnits(book, sectionLabel);
-        int target = targetUnitsForDate(book, sectionLabel, deadline, targetDate);
-        int currentUnits = isAudiobookSection(sectionLabel)
-                ? currentPage - book.startPage
-                : currentPage - book.startPage + 1;
-        return target > completed && currentUnits >= target;
+        return targets.targetReached(book, sectionLabel, targetDate, currentPage);
     }
 
-    private static String targetDisplayValue(String sectionLabel, Book book, int targetUnits) {
-        if (isAudiobookSection(sectionLabel)) {
-            return formatDuration(Math.max(totalUnits(book, sectionLabel) - targetUnits, 0));
-        }
-        if (targetUnits <= 0) {
-            return String.valueOf(book.startPage);
-        }
-        return String.valueOf(book.startPage + targetUnits - 1);
-    }
-
-    private static String sessionDailyPaceValue(String sectionLabel, double dailyPages) {
-        return isAudiobookSection(sectionLabel) ? formatDuration(dailyPages) : String.valueOf(roundedUpPageTarget(dailyPages));
-    }
+    boolean isTargetCompleteToday(Book book) { return targets.isTargetCompleteToday(book); }
 
     private String summaryText(PlanSummary summary, boolean includeSectionDetails) {
         SectionPlan physical = sectionPlanByLabel(summary.sectionPlans, PHYSICAL_BOOKS_LABEL);
@@ -1381,389 +1223,37 @@ public class MainActivity extends Activity {
     }
 
 
-    private void calculateBaselineSchedules(
-            List<BookSection> planSections, LocalDate planStart, LocalDate planEnd
-    ) {
-        for (BookSection section : planSections) {
-            int sectionUnits = 0;
-            for (Book book : section.books) {
-                sectionUnits += totalUnits(book, section.label);
-            }
-            double dailyPace = section.books.isEmpty()
-                    ? 0.0
-                    : availableReadingDaysCount(planStart, planEnd) == 0
-                    ? 0.0
-                    : (double) sectionUnits / availableReadingDaysCount(planStart, planEnd);
-            SectionPlan plan = buildPlan(
-                    section,
-                    planStart,
-                    planEnd,
-                    dailyPace,
-                    book -> totalUnits(book, section.label)
-            );
-            for (BookDeadline deadline : plan.deadlines) {
-                deadline.book.baselineSchedule = new BaselineSchedule(
-                        deadline.startDate, deadline.deadline, deadline.dailyPages
-                );
-            }
-            applyPersistedDeadlineOverrides(section, planEnd);
-            section.baselineNeedsRecalculation = false;
-        }
+    private void calculateBaselineSchedules(List<BookSection> planSections, LocalDate planStart, LocalDate planEnd) {
+        scheduler.calculateBaselineSchedules(planSections, planStart, planEnd);
     }
 
-    void recalculateBaselineSchedules(
-            List<BookSection> planSections, LocalDate planStart, LocalDate planEnd
-    ) {
-        for (BookSection section : planSections) {
-            int sectionUnits = 0;
-            for (Book book : section.books) {
-                sectionUnits += unitsRemaining(book, section.label);
-            }
-            double dailyPace = section.books.isEmpty()
-                    ? 0.0
-                    : availableReadingDaysCount(planStart, planEnd) == 0
-                    ? 0.0
-                    : (double) sectionUnits / availableReadingDaysCount(planStart, planEnd);
-            SectionPlan plan = buildPlan(
-                    section,
-                    planStart,
-                    planEnd,
-                    dailyPace,
-                    book -> unitsRemaining(book, section.label)
-            );
-            for (BookDeadline deadline : plan.deadlines) {
-                deadline.book.baselineSchedule = new BaselineSchedule(
-                        deadline.startDate, deadline.deadline, deadline.dailyPages
-                );
-            }
-            applyPersistedDeadlineOverrides(section, planEnd);
-            section.baselineNeedsRecalculation = false;
-        }
+    void recalculateBaselineSchedules(List<BookSection> planSections, LocalDate planStart, LocalDate planEnd) {
+        scheduler.recalculateBaselineSchedules(planSections, planStart, planEnd);
     }
+
     void applyDeadlineOverride(BookSection section, Book book, LocalDate override, LocalDate planEnd) {
-        if (book.baselineSchedule == null) {
-            throw new IllegalArgumentException("calculate the plan before setting a deadline override");
-        }
-        if (override != null) {
-            if (override.isBefore(LocalDate.now())) {
-                throw new IllegalArgumentException("deadline override cannot be before today");
-            }
-            if (override.isAfter(planEnd)) {
-                throw new IllegalArgumentException("deadline override cannot be after the plan finish date");
-            }
-        }
-        List<Integer> containingGroup = null;
-        for (List<Integer> group : section.simultaneousGroups) {
-            if (group.contains(book.number)) {
-                containingGroup = group;
-                break;
-            }
-        }
-        book.deadlineOverride = override;
-        LocalDate deadline = override == null ? planEnd : override;
-        if (override == null && containingGroup != null) {
-            for (Integer bookId : containingGroup) {
-                Book other = section.books.get(bookId - 1);
-                if (bookId != book.number && other.baselineSchedule != null) {
-                    deadline = other.baselineSchedule.deadline;
-                    break;
-                }
-            }
-        }
-        LocalDate start = book.baselineSchedule.startDate;
-        int remaining = unitsRemaining(book, section.label);
-        LocalDate paceStart = effectiveRemainingStartDate(start, deadline, LocalDate.now());
-        int availableDays = availableReadingDaysCount(paceStart, deadline);
-        double dailyTarget = remaining == 0 || availableDays == 0 ? 0.0 : (double) remaining / availableDays;
-        book.baselineSchedule = new BaselineSchedule(start, deadline, dailyTarget);
-
-        if (containingGroup != null) {
-            List<Integer> activeGroup = new ArrayList<>();
-            for (Integer bookId : containingGroup) {
-                if (section.books.get(bookId - 1).deadlineOverride == null && section.books.get(bookId - 1).startDateOverride == null) {
-                    activeGroup.add(bookId);
-                }
-            }
-            if (activeGroup.size() >= 2) {
-                BaselineSchedule reference = section.books.get(activeGroup.get(0) - 1).baselineSchedule;
-                int groupRemaining = 0;
-                for (Integer bookId : activeGroup) {
-                    groupRemaining += unitsRemaining(section.books.get(bookId - 1), section.label);
-                }
-                LocalDate groupStart = effectiveRemainingStartDate(reference.startDate, reference.deadline, LocalDate.now());
-                int groupDays = availableReadingDaysCount(groupStart, reference.deadline);
-                double groupPace = groupRemaining == 0 || groupDays == 0 ? 0.0 : (double) groupRemaining / groupDays;
-                for (Integer bookId : activeGroup) {
-                    Book groupBook = section.books.get(bookId - 1);
-                    int bookRemaining = unitsRemaining(groupBook, section.label);
-                    double bookTarget = groupRemaining == 0 || bookRemaining == 0
-                            ? 0.0
-                            : groupPace * bookRemaining / groupRemaining;
-                    groupBook.baselineSchedule = new BaselineSchedule(
-                            reference.startDate, reference.deadline, bookTarget
-                    );
-                }
-            }
-        }
-        section.baselineNeedsRecalculation = false;
+        scheduler.applyDeadlineOverride(section, book, override, planEnd);
     }
 
     void applyStartDateOverride(BookSection section, Book book, LocalDate override, LocalDate planStart) {
-        if (book.baselineSchedule == null) {
-            throw new IllegalArgumentException("calculate the plan before setting a start date override");
-        }
-        LocalDate deadline = book.baselineSchedule.deadline;
-        if (override != null && override.isAfter(deadline)) {
-            throw new IllegalArgumentException("start date override cannot be after the deadline");
-        }
-        book.startDateOverride = override;
-        LocalDate start = override == null
-                ? (planStart == null ? book.baselineSchedule.startDate : planStart)
-                : override;
-        int remaining = unitsRemaining(book, section.label);
-        LocalDate paceStart = effectiveRemainingStartDate(start, deadline, LocalDate.now());
-        int availableDays = availableReadingDaysCount(paceStart, deadline);
-        double dailyTarget = remaining == 0 || availableDays == 0 ? 0.0 : (double) remaining / availableDays;
-        book.baselineSchedule = new BaselineSchedule(start, deadline, dailyTarget);
-        section.baselineNeedsRecalculation = false;
+        scheduler.applyStartDateOverride(section, book, override, planStart);
     }
 
-    private void applyPersistedDeadlineOverrides(BookSection section, LocalDate planEnd) {
-        for (Book book : section.books) {
-            if (book.deadlineOverride != null) {
-                applyDeadlineOverride(section, book, book.deadlineOverride, planEnd);
-            }
-        }
-        for (Book book : section.books) {
-            if (book.startDateOverride != null) {
-                applyStartDateOverride(section, book, book.startDateOverride, null);
-            }
-        }
-    }
-    void invalidateBaselineSchedules(BookSection section) {
-        section.baselineNeedsRecalculation = true;
-    }
+    void invalidateBaselineSchedules(BookSection section) { scheduler.invalidateBaselineSchedules(section); }
 
     private void invalidateAllBaselineSchedules() {
         for (BookSection section : sections) {
-            section.baselineNeedsRecalculation = true;
+            scheduler.invalidateBaselineSchedules(section);
         }
     }
 
-    PlanSummary buildRemainingPlans() {
-        List<SectionPlan> plans = new ArrayList<>();
-        for (BookSection section : sections) {
-            plans.add(buildRemainingSectionPlan(section, startDate, endDate, LocalDate.now()));
-        }
-        int totalPages = 0;
-        double highestPace = 0.0;
-        boolean achievable = true;
-        for (SectionPlan plan : plans) {
-            if (!isAudiobookSection(plan.section.label)) {
-                totalPages += plan.totalPages;
-                highestPace = Math.max(highestPace, plan.dailyPace);
-            }
-            achievable = achievable && "achievable".equals(plan.overallStatus);
-        }
-        return new PlanSummary(plans, totalPages, highestPace, achievable ? "achievable" : "not achievable");
-    }
-
-    private SectionPlan buildRemainingSectionPlan(BookSection section, LocalDate start, LocalDate end, LocalDate today) {
-        if (section.books.isEmpty()) {
-            return new SectionPlan(section, new ArrayList<>(), 0.0, 0, 0.0, "achievable");
-        }
-        LocalDate remainingStart = effectiveRemainingStartDate(start, end, today);
-        int periodDays = availableReadingDaysCount(remainingStart, end);
-        int remainingPages = 0;
-        for (Book book : section.books) {
-            remainingPages += unitsRemaining(book, section.label);
-        }
-        double dailyPace = remainingPages == 0 || periodDays == 0 ? 0.0 : (double) remainingPages / periodDays;
-        SectionPlan plan = buildPlan(
-                section,
-                remainingStart,
-                end,
-                dailyPace,
-                book -> unitsRemaining(book, section.label)
-        );
-        return withPersistedBaselineDeadlines(plan, end, today);
-    }
-
-    private SectionPlan withPersistedBaselineDeadlines(SectionPlan plan, LocalDate end, LocalDate today) {
-        if (plan.section.baselineNeedsRecalculation) {
-            return plan;
-        }
-        for (Book book : plan.section.books) {
-            if (book.baselineSchedule == null) {
-                return plan;
-            }
-        }
-        List<BookDeadline> deadlines = new ArrayList<>();
-        for (BookDeadline deadline : plan.deadlines) {
-            BaselineSchedule baseline = deadline.book.baselineSchedule;
-            String status = baseline.deadline.isBefore(end)
-                    ? "before end"
-                    : baseline.deadline.equals(end) ? "on end date" : "after end";
-
-            // Compute fresh daily pages from remaining work and remaining reading days
-            LocalDate paceStart = effectiveRemainingStartDate(baseline.startDate, baseline.deadline, today);
-            int availableDays = availableReadingDaysCount(paceStart, baseline.deadline);
-            int remaining = unitsRemaining(deadline.book, plan.section.label);
-            double dailyPages = remaining == 0 || availableDays == 0 ? 0.0 : (double) remaining / availableDays;
-
-            deadlines.add(new BookDeadline(
-                    deadline.book,
-                    deadline.cumulativePages,
-                    baseline.startDate,
-                    baseline.deadline,
-                    availableReadingDaysCount(baseline.startDate, baseline.deadline),
-                    dailyPages,
-                    status
-            ));
-        }
-        return new SectionPlan(
-                plan.section,
-                deadlines,
-                plan.dailyPace,
-                plan.totalPages,
-                plan.requiredPace,
-                plan.overallStatus
-        );
-    }
-
-    private List<List<Integer>> activeSimultaneousGroups(BookSection section) {
-        List<List<Integer>> activeGroups = new ArrayList<>();
-        for (List<Integer> group : section.simultaneousGroups) {
-            List<Integer> active = new ArrayList<>();
-            for (Integer bookId : group) {
-                if (section.books.get(bookId - 1).deadlineOverride == null && section.books.get(bookId - 1).startDateOverride == null) {
-                    active.add(bookId);
-                }
-            }
-            if (active.size() >= 2) {
-                activeGroups.add(active);
-            }
-        }
-        return activeGroups;
-    }
-    private SectionPlan buildPlan(BookSection section, LocalDate start, LocalDate end, double dailyPace, PageCounter counter) {
-        int totalPages = 0;
-        for (Book book : section.books) {
-            totalPages += counter.pages(book);
-        }
-        int periodDays = availableReadingDaysCount(start, end);
-        double requiredPace = periodDays == 0 ? 0.0 : (double) totalPages / periodDays;
-        List<BookDeadline> deadlines = calculateDeadlines(section.books, start, end, dailyPace, activeSimultaneousGroups(section), counter);
-        String overallStatus = totalPages == 0
-                || (periodDays > 0
-                && (deadlines.isEmpty() || !deadlines.get(deadlines.size() - 1).deadline.isAfter(end)))
-                ? "achievable"
-                : "not achievable";
-        return new SectionPlan(section, deadlines, dailyPace, totalPages, requiredPace, overallStatus);
-    }
-
-    private List<BookDeadline> calculateDeadlines(
-            List<Book> books,
-            LocalDate start,
-            LocalDate end,
-            double dailyPace,
-            List<List<Integer>> simultaneousGroups,
-            PageCounter counter
-    ) {
-        List<List<Integer>> groups = validateSimultaneousGroups(books, simultaneousGroups, false);
-        Map<Integer, List<Integer>> groupByFirst = new HashMap<>();
-        Set<Integer> groupedIds = new HashSet<>();
-        for (List<Integer> group : groups) {
-            groupByFirst.put(group.get(0), group);
-            groupedIds.addAll(group);
-        }
-
-        Map<Integer, Book> booksByNumber = new HashMap<>();
-        for (Book book : books) {
-            booksByNumber.put(book.number, book);
-        }
-        List<BookDeadline> deadlines = new ArrayList<>();
-        List<LocalDate> readingDates = availableReadingDays(start, end);
-        int cumulativePages = 0;
-        int previousCumulativeDays = 0;
-        int bookIndex = 0;
-        while (bookIndex < books.size()) {
-            Book book = books.get(bookIndex);
-            if (groupedIds.contains(book.number) && !groupByFirst.containsKey(book.number)) {
-                bookIndex++;
-                continue;
-            }
-            List<Integer> groupIds = groupByFirst.containsKey(book.number)
-                    ? groupByFirst.get(book.number)
-                    : Collections.singletonList(book.number);
-            List<Book> groupBooks = new ArrayList<>();
-            for (Integer groupId : groupIds) {
-                groupBooks.add(booksByNumber.get(groupId));
-            }
-            int groupPages = 0;
-            for (Book groupBook : groupBooks) {
-                groupPages += counter.pages(groupBook);
-            }
-            cumulativePages += groupPages;
-            int cumulativeDays;
-            if (dailyPace <= 0 || cumulativePages == 0) {
-                cumulativeDays = previousCumulativeDays;
-            } else {
-                cumulativeDays = Math.max(1, (int) Math.ceil(cumulativePages / dailyPace - 1e-9));
-            }
-            int daysAllocated = cumulativeDays - previousCumulativeDays;
-            LocalDate deadline;
-            LocalDate groupStart;
-            if (readingDates.isEmpty()) {
-                deadline = end;
-                groupStart = end;
-            } else {
-                deadline = readingDates.get(Math.max(0, Math.min(cumulativeDays, readingDates.size()) - 1));
-                groupStart = daysAllocated == 0 ? deadline : readingDates.get(previousCumulativeDays);
-            }
-            String status;
-            if (deadline.isBefore(end)) {
-                status = "before end";
-            } else if (deadline.equals(end)) {
-                status = "on end date";
-            } else {
-                status = "after end";
-            }
-            int individualCumulativePages = cumulativePages - groupPages;
-            for (Book groupBook : groupBooks) {
-                int bookPages = counter.pages(groupBook);
-                individualCumulativePages += bookPages;
-                double dailyPages;
-                if (bookPages == 0) {
-                    dailyPages = 0.0;
-                } else if (groupBooks.size() == 1) {
-                    dailyPages = dailyPace;
-                } else if (groupPages == 0) {
-                    dailyPages = 0.0;
-                } else {
-                    dailyPages = dailyPace * bookPages / groupPages;
-                }
-                deadlines.add(new BookDeadline(
-                        groupBook,
-                        individualCumulativePages,
-                        groupStart,
-                        deadline,
-                        daysAllocated,
-                        dailyPages,
-                        status
-                ));
-            }
-            previousCumulativeDays = cumulativeDays;
-            bookIndex++;
-        }
-        return deadlines;
-    }
+    PlanSummary buildRemainingPlans() { return scheduler.buildRemainingPlans(); }
 
     List<String[]> allOptionalSummaryRows(List<SectionPlan> sectionPlans, double highestDailyPace) {
         return optionalSummaryRows(sectionPlans, highestDailyPace, new StatsOptions(true, true, true, true, true));
     }
 
-    private List<String[]> optionalSummaryRows(List<SectionPlan> sectionPlans, double highestDailyPace) {
+    List<String[]> optionalSummaryRows(List<SectionPlan> sectionPlans, double highestDailyPace) {
         return optionalSummaryRows(sectionPlans, highestDailyPace, statsOptions);
     }
 
@@ -1808,99 +1298,12 @@ public class MainActivity extends Activity {
     }
 
     void addReadingSession(Book book, LocalDate sessionDate, int currentPage, String sectionLabel) {
-        int previousPagesRead = completedUnits(book, sectionLabel);
-        setBookProgress(book, currentPage, sectionLabel);
-        int pagesRead = completedUnits(book, sectionLabel) - previousPagesRead;
-        if (pagesRead <= 0) {
-            throw new IllegalArgumentException(isAudiobookSection(sectionLabel)
-                    ? "time left must be less than the previously recorded time left"
-                    : "current page must be after the previously recorded page");
-        }
-        book.readingSessions.add(new ReadingSession(sessionDate, currentPage, pagesRead));
+        bookProgress.addReadingSession(book, sessionDate, currentPage, sectionLabel);
     }
 
-    void removeReadingSession(Book book, int index) {
-        if (index < 0 || index >= book.readingSessions.size()) {
-            throw new IllegalArgumentException("reading session not found");
-        }
-        book.readingSessions.remove(index);
-        if (book.readingSessions.isEmpty()) {
-            book.currentPage = null;
-            return;
-        }
-        int max = book.readingSessions.get(0).currentPage;
-        for (ReadingSession session : book.readingSessions) {
-            max = Math.max(max, session.currentPage);
-        }
-        book.currentPage = max;
-    }
+    void removeReadingSession(Book book, int index) { bookProgress.removeReadingSession(book, index); }
 
-    private void setBookProgress(Book book, int currentPage, String sectionLabel) {
-        if (currentPage < book.startPage) {
-            throw new IllegalArgumentException(isAudiobookSection(sectionLabel)
-                    ? "time left cannot be greater than the audiobook duration"
-                    : "current page cannot be before the book's start page");
-        }
-        if (currentPage > book.endPage) {
-            throw new IllegalArgumentException(isAudiobookSection(sectionLabel)
-                    ? "time left cannot be negative"
-                    : "current page cannot be after the book's end page");
-        }
-        book.currentPage = currentPage;
-    }
-
-    void moveSelectedBook(BookSection section, int offset) {
-        if (!hasSelectedBook(section)) {
-            showError("Select a book first");
-            return;
-        }
-        Book selected = section.books.get(selectedBookIndex);
-        List<List<Book>> oldGroupBooks = new ArrayList<>();
-        for (List<Integer> group : section.simultaneousGroups) {
-            List<Book> groupBooks = new ArrayList<>();
-            for (Integer id : group) {
-                groupBooks.add(section.books.get(id - 1));
-            }
-            oldGroupBooks.add(groupBooks);
-        }
-        int[] block = moveBlockRange(section, selectedBookIndex);
-        if (offset < 0) {
-            if (block[0] == 0) {
-                return;
-            }
-            int[] adjacent = moveBlockRange(section, block[0] - 1);
-            List<Book> moving = new ArrayList<>(section.books.subList(block[0], block[1] + 1));
-            List<Book> adjacentBooks = new ArrayList<>(section.books.subList(adjacent[0], adjacent[1] + 1));
-            section.books.subList(adjacent[0], block[1] + 1).clear();
-            section.books.addAll(adjacent[0], moving);
-            section.books.addAll(adjacent[0] + moving.size(), adjacentBooks);
-        } else {
-            if (block[1] == section.books.size() - 1) {
-                return;
-            }
-            int[] adjacent = moveBlockRange(section, block[1] + 1);
-            List<Book> moving = new ArrayList<>(section.books.subList(block[0], block[1] + 1));
-            List<Book> adjacentBooks = new ArrayList<>(section.books.subList(adjacent[0], adjacent[1] + 1));
-            section.books.subList(block[0], adjacent[1] + 1).clear();
-            section.books.addAll(block[0], adjacentBooks);
-            section.books.addAll(block[0] + adjacentBooks.size(), moving);
-        }
-        renumberBooks(section.books);
-        section.simultaneousGroups = remapGroupsByBookIdentity(section.books, oldGroupBooks);
-        selectedBookIndex = section.books.indexOf(selected);
-        invalidateBaselineSchedules(section);
-        afterStateChange("Book moved");
-    }
-
-    private int[] moveBlockRange(BookSection section, int index) {
-        int bookId = index + 1;
-        for (List<Integer> group : section.simultaneousGroups) {
-            if (group.contains(bookId)) {
-                return new int[]{group.get(0) - 1, group.get(group.size() - 1) - 1};
-            }
-        }
-        return new int[]{index, index};
-    }
+    void moveSelectedBook(BookSection section, int offset) { bookProgress.moveSelectedBook(section, offset); }
 
     BookFields readBookFields(String sectionLabel, EditText titleInput, EditText startPageInput, EditText endPageInput, String defaultTitle, Integer defaultStart, Integer defaultEnd) {
         try {
@@ -1966,79 +1369,24 @@ public class MainActivity extends Activity {
         return sectionByLabelFromList(sections, label);
     }
 
-    private static LocalDate nextQuarterStart(LocalDate today) {
-        for (int month : new int[]{1, 4, 7, 10}) {
-            LocalDate candidate = LocalDate.of(today.getYear(), month, 1);
-            if (candidate.isAfter(today)) {
-                return candidate;
-            }
-        }
-        return LocalDate.of(today.getYear() + 1, 1, 1);
-    }
+    private static LocalDate nextQuarterStart(LocalDate today) { return ReadingPlanCalendar.nextQuarterStart(today); }
 
-    static LocalDate periodEndFromStart(LocalDate start) {
-        return start.plusMonths(3).minusDays(1);
-    }
+    static LocalDate periodEndFromStart(LocalDate start) { return ReadingPlanCalendar.periodEndFromStart(start); }
 
-    boolean isRestDay(LocalDate value) {
-        for (RestDayRange range : restDays) {
-            if (!value.isBefore(range.startDate) && !value.isAfter(range.endDate)) {
-                return true;
-            }
-        }
-        return false;
-    }
+    boolean isRestDay(LocalDate value) { return calendar.isRestDay(value); }
 
     List<LocalDate> availableReadingDays(LocalDate start, LocalDate end) {
-        List<LocalDate> dates = new ArrayList<>();
-        for (LocalDate current = start; !current.isAfter(end); current = current.plusDays(1)) {
-            if (!isRestDay(current)) {
-                dates.add(current);
-            }
-        }
-        return dates;
+        return calendar.availableReadingDays(start, end);
     }
 
     int availableReadingDaysCount(LocalDate start, LocalDate end) {
-        return availableReadingDays(start, end).size();
+        return calendar.availableReadingDaysCount(start, end);
     }
 
-    void normalizeRestDayRanges() {
-        restDays.sort((left, right) -> left.startDate.compareTo(right.startDate));
-        List<RestDayRange> merged = new ArrayList<>();
-        for (RestDayRange range : restDays) {
-            if (merged.isEmpty()
-                    || range.startDate.isAfter(merged.get(merged.size() - 1).endDate.plusDays(1))) {
-                merged.add(range);
-            } else {
-                RestDayRange previous = merged.remove(merged.size() - 1);
-                merged.add(new RestDayRange(
-                        previous.startDate,
-                        previous.endDate.isAfter(range.endDate) ? previous.endDate : range.endDate
-                ));
-            }
-        }
-        restDays.clear();
-        restDays.addAll(merged);
-    }
+    void normalizeRestDayRanges() { calendar.normalizeRestDayRanges(); }
 
-    private static int inclusiveDaysBetween(LocalDate start, LocalDate end) {
-        return (int) ChronoUnit.DAYS.between(start, end) + 1;
-    }
-
-    private LocalDate effectiveRemainingStartDate(LocalDate start, LocalDate end, LocalDate today) {
-        LocalDate candidate;
-        if (today.isBefore(start)) {
-            candidate = start;
-        } else if (today.isAfter(end)) {
-            candidate = end;
-        } else {
-            candidate = today;
-        }
-        for (LocalDate readingDay : availableReadingDays(candidate, end)) {
-            return readingDay;
-        }
-        return end;
+    LocalDate effectiveRemainingStartDate(LocalDate start, LocalDate end, LocalDate today) {
+        return calendar.effectiveRemainingStartDate(start, end, today);
     }
 
     private static double averagePages(SectionPlan plan) {
@@ -2062,9 +1410,7 @@ public class MainActivity extends Activity {
         return "You finish " + lateDays + " day" + (lateDays == 1 ? "" : "s") + " after the " + endName + ".";
     }
 
-    static int clamp(int value, int min, int max) {
-        return Math.min(Math.max(value, min), max);
-    }
+    static int clamp(int value, int min, int max) { return ReadingPlanCalendar.clamp(value, min, max); }
 
     int dp(int value) {
         float density = getResources().getDisplayMetrics().density;
@@ -2077,41 +1423,6 @@ public class MainActivity extends Activity {
 
     static String format2(double value) {
         return String.format(Locale.US, "%.2f", value);
-    }
-
-    private static String groupsToText(List<List<Integer>> groups) {
-        List<String> groupTexts = new ArrayList<>();
-        for (List<Integer> group : groups) {
-            List<String> ids = new ArrayList<>();
-            for (Integer id : group) {
-                ids.add(String.valueOf(id));
-            }
-            groupTexts.add(String.join(",", ids));
-        }
-        return String.join("; ", groupTexts);
-    }
-
-    private static String groupsCompact(List<List<Integer>> groups) {
-        return groupsToText(groups).replace("; ", ";");
-    }
-
-    private static void writeCsvRow(StringBuilder out, List<String> row) {
-        for (int i = 0; i < row.size(); i++) {
-            if (i > 0) {
-                out.append(',');
-            }
-            out.append(escapeCsv(row.get(i)));
-        }
-        out.append('\n');
-    }
-
-    private static String escapeCsv(String value) {
-        if (value == null) {
-            return "";
-        }
-        boolean needsQuotes = value.contains(",") || value.contains("\"") || value.contains("\n") || value.contains("\r");
-        String escaped = value.replace("\"", "\"\"");
-        return needsQuotes ? "\"" + escaped + "\"" : escaped;
     }
 
     static class SimpleTextWatcher implements TextWatcher {

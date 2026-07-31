@@ -237,12 +237,12 @@
           },
           "deadline_override": null,
           "start_date_override": "2026-07-01",
-          "target_completed_date": "2026-07-29",
+          "target_completed_date": "2026-07-30",
           "start_page": 1,
           "end_page": 350,
-          "current_page": 135,
+          "current_page": 143,
           "pages": 350,
-          "pages_read": 135,
+          "pages_read": 143,
           "reading_sessions": [
             {
               "date": "2026-07-06",
@@ -283,6 +283,16 @@
               "date": "2026-07-29",
               "current_page": 135,
               "pages_read": 4
+            },
+            {
+              "date": "2026-07-30",
+              "current_page": 140,
+              "pages_read": 5
+            },
+            {
+              "date": "2026-07-31",
+              "current_page": 143,
+              "pages_read": 3
             }
           ]
         }
