@@ -60,12 +60,12 @@
           },
           "deadline_override": "2026-09-13",
           "start_date_override": "2026-07-01",
-          "target_completed_date": "2026-07-26",
+          "target_completed_date": "2026-07-29",
           "start_page": 1,
           "end_page": 669,
-          "current_page": 340,
+          "current_page": 354,
           "pages": 669,
-          "pages_read": 340,
+          "pages_read": 354,
           "reading_sessions": [
             {
               "date": "2026-07-06",
@@ -121,6 +121,11 @@
               "date": "2026-07-26",
               "current_page": 340,
               "pages_read": 20
+            },
+            {
+              "date": "2026-07-28",
+              "current_page": 354,
+              "pages_read": 14
             }
           ]
         },
@@ -134,12 +139,12 @@
           },
           "deadline_override": "2026-09-13",
           "start_date_override": "2026-07-01",
-          "target_completed_date": "2026-07-26",
+          "target_completed_date": "2026-08-01",
           "start_page": 1,
           "end_page": 559,
-          "current_page": 193,
+          "current_page": 209,
           "pages": 559,
-          "pages_read": 193,
+          "pages_read": 209,
           "reading_sessions": [
             {
               "date": "2026-07-06",
@@ -170,6 +175,11 @@
               "date": "2026-07-26",
               "current_page": 193,
               "pages_read": 15
+            },
+            {
+              "date": "2026-08-01",
+              "current_page": 209,
+              "pages_read": 16
             }
           ]
         },
@@ -232,12 +242,12 @@
           },
           "deadline_override": null,
           "start_date_override": "2026-07-01",
-          "target_completed_date": "2026-07-27",
+          "target_completed_date": "2026-08-01",
           "start_page": 1,
           "end_page": 350,
-          "current_page": 126,
+          "current_page": 148,
           "pages": 350,
-          "pages_read": 126,
+          "pages_read": 148,
           "reading_sessions": [
             {
               "date": "2026-07-06",
@@ -268,6 +278,31 @@
               "date": "2026-07-27",
               "current_page": 126,
               "pages_read": 4
+            },
+            {
+              "date": "2026-07-28",
+              "current_page": 131,
+              "pages_read": 5
+            },
+            {
+              "date": "2026-07-29",
+              "current_page": 135,
+              "pages_read": 4
+            },
+            {
+              "date": "2026-07-30",
+              "current_page": 140,
+              "pages_read": 5
+            },
+            {
+              "date": "2026-07-31",
+              "current_page": 143,
+              "pages_read": 3
+            },
+            {
+              "date": "2026-08-01",
+              "current_page": 148,
+              "pages_read": 5
             }
           ]
         }
@@ -346,19 +381,25 @@
           "baseline_schedule": null,
           "deadline_override": null,
           "start_date_override": null,
-          "target_completed_date": "2026-07-27",
+          "target_completed_date": "2026-07-29",
           "start_time_seconds": 0,
           "end_time_seconds": 60414,
-          "current_time_seconds": 1106,
+          "current_time_seconds": 6107,
           "duration_seconds": 60414,
-          "time_listened_seconds": 1106,
-          "remaining_time_seconds": 59308,
+          "time_listened_seconds": 6107,
+          "remaining_time_seconds": 54307,
           "reading_sessions": [
             {
               "date": "2026-07-27",
               "current_time_seconds": 1106,
               "time_listened_seconds": 1106,
               "remaining_time_seconds": 59308
+            },
+            {
+              "date": "2026-07-29",
+              "current_time_seconds": 6107,
+              "time_listened_seconds": 5001,
+              "remaining_time_seconds": 54307
             }
           ]
         }

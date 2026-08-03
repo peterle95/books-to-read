@@ -167,10 +167,24 @@ class BaselineSchedulePersistenceTests(unittest.TestCase):
         )
         plan = plans[0]
 
-        self.assertEqual(date(2026, 7, 10), plan.deadlines[0].start_date)
+        self.assertEqual(date(2026, 7, 1), plan.deadlines[0].start_date)
         self.assertEqual(date(2026, 9, 30), plan.deadlines[0].deadline)
         self.assertAlmostEqual(90 / 83, plan.deadlines[0].daily_pages)
         self.assertAlmostEqual(90 / 83, plan.daily_pace)
+
+    def test_audiobook_start_date_uses_the_persisted_baseline(self):
+        sections = [
+            BookSection("Physical books", [], []),
+            BookSection("Digital books", [], []),
+            BookSection("Audiobooks", [Book(1, "One", 0, 3600)], []),
+        ]
+        calculate_baseline_schedules(sections, date(2026, 7, 1), date(2026, 9, 30))
+
+        plans, *_ = build_remaining_section_plans(
+            sections, date(2026, 7, 1), date(2026, 9, 30), date(2026, 7, 2)
+        )
+
+        self.assertEqual(date(2026, 7, 1), plans[2].deadlines[0].start_date)
 
 
     def test_structural_changes_round_trip_without_rewriting_the_baseline(self):
