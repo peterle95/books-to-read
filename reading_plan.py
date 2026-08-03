@@ -1049,8 +1049,10 @@ def build_remaining_section_plan(
         not section.baseline_needs_recalculation
         and all(book.baseline_schedule is not None for book in section.books)
     )
-    if has_complete_baselines and (
-        rest_days or any(book.start_date_override is not None for book in section.books)
+    if (
+        has_complete_baselines
+        and not rest_days
+        and not any(book.deadline_override is not None for book in section.books)
     ):
         return _build_remaining_from_baselines(
             section, start_date, end_date, today, rest_days

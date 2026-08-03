@@ -27,7 +27,7 @@
           "baseline_schedule": {
             "start_date": "2026-07-05",
             "deadline": "2026-09-13",
-            "daily_target": 0.803921568627451
+            "daily_target": 0
           },
           "deadline_override": "2026-09-13",
           "start_date_override": null,
@@ -56,7 +56,7 @@
           "baseline_schedule": {
             "start_date": "2026-07-01",
             "deadline": "2026-09-13",
-            "daily_target": 7.7555555555555555
+            "daily_target": 8.513513513513514
           },
           "deadline_override": "2026-09-13",
           "start_date_override": "2026-07-01",
@@ -135,16 +135,16 @@
           "baseline_schedule": {
             "start_date": "2026-07-01",
             "deadline": "2026-09-13",
-            "daily_target": 7.775510204081633
+            "daily_target": 9.054054054054054
           },
           "deadline_override": "2026-09-13",
           "start_date_override": "2026-07-01",
-          "target_completed_date": "2026-07-29",
+          "target_completed_date": "2026-08-02",
           "start_page": 1,
           "end_page": 559,
-          "current_page": 193,
+          "current_page": 224,
           "pages": 559,
-          "pages_read": 193,
+          "pages_read": 224,
           "reading_sessions": [
             {
               "date": "2026-07-06",
@@ -174,6 +174,16 @@
             {
               "date": "2026-07-26",
               "current_page": 193,
+              "pages_read": 15
+            },
+            {
+              "date": "2026-08-01",
+              "current_page": 209,
+              "pages_read": 16
+            },
+            {
+              "date": "2026-08-02",
+              "current_page": 224,
               "pages_read": 15
             }
           ]
@@ -233,16 +243,16 @@
           "baseline_schedule": {
             "start_date": "2026-07-01",
             "deadline": "2026-09-30",
-            "daily_target": 3.712121212121212
+            "daily_target": 3.6296296296296298
           },
           "deadline_override": null,
           "start_date_override": "2026-07-01",
-          "target_completed_date": "2026-07-30",
+          "target_completed_date": "2026-08-03",
           "start_page": 1,
           "end_page": 350,
-          "current_page": 143,
+          "current_page": 158,
           "pages": 350,
-          "pages_read": 143,
+          "pages_read": 158,
           "reading_sessions": [
             {
               "date": "2026-07-06",
@@ -293,6 +303,26 @@
               "date": "2026-07-31",
               "current_page": 143,
               "pages_read": 3
+            },
+            {
+              "date": "2026-08-01",
+              "current_page": 148,
+              "pages_read": 5
+            },
+            {
+              "date": "2026-08-02",
+              "current_page": 150,
+              "pages_read": 2
+            },
+            {
+              "date": "2026-08-02",
+              "current_page": 154,
+              "pages_read": 4
+            },
+            {
+              "date": "2026-08-03",
+              "current_page": 158,
+              "pages_read": 4
             }
           ]
         }
@@ -301,18 +331,18 @@
     },
     {
       "label": "Audiobooks",
-      "baseline_needs_recalculation": true,
+      "baseline_needs_recalculation": false,
       "books": [
         {
           "number": 1,
           "title": "pane e bugie",
           "baseline_schedule": {
-            "start_date": "2026-07-05",
-            "deadline": "2026-07-31",
-            "daily_target": 798
+            "start_date": "2026-07-14",
+            "deadline": "2026-08-01",
+            "daily_target": 0
           },
           "deadline_override": "2026-07-31",
-          "start_date_override": null,
+          "start_date_override": "2026-07-14",
           "target_completed_date": "2026-07-22",
           "start_time_seconds": 0,
           "end_time_seconds": 29820,
@@ -368,9 +398,13 @@
         {
           "number": 2,
           "title": "Red Moon",
-          "baseline_schedule": null,
+          "baseline_schedule": {
+            "start_date": "2026-07-26",
+            "deadline": "2026-09-30",
+            "daily_target": 1005.6851851851852
+          },
           "deadline_override": null,
-          "start_date_override": null,
+          "start_date_override": "2026-07-26",
           "target_completed_date": "2026-07-29",
           "start_time_seconds": 0,
           "end_time_seconds": 60414,
