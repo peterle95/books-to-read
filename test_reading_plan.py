@@ -8,6 +8,7 @@ from reading_plan import (
     Book,
     BookDeadline,
     BookSection,
+    ExternalPlanChangeError,
     RestDayRange,
     SummaryStatsOptions,
     available_reading_days,
@@ -20,6 +21,7 @@ from reading_plan import (
     build_remaining_section_plans,
     calculate_baseline_schedules,
     load_json_plan,
+    ensure_json_plan_unchanged,
     recalculate_baseline_schedules,
     write_json_plan,
 )
@@ -51,7 +53,9 @@ class BaselineSchedulePersistenceTests(unittest.TestCase):
             )
             payload = json.loads(path.read_text(encoding="utf-8"))
 
-        self.assertEqual(7, payload["schema_version"])
+        self.assertEqual(8, payload["schema_version"])
+        self.assertEqual(1, payload["revision"])
+        self.assertIn("id", payload["sections"][0]["books"][0])
         self.assertEqual(
             {
                 "start_date": "2026-07-01",
@@ -925,6 +929,103 @@ class DeadlineOverrideTests(unittest.TestCase):
         self.assertEqual(date(2026, 8, 1), loaded_sections[0].books[0].deadline_override)
 
 
+
+
+class SyncPersistenceTests(unittest.TestCase):
+    def test_load_preserves_android_fields_and_does_not_write(self):
+        payload = {
+            "schema_version": 8,
+            "revision": 12,
+            "last_modified": "2026-08-04T08:55:00+02:00",
+            "modified_by": "android-phone",
+            "start_date": "2026-07-01",
+            "end_date": "2026-09-30",
+            "end_label": "Quarter end",
+            "sections": [{
+                "label": "Physical books",
+                "books": [{
+                    "id": "book-uuid",
+                    "title": "One",
+                    "start_page": 1,
+                    "end_page": 10,
+                    "target_completed_date": "2026-08-03",
+                    "baseline_schedule": {"start_date": "2026-07-01", "deadline": "2026-09-30", "daily_target": 1},
+                    "reading_sessions": [{"id": "session-uuid", "date": "2026-08-03", "current_page": 3, "pages_read": 3}],
+                }],
+                "simultaneous_groups": [],
+            }],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "plan.json"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            original = path.read_bytes()
+            sections, *_ = load_json_plan(str(path))
+
+            self.assertEqual(original, path.read_bytes())
+            self.assertEqual("book-uuid", sections[0].books[0].id)
+            self.assertEqual("session-uuid", sections[0].books[0].reading_sessions[0].id)
+            self.assertEqual(date(2026, 8, 3), sections[0].books[0].target_completed_date)
+
+    def test_stale_loaded_hash_rejects_blind_overwrite(self):
+        sections = [
+            BookSection("Physical books", [Book(1, "One", 1, 10)], []),
+            BookSection("Digital books", [], []),
+            BookSection("Audiobooks", [], []),
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "plan.json"
+            loaded = write_json_plan(
+                str(path), sections, date(2026, 7, 1), date(2026, 9, 30),
+                "Quarter end", SummaryStatsOptions(True, True, True, True, True),
+            )
+            changed = json.loads(path.read_text(encoding="utf-8"))
+            changed["revision"] = 2
+            path.write_text(json.dumps(changed), encoding="utf-8")
+
+            with self.assertRaises(ExternalPlanChangeError):
+                ensure_json_plan_unchanged(str(path), loaded)
+
+    def test_legacy_current_page_is_not_reduced_by_older_session(self):
+        payload = {
+            "schema_version": 7,
+            "start_date": "2026-07-01",
+            "end_date": "2026-09-30",
+            "sections": [{
+                "label": "Physical books",
+                "books": [{
+                    "title": "One",
+                    "start_page": 1,
+                    "end_page": 100,
+                    "current_page": 100,
+                    "baseline_schedule": {"start_date": "2026-07-01", "deadline": "2026-09-30", "daily_target": 1},
+                    "reading_sessions": [{"date": "2026-08-01", "current_page": 50, "pages_read": 50}],
+                }],
+                "simultaneous_groups": [],
+            }],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "plan.json"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            sections, *_ = load_json_plan(str(path))
+
+        self.assertEqual(100, sections[0].books[0].current_page)
+
+    def test_unknown_stable_group_id_is_a_validation_error(self):
+        payload = {
+            "schema_version": 8,
+            "start_date": "2026-07-01",
+            "end_date": "2026-09-30",
+            "sections": [{
+                "label": "Physical books",
+                "books": [{"id": "book-id", "title": "One", "start_page": 1, "end_page": 10}],
+                "simultaneous_groups": [["missing-id"]],
+            }],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "plan.json"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            with self.assertRaises(ValueError):
+                load_json_plan(str(path))
 
 
 if __name__ == "__main__":
