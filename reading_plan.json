@@ -135,16 +135,16 @@
           "baseline_schedule": {
             "start_date": "2026-07-01",
             "deadline": "2026-09-13",
-            "daily_target": 9.054054054054054
+            "daily_target": 9.891891891891891
           },
           "deadline_override": "2026-09-13",
           "start_date_override": "2026-07-01",
-          "target_completed_date": "2026-08-02",
+          "target_completed_date": "2026-08-03",
           "start_page": 1,
           "end_page": 559,
-          "current_page": 224,
+          "current_page": 243,
           "pages": 559,
-          "pages_read": 224,
+          "pages_read": 243,
           "reading_sessions": [
             {
               "date": "2026-07-06",
@@ -185,6 +185,11 @@
               "date": "2026-08-02",
               "current_page": 224,
               "pages_read": 15
+            },
+            {
+              "date": "2026-08-03",
+              "current_page": 243,
+              "pages_read": 19
             }
           ]
         },
@@ -243,7 +248,7 @@
           "baseline_schedule": {
             "start_date": "2026-07-01",
             "deadline": "2026-09-30",
-            "daily_target": 3.6296296296296298
+            "daily_target": 3.9814814814814814
           },
           "deadline_override": null,
           "start_date_override": "2026-07-01",
@@ -337,12 +342,12 @@
           "number": 1,
           "title": "pane e bugie",
           "baseline_schedule": {
-            "start_date": "2026-07-14",
+            "start_date": "2026-07-01",
             "deadline": "2026-08-01",
             "daily_target": 0
           },
           "deadline_override": "2026-07-31",
-          "start_date_override": "2026-07-14",
+          "start_date_override": "2026-07-01",
           "target_completed_date": "2026-07-22",
           "start_time_seconds": 0,
           "end_time_seconds": 29820,
@@ -401,17 +406,17 @@
           "baseline_schedule": {
             "start_date": "2026-07-26",
             "deadline": "2026-09-30",
-            "daily_target": 1005.6851851851852
+            "daily_target": 945.3518518518518
           },
           "deadline_override": null,
           "start_date_override": "2026-07-26",
-          "target_completed_date": "2026-07-29",
+          "target_completed_date": "2026-08-03",
           "start_time_seconds": 0,
           "end_time_seconds": 60414,
-          "current_time_seconds": 6107,
+          "current_time_seconds": 11454,
           "duration_seconds": 60414,
-          "time_listened_seconds": 6107,
-          "remaining_time_seconds": 54307,
+          "time_listened_seconds": 11454,
+          "remaining_time_seconds": 48960,
           "reading_sessions": [
             {
               "date": "2026-07-27",
@@ -424,6 +429,18 @@
               "current_time_seconds": 6107,
               "time_listened_seconds": 5001,
               "remaining_time_seconds": 54307
+            },
+            {
+              "date": "2026-08-03",
+              "current_time_seconds": 9365,
+              "time_listened_seconds": 3258,
+              "remaining_time_seconds": 51049
+            },
+            {
+              "date": "2026-08-03",
+              "current_time_seconds": 11454,
+              "time_listened_seconds": 2089,
+              "remaining_time_seconds": 48960
             }
           ]
         }
