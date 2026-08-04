@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import calendar
 import csv
+import hashlib
 import json
 import math
+import os
+import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from uuid import uuid4
 
 
 DATE_FORMAT = "%Y-%m-%d"
@@ -54,6 +58,20 @@ class ReadingSession:
     date: date
     current_page: int
     pages_read: int
+    id: str = field(default_factory=lambda: str(uuid4()))
+    deleted: bool = False
+
+
+@dataclass(frozen=True)
+class JsonPlanMetadata:
+    revision: int
+    last_modified: str | None
+    modified_by: str | None
+    sha256: str
+
+
+class ExternalPlanChangeError(ValueError):
+    """The document changed after it was loaded and cannot be safely overwritten."""
 
 
 @dataclass
@@ -98,11 +116,13 @@ class Book:
     title: str
     start_page: int
     end_page: int
+    id: str = field(default_factory=lambda: str(uuid4()))
     current_page: int | None = None
     reading_sessions: list[ReadingSession] = field(default_factory=list)
     baseline_schedule: BaselineSchedule | None = None
     deadline_override: date | None = None
     start_date_override: date | None = None
+    target_completed_date: date | None = None
 
     @property
     def pages(self) -> int:
@@ -380,13 +400,34 @@ def add_reading_session(
 
 def remove_reading_session(book: Book, session_index: int) -> None:
     try:
-        book.reading_sessions.pop(session_index)
+        book.reading_sessions[session_index].deleted = True
     except IndexError as error:
         raise ValueError("reading session not found") from error
-    if not book.reading_sessions:
+    active_sessions = [session for session in book.reading_sessions if not session.deleted]
+    if not active_sessions:
         book.current_page = None
         return
-    book.current_page = max(session.current_page for session in book.reading_sessions)
+    book.current_page = max(session.current_page for session in active_sessions)
+
+
+def merge_reading_sessions(
+    sessions: list[ReadingSession],
+) -> list[ReadingSession]:
+    """Deduplicate immutable session events and reject conflicting UUID reuse."""
+    by_id: dict[str, ReadingSession] = {}
+    for session in sessions:
+        existing = by_id.get(session.id)
+        if existing is None:
+            by_id[session.id] = session
+        elif (
+            existing.date != session.date
+            or existing.current_page != session.current_page
+            or existing.pages_read != session.pages_read
+        ):
+            raise ValueError("conflicting reading session UUID")
+        elif session.deleted:
+            existing.deleted = True
+    return sorted(by_id.values(), key=lambda session: (session.date, session.id))
 
 
 def renumber_books(books: list[Book]) -> None:
@@ -1810,6 +1851,7 @@ def reading_session_to_json(
 ) -> dict[str, object]:
     if is_audiobook_section(section_label):
         payload: dict[str, object] = {
+            "id": session.id,
             "date": session.date.isoformat(),
             "current_time_seconds": session.current_page,
             "time_listened_seconds": session.pages_read,
@@ -1818,12 +1860,18 @@ def reading_session_to_json(
             payload["remaining_time_seconds"] = remaining_time_at_current(
                 book, session.current_page
             )
+        if session.deleted:
+            payload["deleted"] = True
         return payload
-    return {
+    payload = {
+        "id": session.id,
         "date": session.date.isoformat(),
         "current_page": session.current_page,
         "pages_read": session.pages_read,
     }
+    if session.deleted:
+        payload["deleted"] = True
+    return payload
 
 
 def parse_session_date(value: object) -> date:
@@ -1857,6 +1905,7 @@ def book_to_json(book: Book, section_label: str) -> dict[str, object]:
     )
     if is_audiobook_section(section_label):
         return {
+            "id": book.id,
             "number": book.number,
             "title": book.title,
             "start_time_seconds": book.start_page,
@@ -1872,12 +1921,18 @@ def book_to_json(book: Book, section_label: str) -> dict[str, object]:
             "baseline_schedule": baseline_schedule,
             "deadline_override": deadline_override,
             "start_date_override": start_date_override,
+            "target_completed_date": (
+                None
+                if book.target_completed_date is None
+                else book.target_completed_date.isoformat()
+            ),
             "reading_sessions": [
                 reading_session_to_json(session, section_label, book)
                 for session in book.reading_sessions
             ],
         }
     return {
+        "id": book.id,
         "number": book.number,
         "title": book.title,
         "start_page": book.start_page,
@@ -1888,6 +1943,11 @@ def book_to_json(book: Book, section_label: str) -> dict[str, object]:
         "baseline_schedule": baseline_schedule,
         "deadline_override": deadline_override,
         "start_date_override": start_date_override,
+        "target_completed_date": (
+            None
+            if book.target_completed_date is None
+            else book.target_completed_date.isoformat()
+        ),
         "reading_sessions": [
             reading_session_to_json(session, section_label)
             for session in book.reading_sessions
@@ -1895,7 +1955,10 @@ def book_to_json(book: Book, section_label: str) -> dict[str, object]:
     }
 
 def book_from_json(
-    value: object, fallback_number: int, section_label: str
+    value: object,
+    fallback_number: int,
+    section_label: str,
+    derive_progress_from_sessions: bool = False,
 ) -> Book:
     if not isinstance(value, dict):
         raise ValueError("each book must be a JSON object")
@@ -1955,6 +2018,8 @@ def book_from_json(
     for raw_session in raw_sessions:
         if not isinstance(raw_session, dict):
             raise ValueError("each reading session must be a JSON object")
+        session_id = str(raw_session.get("id", "")).strip() or str(uuid4())
+        deleted = raw_session.get("deleted") is True
         session_date = parse_session_date(raw_session)
         try:
             if is_audiobook_section(section_label):
@@ -2024,14 +2089,24 @@ def book_from_json(
             raise ValueError("reading session pages must be positive")
         session_current_page = min(max(session_current_page, start_page), end_page)
         reading_sessions.append(
-            ReadingSession(session_date, session_current_page, session_pages_read)
+            ReadingSession(
+                session_date,
+                session_current_page,
+                session_pages_read,
+                session_id,
+                deleted,
+            )
         )
         previous_current_page = max(
             previous_current_page or session_current_page, session_current_page
         )
 
-    if current_page is None and reading_sessions:
-        current_page = max(session.current_page for session in reading_sessions)
+    reading_sessions = merge_reading_sessions(reading_sessions)
+    active_sessions = [session for session in reading_sessions if not session.deleted]
+    if derive_progress_from_sessions and not active_sessions and reading_sessions:
+        current_page = None
+    elif active_sessions and (derive_progress_from_sessions or current_page is None):
+        current_page = max(session.current_page for session in active_sessions)
     elif current_page is None and pages_read > 0:
         current_page = (
             start_page + pages_read
@@ -2071,31 +2146,46 @@ def book_from_json(
         except ValueError as error:
             raise ValueError("invalid start_date_override") from error
 
+    raw_target_completed_date = value.get("target_completed_date")
+    target_completed_date: date | None = None
+    if raw_target_completed_date not in (None, ""):
+        try:
+            target_completed_date = parse_date(str(raw_target_completed_date))
+        except ValueError as error:
+            raise ValueError("invalid target_completed_date") from error
+
     return Book(
         number=fallback_number,
         title=title,
         start_page=start_page,
         end_page=end_page,
+        id=str(value.get("id", "")).strip() or str(uuid4()),
         current_page=current_page,
         reading_sessions=reading_sessions,
         baseline_schedule=baseline_schedule,
         deadline_override=deadline_override,
         start_date_override=start_date_override,
+        target_completed_date=target_completed_date,
     )
 
 
 def book_section_to_json(section: BookSection) -> dict[str, object]:
+    book_ids = {book.number: book.id for book in section.books}
+    try:
+        groups = [[book_ids[book_number] for book_number in group] for group in section.simultaneous_groups]
+    except KeyError as error:
+        raise ValueError("simultaneous group references an unknown book") from error
     return {
         "label": section.label,
         "baseline_needs_recalculation": section.baseline_needs_recalculation,
         "books": [book_to_json(book, section.label) for book in section.books],
-        "simultaneous_groups": [
-            list(group) for group in section.simultaneous_groups
-        ],
+        "simultaneous_groups": groups,
     }
 
 
-def book_section_from_json(value: object, default_label: str) -> BookSection:
+def book_section_from_json(
+    value: object, default_label: str, derive_progress_from_sessions: bool = False
+) -> BookSection:
     if not isinstance(value, dict):
         raise ValueError("each section must be a JSON object")
     label = canonical_section_label(value.get("label", default_label), default_label)
@@ -2105,7 +2195,12 @@ def book_section_from_json(value: object, default_label: str) -> BookSection:
     if not isinstance(raw_books, list):
         raise ValueError(f"{label} books must be a list")
     books = [
-        book_from_json(book_value, fallback_number=index, section_label=label)
+        book_from_json(
+            book_value,
+            fallback_number=index,
+            section_label=label,
+            derive_progress_from_sessions=derive_progress_from_sessions,
+        )
         for index, book_value in enumerate(raw_books, start=1)
     ]
     renumber_books(books)
@@ -2114,14 +2209,24 @@ def book_section_from_json(value: object, default_label: str) -> BookSection:
     if not isinstance(raw_groups, list):
         raise ValueError(f"{label} simultaneous groups must be a list")
     groups: list[tuple[int, ...]] = []
+    book_numbers_by_id = {book.id: book.number for book in books}
     for raw_group in raw_groups:
         if not isinstance(raw_group, list):
             raise ValueError(f"{label} simultaneous groups must be lists")
         try:
-            groups.append(tuple(int(book_id) for book_id in raw_group))
-        except (TypeError, ValueError) as error:
+            groups.append(
+                tuple(
+                    int(book_id)
+                    if isinstance(book_id, str) and book_id.strip().isdigit()
+                    else book_numbers_by_id[str(book_id)]
+                    if isinstance(book_id, str)
+                    else int(book_id)
+                    for book_id in raw_group
+                )
+            )
+        except (KeyError, TypeError, ValueError) as error:
             raise ValueError(
-                f"{label} simultaneous group IDs must be whole numbers"
+                f"{label} simultaneous group references an unknown book"
             ) from error
     return BookSection(
         label,
@@ -2162,15 +2267,16 @@ def rest_day_ranges_from_json(value: object) -> list[RestDayRange]:
     return normalize_rest_day_ranges(ranges)
 
 
-def write_json_plan(
-    filename: str,
+def json_plan_payload(
     sections: list[BookSection],
     start_date: date,
     end_date: date,
     end_label: str,
     stats_options: SummaryStatsOptions,
     rest_days: list[RestDayRange] | None = None,
-) -> None:
+    metadata: JsonPlanMetadata | None = None,
+    modified_by: str = "desktop",
+) -> dict[str, object]:
     if (
         not any(section.baseline_needs_recalculation for section in sections)
         and any(
@@ -2180,8 +2286,11 @@ def write_json_plan(
         )
     ):
         calculate_baseline_schedules(sections, start_date, end_date, rest_days)
-    payload = {
-        "schema_version": 7,
+    return {
+        "schema_version": 8,
+        "revision": (metadata.revision if metadata is not None else 0) + 1,
+        "last_modified": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "modified_by": modified_by,
         "start_date": start_date.isoformat(),
         "end_date": end_date.isoformat(),
         "end_label": end_label,
@@ -2189,10 +2298,118 @@ def write_json_plan(
         "rest_days": rest_day_ranges_to_json(rest_days),
         "sections": [book_section_to_json(section) for section in sections],
     }
-    Path(filename).write_text(
-        json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8",
+
+
+def _atomic_write_json(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as temporary:
+            temporary.write(text)
+            temporary.flush()
+            os.fsync(temporary.fileno())
+        json.loads(Path(temporary_name).read_text(encoding="utf-8"))
+        os.replace(temporary_name, path)
+        if os.name != "nt":
+            directory = os.open(path.parent, os.O_RDONLY)
+            try:
+                os.fsync(directory)
+            finally:
+                os.close(directory)
+    except BaseException:
+        Path(temporary_name).unlink(missing_ok=True)
+        raise
+
+
+def write_json_plan(
+    filename: str,
+    sections: list[BookSection],
+    start_date: date,
+    end_date: date,
+    end_label: str,
+    stats_options: SummaryStatsOptions,
+    rest_days: list[RestDayRange] | None = None,
+) -> JsonPlanMetadata:
+    return write_json_plan_with_metadata(
+        filename,
+        sections,
+        start_date,
+        end_date,
+        end_label,
+        stats_options,
+        rest_days,
     )
+
+
+def write_json_plan_with_metadata(
+    filename: str,
+    sections: list[BookSection],
+    start_date: date,
+    end_date: date,
+    end_label: str,
+    stats_options: SummaryStatsOptions,
+    rest_days: list[RestDayRange] | None = None,
+    metadata: JsonPlanMetadata | None = None,
+    modified_by: str = "desktop",
+) -> JsonPlanMetadata:
+    payload = json_plan_payload(
+        sections,
+        start_date,
+        end_date,
+        end_label,
+        stats_options,
+        rest_days,
+        metadata,
+        modified_by,
+    )
+    raw = json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
+    _atomic_write_json(Path(filename), raw)
+    if Path(filename).read_bytes() != raw.encode("utf-8"):
+        raise ExternalPlanChangeError("reading_plan.json changed while it was being saved")
+    return JsonPlanMetadata(
+        int(payload["revision"]),
+        str(payload["last_modified"]),
+        str(payload["modified_by"]),
+        hashlib.sha256(raw.encode("utf-8")).hexdigest(),
+    )
+
+
+def read_json_plan_metadata(filename: str) -> JsonPlanMetadata:
+    raw = Path(filename).read_bytes()
+    try:
+        payload = json.loads(raw.decode("utf-8"))
+    except UnicodeDecodeError as error:
+        raise ValueError("JSON plan must be UTF-8") from error
+    except json.JSONDecodeError as error:
+        raise ValueError("invalid JSON") from error
+    if not isinstance(payload, dict):
+        raise ValueError("the JSON plan must be an object")
+    try:
+        schema_version = int(payload.get("schema_version", 4))
+    except (TypeError, ValueError) as error:
+        raise ValueError("invalid schema version") from error
+    if schema_version > 8:
+        raise ValueError("unsupported newer schema version")
+    try:
+        revision = int(payload.get("revision", 0))
+    except (TypeError, ValueError) as error:
+        raise ValueError("invalid revision") from error
+    if revision < 0:
+        raise ValueError("invalid revision")
+    return JsonPlanMetadata(
+        revision,
+        None if payload.get("last_modified") is None else str(payload["last_modified"]),
+        None if payload.get("modified_by") is None else str(payload["modified_by"]),
+        hashlib.sha256(raw).hexdigest(),
+    )
+
+
+def ensure_json_plan_unchanged(filename: str, loaded: JsonPlanMetadata) -> None:
+    current = read_json_plan_metadata(filename)
+    if current.revision != loaded.revision or current.sha256 != loaded.sha256:
+        raise ExternalPlanChangeError(
+            "reading_plan.json changed on another device; reload or merge it before saving"
+        )
 
 
 def load_json_plan(
@@ -2212,6 +2429,12 @@ def load_json_plan(
         raise ValueError("invalid JSON") from error
     if not isinstance(payload, dict):
         raise ValueError("the JSON plan must be an object")
+    try:
+        schema_version = int(payload.get("schema_version", 4))
+    except (TypeError, ValueError) as error:
+        raise ValueError("invalid schema version") from error
+    if schema_version > 8:
+        raise ValueError("unsupported newer schema version")
 
     try:
         start_date = parse_date(str(payload["start_date"]))
@@ -2249,15 +2472,13 @@ def load_json_plan(
             if index < len(BOOK_SECTION_LABELS)
             else f"Section {index + 1}"
         )
-        section = book_section_from_json(raw_section, default_label)
+        section = book_section_from_json(
+            raw_section, default_label, derive_progress_from_sessions=schema_version >= 8
+        )
         if section.label in BOOK_SECTION_LABELS:
             sections_by_label[section.label] = section
 
     sections = [sections_by_label[label] for label in BOOK_SECTION_LABELS]
-    try:
-        schema_version = int(payload.get("schema_version", 4))
-    except (TypeError, ValueError) as error:
-        raise ValueError("invalid schema version") from error
     if schema_version < 5:
         calculate_baseline_schedules(sections, start_date, end_date, rest_days)
     return (
