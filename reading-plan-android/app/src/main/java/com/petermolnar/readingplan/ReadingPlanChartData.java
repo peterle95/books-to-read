@@ -61,7 +61,7 @@ final class ReadingPlanChartData {
             );
             plannedPages.add(planned);
             for (ReadingSession session : book.readingSessions) {
-                if (!session.date.isAfter(date)) {
+                if (!session.deleted && !session.date.isAfter(date)) {
                     sessionActual = Math.max(
                             sessionActual,
                             isAudiobookSection(sectionLabel)
@@ -109,14 +109,17 @@ final class ReadingPlanChartData {
     }
 
     private static double actualReadingPace(MainActivity activity, Book book, String sectionLabel, LocalDate today) {
-        if (book.readingSessions.isEmpty() || completedUnits(book, sectionLabel) <= 0) {
+        if (completedUnits(book, sectionLabel) <= 0) {
             return 0.0;
         }
-        LocalDate firstSession = book.readingSessions.get(0).date;
+        LocalDate firstSession = null;
         for (ReadingSession session : book.readingSessions) {
-            if (session.date.isBefore(firstSession)) {
+            if (!session.deleted && (firstSession == null || session.date.isBefore(firstSession))) {
                 firstSession = session.date;
             }
+        }
+        if (firstSession == null) {
+            return 0.0;
         }
         int elapsedReadingDays = activity.availableReadingDaysCount(firstSession, today);
         return elapsedReadingDays <= 0 ? 0.0 : (double) completedUnits(book, sectionLabel) / elapsedReadingDays;

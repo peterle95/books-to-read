@@ -94,7 +94,10 @@ final class ReadingSessionEntries {
             for (int bookIndex = 0; bookIndex < section.books.size(); bookIndex++) {
                 Book book = section.books.get(bookIndex);
                 for (int sessionIndex = 0; sessionIndex < book.readingSessions.size(); sessionIndex++) {
-                    entries.add(new SessionEntry(sectionIndex, bookIndex, sessionIndex, section, book, book.readingSessions.get(sessionIndex)));
+                    ReadingSession session = book.readingSessions.get(sessionIndex);
+                    if (!session.deleted) {
+                        entries.add(new SessionEntry(sectionIndex, bookIndex, sessionIndex, section, book, session));
+                    }
                 }
             }
         }
