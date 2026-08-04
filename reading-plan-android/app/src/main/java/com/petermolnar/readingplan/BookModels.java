@@ -3,16 +3,25 @@ package com.petermolnar.readingplan;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 class ReadingSession {
+    final String id;
     final LocalDate date;
     final int currentPage;
     final int pagesRead;
+    boolean deleted;
 
     ReadingSession(LocalDate date, int currentPage, int pagesRead) {
+        this(UUID.randomUUID().toString(), date, currentPage, pagesRead, false);
+    }
+
+    ReadingSession(String id, LocalDate date, int currentPage, int pagesRead, boolean deleted) {
+        this.id = id;
         this.date = date;
         this.currentPage = currentPage;
         this.pagesRead = pagesRead;
+        this.deleted = deleted;
     }
 }
 class RestDayRange {
@@ -36,6 +45,7 @@ class BaselineSchedule {
     }
 }
 class Book {
+    final String id;
     int number;
     final String title;
     final int startPage;
@@ -105,6 +115,24 @@ class Book {
             LocalDate startDateOverride,
             String targetCompletedDate
     ) {
+        this(number, title, startPage, endPage, currentPage, readingSessions, baselineSchedule,
+                deadlineOverride, startDateOverride, targetCompletedDate, UUID.randomUUID().toString());
+    }
+
+    Book(
+            int number,
+            String title,
+            int startPage,
+            int endPage,
+            Integer currentPage,
+            List<ReadingSession> readingSessions,
+            BaselineSchedule baselineSchedule,
+            LocalDate deadlineOverride,
+            LocalDate startDateOverride,
+            String targetCompletedDate,
+            String id
+    ) {
+        this.id = id;
         this.number = number;
         this.title = title;
         this.startPage = startPage;

@@ -4,7 +4,7 @@ Native Android companion app for the desktop `reading_plan_gui.py` program.
 
 The app reads and writes the same `reading_plan.json` schema as the computer program:
 
-- `schema_version: 6 (with per-book baseline schedules and plan-wide rest-day ranges)`
+- `schema_version: 8 (with revision metadata, stable book/session IDs, and per-book baseline schedules)`
 - physical, digital, and audiobook sections
 - start/end dates and optional summary settings
 - reading sessions, current-page progress, and audiobook time left
@@ -17,7 +17,7 @@ The app reads and writes the same `reading_plan.json` schema as the computer pro
 3. Tap **Connect synced reading_plan.json** and choose the synced JSON file through Android's file picker.
 4. The app keeps that document permission and auto-saves changes back to the same file.
 
-For fewer sync conflicts, enable Syncthing file versioning and avoid editing the desktop and Android app at the exact same time.
+The apps compare the loaded revision and SHA-256 hash before saving. If another device changed the file, the app stops rather than overwriting it; reload or resolve the conflict first.
 
 ## Features
 

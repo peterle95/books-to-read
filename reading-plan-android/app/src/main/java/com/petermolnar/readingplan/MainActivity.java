@@ -15,6 +15,8 @@ import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.Editable;
 import android.text.InputType;
 import android.text.TextWatcher;
@@ -47,7 +49,10 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -60,6 +65,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 import static com.petermolnar.readingplan.BookCollections.*;
 import static com.petermolnar.readingplan.CsvSupport.*;
@@ -68,6 +74,7 @@ import static com.petermolnar.readingplan.PlanPrimitives.*;
 public class MainActivity extends Activity {
     private static final String PREFS = "reading_plan_prefs";
     private static final String PREF_JSON_URI = "json_uri";
+    private static final String PREF_CLIENT_ID = "client_id";
     private static final int REQUEST_OPEN_JSON = 100;
     private static final int REQUEST_OPEN_CSV = 101;
     private static final int REQUEST_CREATE_CSV = 102;
@@ -132,6 +139,11 @@ public class MainActivity extends Activity {
     boolean showPlanDateFields = false;
     boolean showActualPaceProjection = true;
     private boolean restoring = false;
+    private final Handler saveHandler = new Handler(Looper.getMainLooper());
+    private Runnable pendingSave;
+    private String loadedHash;
+    private int loadedRevision;
+    private boolean localDirty;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -141,6 +153,26 @@ public class MainActivity extends Activity {
         buildRoot();
         loadSavedJsonUri();
         showCurrentTab();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        checkForExternalChange();
+    }
+
+    @Override
+    protected void onPause() {
+        flushPendingSave();
+        super.onPause();
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (pendingSave != null) {
+            saveHandler.removeCallbacks(pendingSave);
+        }
+        super.onDestroy();
     }
 
     private void buildRoot() {
@@ -509,10 +541,13 @@ public class MainActivity extends Activity {
             return;
         }
         try {
-            CsvPlan plan = loadJson(readText(jsonUri));
+            String raw = readText(jsonUri);
+            CsvPlan plan = loadJson(raw);
             applyPlan(plan);
+            loadedHash = sha256(raw);
+            loadedRevision = new JSONObject(raw).optInt("revision", 0);
+            localDirty = false;
             setJsonLoaded(true);
-            autosaveJson("Migrated baseline schedule");
             showCurrentTab();
         } catch (IOException | JSONException | IllegalArgumentException ex) {
             setJsonLoaded(false);
@@ -528,12 +563,90 @@ public class MainActivity extends Activity {
             setJsonLoaded(false);
             return;
         }
+        localDirty = true;
+        if (pendingSave != null) {
+            saveHandler.removeCallbacks(pendingSave);
+        }
+        pendingSave = () -> saveJsonNow();
+        saveHandler.postDelayed(pendingSave, 250);
+    }
+
+    private void saveJsonNow() {
+        if (jsonUri == null) {
+            return;
+        }
         try {
-            writeText(jsonUri, jsonText());
+            if (loadedHash == null) {
+                throw new IOException("reload the JSON successfully before saving");
+            }
+            String current = readText(jsonUri);
+            if (!loadedHash.equals(sha256(current))
+                    || loadedRevision != new JSONObject(current).optInt("revision", 0)) {
+                throw new IOException("reading_plan.json changed on another device; reload or merge it before saving");
+            }
+            String written = jsonText(loadedRevision + 1);
+            writeText(jsonUri, written);
+            if (!sha256(written).equals(sha256(readText(jsonUri)))) {
+                throw new IOException("reading_plan.json changed while it was being saved");
+            }
+            loadedHash = sha256(written);
+            loadedRevision++;
+            localDirty = false;
             setJsonLoaded(true);
         } catch (IOException | JSONException ex) {
             setJsonLoaded(false);
             showError("Autosave failed: " + ex.getMessage());
+        }
+    }
+
+    private void flushPendingSave() {
+        if (pendingSave == null || !localDirty) {
+            return;
+        }
+        saveHandler.removeCallbacks(pendingSave);
+        pendingSave = null;
+        saveJsonNow();
+    }
+
+    private void checkForExternalChange() {
+        if (jsonUri == null || loadedHash == null) {
+            return;
+        }
+        try {
+            if (loadedHash.equals(sha256(readText(jsonUri)))) {
+                return;
+            }
+            if (localDirty) {
+                showError("reading_plan.json changed on another device while this app has unsaved changes");
+                return;
+            }
+            reloadFromJson();
+        } catch (IOException ex) {
+            showError("Could not check synced JSON: " + ex.getMessage());
+        }
+    }
+
+    private String clientId() {
+        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        String id = prefs.getString(PREF_CLIENT_ID, null);
+        if (id != null) {
+            return id;
+        }
+        id = "android-" + UUID.randomUUID();
+        prefs.edit().putString(PREF_CLIENT_ID, id).apply();
+        return id;
+    }
+
+    private static String sha256(String text) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(text.getBytes(StandardCharsets.UTF_8));
+            StringBuilder result = new StringBuilder(digest.length * 2);
+            for (byte value : digest) {
+                result.append(String.format(Locale.ROOT, "%02x", value));
+            }
+            return result.toString();
+        } catch (NoSuchAlgorithmException ex) {
+            throw new AssertionError(ex);
         }
     }
 
@@ -583,6 +696,10 @@ public class MainActivity extends Activity {
 
     private CsvPlan loadJson(String raw) throws JSONException {
         JSONObject payload = new JSONObject(raw);
+        int schemaVersion = payload.optInt("schema_version", 4);
+        if (schemaVersion > 8) {
+            throw new IllegalArgumentException("unsupported newer schema version");
+        }
         LocalDate loadedStart = parseDate(payload.getString("start_date"));
         LocalDate loadedEnd = parseDate(payload.getString("end_date"));
         if (loadedEnd.isBefore(loadedStart)) {
@@ -601,7 +718,9 @@ public class MainActivity extends Activity {
         if (rawSections != null) {
             for (int i = 0; i < rawSections.length(); i++) {
                 String defaultLabel = i < BOOK_SECTION_LABELS.size() ? BOOK_SECTION_LABELS.get(i) : "Section " + (i + 1);
-                BookSection section = bookSectionFromJson(rawSections.getJSONObject(i), defaultLabel);
+                BookSection section = bookSectionFromJson(
+                        rawSections.getJSONObject(i), defaultLabel, schemaVersion >= 8
+                );
                 if (BOOK_SECTION_LABELS.contains(section.label)) {
                     byLabel.put(section.label, section);
                 }
@@ -612,7 +731,7 @@ public class MainActivity extends Activity {
         for (String label : BOOK_SECTION_LABELS) {
             loadedSections.add(byLabel.get(label));
         }
-        if (payload.optInt("schema_version", 4) < 5) {
+        if (schemaVersion < 5) {
             restDays.clear();
             restDays.addAll(loadedRestDays);
             calculateBaselineSchedules(loadedSections, loadedStart, loadedEnd);
@@ -627,10 +746,13 @@ public class MainActivity extends Activity {
         );
     }
 
-    private String jsonText() throws JSONException {
+    private String jsonText(int revision) throws JSONException {
         initializeMissingBaselineSchedules();
         JSONObject payload = new JSONObject();
-        payload.put("schema_version", 7);
+        payload.put("schema_version", 8);
+        payload.put("revision", revision);
+        payload.put("last_modified", OffsetDateTime.now().withNano(0).toString());
+        payload.put("modified_by", clientId());
         payload.put("start_date", startDate.toString());
         payload.put("end_date", endDate.toString());
         payload.put("end_label", endLabel);
@@ -683,7 +805,7 @@ public class MainActivity extends Activity {
         for (List<Integer> group : section.simultaneousGroups) {
             JSONArray jsonGroup = new JSONArray();
             for (Integer id : group) {
-                jsonGroup.put(id);
+                jsonGroup.put(section.books.get(id - 1).id);
             }
             groups.put(jsonGroup);
         }
@@ -693,6 +815,7 @@ public class MainActivity extends Activity {
 
     private JSONObject bookToJson(Book book, String sectionLabel) throws JSONException {
         JSONObject object = new JSONObject();
+        object.put("id", book.id);
         object.put("number", book.number);
         object.put("title", book.title);
         object.put("baseline_schedule", baselineScheduleToJson(book.baselineSchedule));
@@ -712,10 +835,14 @@ public class MainActivity extends Activity {
             JSONArray sessions = new JSONArray();
             for (ReadingSession session : book.readingSessions) {
                 JSONObject item = new JSONObject();
+                item.put("id", session.id);
                 item.put("date", session.date.toString());
                 item.put("current_time_seconds", session.currentPage);
                 item.put("time_listened_seconds", session.pagesRead);
                 item.put("remaining_time_seconds", remainingTimeAt(book, session.currentPage));
+                if (session.deleted) {
+                    item.put("deleted", true);
+                }
                 sessions.put(item);
             }
             object.put("reading_sessions", sessions);
@@ -729,16 +856,22 @@ public class MainActivity extends Activity {
         JSONArray sessions = new JSONArray();
         for (ReadingSession session : book.readingSessions) {
             JSONObject item = new JSONObject();
+            item.put("id", session.id);
             item.put("date", session.date.toString());
             item.put("current_page", session.currentPage);
             item.put("pages_read", session.pagesRead);
+            if (session.deleted) {
+                item.put("deleted", true);
+            }
             sessions.put(item);
         }
         object.put("reading_sessions", sessions);
         return object;
     }
 
-    private BookSection bookSectionFromJson(JSONObject object, String defaultLabel) throws JSONException {
+    private BookSection bookSectionFromJson(
+            JSONObject object, String defaultLabel, boolean deriveProgressFromSessions
+    ) throws JSONException {
         String label = canonicalSectionLabel(object.optString("label", defaultLabel), defaultLabel);
         BookSection section = new BookSection(label);
         section.baselineNeedsRecalculation = object.optBoolean("baseline_needs_recalculation", false);
@@ -748,7 +881,9 @@ public class MainActivity extends Activity {
         JSONArray rawBooks = object.optJSONArray("books");
         if (rawBooks != null) {
             for (int i = 0; i < rawBooks.length(); i++) {
-                section.books.add(bookFromJson(rawBooks.getJSONObject(i), i + 1, label));
+                section.books.add(bookFromJson(
+                        rawBooks.getJSONObject(i), i + 1, label, deriveProgressFromSessions
+                ));
             }
         }
         renumberBooks(section.books);
@@ -759,7 +894,28 @@ public class MainActivity extends Activity {
                 JSONArray rawGroup = rawGroups.getJSONArray(i);
                 List<Integer> group = new ArrayList<>();
                 for (int j = 0; j < rawGroup.length(); j++) {
-                    group.add(rawGroup.getInt(j));
+                    Object value = rawGroup.get(j);
+                    if (value instanceof String) {
+                        String id = (String) value;
+                        try {
+                            group.add(Integer.parseInt(id));
+                            continue;
+                        } catch (NumberFormatException ignored) {
+                        }
+                        int number = -1;
+                        for (Book book : section.books) {
+                            if (book.id.equals(id)) {
+                                number = book.number;
+                                break;
+                            }
+                        }
+                        if (number < 0) {
+                            throw new IllegalArgumentException("simultaneous group references an unknown book");
+                        }
+                        group.add(number);
+                    } else {
+                        group.add(rawGroup.getInt(j));
+                    }
                 }
                 groups.add(group);
             }
@@ -768,7 +924,12 @@ public class MainActivity extends Activity {
         return section;
     }
 
-    private Book bookFromJson(JSONObject object, int fallbackNumber, String sectionLabel) throws JSONException {
+    private Book bookFromJson(
+            JSONObject object,
+            int fallbackNumber,
+            String sectionLabel,
+            boolean deriveProgressFromSessions
+    ) throws JSONException {
         String title = object.optString("title", "").trim();
         if (title.isEmpty()) {
             throw new IllegalArgumentException("each book needs a title");
@@ -817,6 +978,11 @@ public class MainActivity extends Activity {
         if (rawSessions != null) {
             for (int i = 0; i < rawSessions.length(); i++) {
                 JSONObject rawSession = rawSessions.getJSONObject(i);
+                String sessionId = rawSession.optString("id", "").trim();
+                if (sessionId.isEmpty()) {
+                    sessionId = UUID.randomUUID().toString();
+                }
+                boolean deleted = rawSession.optBoolean("deleted", false);
                 LocalDate sessionDate = parseDate(rawSession.getString("date"));
                 int sessionCurrentPage;
                 int sessionPagesRead;
@@ -857,18 +1023,38 @@ public class MainActivity extends Activity {
                             : "reading session pages must be positive");
                 }
                 sessionCurrentPage = clamp(sessionCurrentPage, startPage, endPage);
-                sessions.add(new ReadingSession(sessionDate, sessionCurrentPage, sessionPagesRead));
+                sessions.add(new ReadingSession(sessionId, sessionDate, sessionCurrentPage, sessionPagesRead, deleted));
                 previousCurrentPage = previousCurrentPage == null
                         ? sessionCurrentPage
                         : Math.max(previousCurrentPage, sessionCurrentPage);
             }
         }
-        if (currentPage == null && !sessions.isEmpty()) {
-            int max = sessions.get(0).currentPage;
-            for (ReadingSession session : sessions) {
-                max = Math.max(max, session.currentPage);
+        Map<String, ReadingSession> sessionsById = new HashMap<>();
+        for (ReadingSession session : sessions) {
+            ReadingSession existing = sessionsById.get(session.id);
+            if (existing == null) {
+                sessionsById.put(session.id, session);
+            } else if (existing.date.equals(session.date)
+                    && existing.currentPage == session.currentPage
+                    && existing.pagesRead == session.pagesRead) {
+                existing.deleted = existing.deleted || session.deleted;
+            } else {
+                throw new IllegalArgumentException("conflicting reading session UUID");
             }
-            currentPage = max;
+        }
+        sessions = new ArrayList<>(sessionsById.values());
+        Collections.sort(sessions, (left, right) -> {
+            int byDate = left.date.compareTo(right.date);
+            return byDate != 0 ? byDate : left.id.compareTo(right.id);
+        });
+        if (!sessions.isEmpty() && (deriveProgressFromSessions || currentPage == null)) {
+            int max = Integer.MIN_VALUE;
+            for (ReadingSession session : sessions) {
+                if (!session.deleted) {
+                    max = Math.max(max, session.currentPage);
+                }
+            }
+            currentPage = max == Integer.MIN_VALUE ? null : max;
         } else if (currentPage == null && pagesRead > 0) {
             currentPage = isAudiobookSection(sectionLabel)
                     ? startPage + pagesRead
@@ -893,7 +1079,11 @@ public class MainActivity extends Activity {
         if (object.has("target_completed_date") && !object.isNull("target_completed_date")) {
             targetCompletedDate = parseDate(object.getString("target_completed_date")).toString();
         }
-        return new Book(fallbackNumber, title, startPage, endPage, currentPage, sessions, baselineSchedule, deadlineOverride, startDateOverride, targetCompletedDate);
+        String bookId = object.optString("id", "").trim();
+        if (bookId.isEmpty()) {
+            bookId = UUID.randomUUID().toString();
+        }
+        return new Book(fallbackNumber, title, startPage, endPage, currentPage, sessions, baselineSchedule, deadlineOverride, startDateOverride, targetCompletedDate, bookId);
     }
 
     private static Object baselineScheduleToJson(BaselineSchedule schedule) throws JSONException {
