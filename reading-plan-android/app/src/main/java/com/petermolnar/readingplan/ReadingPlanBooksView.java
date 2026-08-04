@@ -168,7 +168,7 @@ final class ReadingPlanBooksView {
             }
             List<ReadingSession> sessions = oldBook.startPage == fields.startPage && oldBook.endPage == fields.endPage
                     ? oldBook.readingSessions : new ArrayList<>();
-            section.books.set(activity.selectedBookIndex, new Book(oldBook.number, fields.title, fields.startPage, fields.endPage, currentPage, sessions, oldBook.baselineSchedule, oldBook.deadlineOverride, oldBook.startDateOverride, oldBook.targetCompletedDate));
+            section.books.set(activity.selectedBookIndex, new Book(oldBook.number, fields.title, fields.startPage, fields.endPage, currentPage, sessions, oldBook.baselineSchedule, oldBook.deadlineOverride, oldBook.startDateOverride, oldBook.targetCompletedDate, oldBook.id));
             activity.invalidateBaselineSchedules(section);
             activity.afterStateChange("Book replaced");
         }));
@@ -200,7 +200,7 @@ final class ReadingPlanBooksView {
                 activity.showError("Book is already complete");
                 return;
             }
-            book.currentPage = book.endPage;
+            activity.addReadingSession(book, LocalDate.now(), book.endPage, section.label);
             activity.afterStateChange("Book completed");
         });
         box.addView(buttons2);
