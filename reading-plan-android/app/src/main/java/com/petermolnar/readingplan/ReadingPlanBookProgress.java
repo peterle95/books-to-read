@@ -31,14 +31,16 @@ final class ReadingPlanBookProgress {
         if (index < 0 || index >= book.readingSessions.size()) {
             throw new IllegalArgumentException("reading session not found");
         }
-        book.readingSessions.remove(index);
-        if (book.readingSessions.isEmpty()) {
+        book.readingSessions.get(index).deleted = true;
+        int max = Integer.MIN_VALUE;
+        for (ReadingSession session : book.readingSessions) {
+            if (!session.deleted) {
+                max = Math.max(max, session.currentPage);
+            }
+        }
+        if (max == Integer.MIN_VALUE) {
             book.currentPage = null;
             return;
-        }
-        int max = book.readingSessions.get(0).currentPage;
-        for (ReadingSession session : book.readingSessions) {
-            max = Math.max(max, session.currentPage);
         }
         book.currentPage = max;
     }
