@@ -592,7 +592,9 @@ public class MainActivity extends Activity {
         panel.addView(header);
         ScrollView metricsScroll = sheetScrollView(dialog, panel, () -> closeMetricsDialog(dialog));
         ScrollView metricsContent = metricsView.build();
-        metricsScroll.addView(metricsContent.getChildAt(0));
+        View metricsBody = metricsContent.getChildAt(0);
+        metricsContent.removeView(metricsBody);
+        metricsScroll.addView(metricsBody);
         panel.addView(metricsScroll, new LinearLayout.LayoutParams(-1, 0, 1));
         dialog.setContentView(panel);
         Window window = dialog.getWindow();
