@@ -27,9 +27,7 @@ final class ReadingPlanChartsView {
         LinearLayout header = activity.row();
         header.addView(activity.heading("Charts"), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
         header.addView(activity.secondaryButton("Metrics", v -> {
-            activity.metricsSubview = true;
-            activity.metricDetail = null;
-            activity.showCurrentTab();
+            activity.showMetricsDialog();
         }));
         box.addView(header);
 
