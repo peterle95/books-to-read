@@ -122,6 +122,7 @@ public class MainActivity extends Activity {
     private final ReadingPlanPlanView planView = new ReadingPlanPlanView(this);
     private final ReadingPlanBooksView booksView = new ReadingPlanBooksView(this);
     private final ReadingPlanMetricsView metricsView = new ReadingPlanMetricsView(this);
+    private Dialog metricsDialog;
     private final ReadingPlanChartsView chartsView = new ReadingPlanChartsView(this);
     private StatsOptions statsOptions = new StatsOptions(true, true, true, true, true);
     LocalDate startDate;
@@ -569,6 +570,43 @@ public class MainActivity extends Activity {
         }
         pendingSave = () -> saveJsonNow();
         saveHandler.postDelayed(pendingSave, 250);
+    }
+
+    void showMetricsDialog() {
+        if (metricsDialog != null && metricsDialog.isShowing()) metricsDialog.dismiss();
+        Dialog dialog = new Dialog(this);
+        metricsDialog = dialog;
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(20), dp(12), dp(20), dp(20));
+        panel.setBackgroundColor(CREAM);
+        View handle = new View(this);
+        handle.setBackground(roundedBackground(BORDER, BORDER));
+        LinearLayout.LayoutParams hp = new LinearLayout.LayoutParams(dp(44), dp(5));
+        hp.gravity = Gravity.CENTER_HORIZONTAL;
+        panel.addView(handle, hp);
+        LinearLayout header = row();
+        header.addView(heading("Metrics"), new LinearLayout.LayoutParams(0, -2, 1));
+        header.addView(secondaryButton("Close", v -> closeMetricsDialog(dialog)));
+        panel.addView(header);
+        panel.addView(metricsView.build(), new LinearLayout.LayoutParams(-1, 0, 1));
+        dialog.setContentView(panel);
+        Window window = dialog.getWindow();
+        if (window != null) { window.setBackgroundDrawable(new ColorDrawable(CREAM)); window.setGravity(Gravity.BOTTOM); }
+        dialog.show();
+        if (dialog.getWindow() != null) dialog.getWindow().setLayout(-1, (int) (getResources().getDisplayMetrics().heightPixels * .86f));
+        final float[] start = {0};
+        handle.setOnTouchListener((v, e) -> {
+            if (e.getAction() == 0) { start[0] = e.getRawY(); return true; }
+            if (e.getAction() == 2) { panel.setTranslationY(Math.max(0, e.getRawY() - start[0])); return true; }
+            if (e.getAction() == 1) { if (e.getRawY() - start[0] > dp(120)) closeMetricsDialog(dialog); else panel.animate().translationY(0).setDuration(180).start(); return true; }
+            return true;
+        });
+    }
+
+    private void closeMetricsDialog(Dialog dialog) {
+        View view = dialog.getWindow().getDecorView();
+        view.animate().translationY(view.getHeight()).setDuration(180).withEndAction(() -> { dialog.dismiss(); if (metricsDialog == dialog) metricsDialog = null; }).start();
     }
 
     private void saveJsonNow() {
