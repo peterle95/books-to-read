@@ -50,12 +50,25 @@ final class ReadingSessionEntries {
         LinearLayout header = activity.row(); header.addView(activity.heading("Reading history"), new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));
         Button close = activity.secondaryButton("Close", v -> dismiss(sheet)); header.addView(close); panel.addView(header);
         activity.attachSheetDrag(header,panel,sheet,()->dismiss(sheet));
-        if (selected == null) { panel.addView(activity.label("Add a book to record reading history.")); finish(sheet,panel,handle); return; }
-        List<String> choices = Book.bookChoices(section); Spinner picker = activity.spinner(choices, selected.number + ". " + selected.title); panel.addView(picker);
+        List<String> choices = new ArrayList<>();
+        List<BookSection> choiceSections = new ArrayList<>();
+        List<Book> choiceBooks = new ArrayList<>();
+        for (String label : MainActivity.BOOK_SECTION_LABELS) {
+            BookSection choiceSection = activity.sectionByLabel(label);
+            for (Book choiceBook : choiceSection.books) {
+                choices.add(label + " - " + choiceBook.number + ". " + choiceBook.title);
+                choiceSections.add(choiceSection);
+                choiceBooks.add(choiceBook);
+            }
+        }
+        if (choices.isEmpty()) { panel.addView(activity.label("Add a book to record reading history.")); finish(sheet,panel,handle); return; }
+        int selectedIndex = 0;
+        for (int i = 0; i < choiceBooks.size(); i++) if (choiceSections.get(i) == section && choiceBooks.get(i) == selected) { selectedIndex = i; break; }
+        Spinner picker = activity.spinner(choices, choices.get(selectedIndex)); panel.addView(picker);
         ScrollView scroll = activity.sheetScrollView(sheet, panel, () -> dismiss(sheet));
         LinearLayout body = activity.verticalBox(); scroll.addView(body); panel.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
-        picker.setOnItemSelectedListener(new MainActivity.SimpleItemSelectedListener(() -> { int i=picker.getSelectedItemPosition(); if(i>=0&&i<section.books.size()) rebuild(body,sheet,section,section.books.get(i)); }));
-        rebuild(body,sheet,section,selected); finish(sheet,panel,handle);
+        picker.setOnItemSelectedListener(new MainActivity.SimpleItemSelectedListener(() -> { int i=picker.getSelectedItemPosition(); if(i>=0&&i<choiceBooks.size()) rebuild(body,sheet,choiceSections.get(i),choiceBooks.get(i)); }));
+        rebuild(body,sheet,choiceSections.get(selectedIndex),choiceBooks.get(selectedIndex)); finish(sheet,panel,handle);
     }
 
     private void rebuild(LinearLayout body, Dialog sheet, BookSection section, Book book) {
