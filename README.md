@@ -26,3 +26,10 @@ You can choose consecutive Book IDs within each table to read simultaneously. Th
 ## Requirements
 
 Python 3.7+ (standard library only, no external dependencies).
+
+## Reading session exports
+
+```bash
+python3 export_reading_sessions.py
+python3 compare_reading_sessions.py
+```
