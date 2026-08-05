@@ -40,6 +40,14 @@ _Avoid_: Ungrouped book, detached book
 
 ## Reading history
 
+**Reading-plan snapshot**:
+A complete record of user-meaningful reading-plan state, including plan dates, books and progress, reading history, rest days, schedules, overrides, groups, and settings.
+_Avoid_: Session export, sync metadata
+
+**Plan difference**:
+A user-meaningful value change, addition, or missing item found by comparing a reading-plan snapshot with the current reading plan.
+_Avoid_: JSON difference, sync update
+
 **Reading session**:
 A recorded instance of reading part of a book on a calendar date, including the resulting page position or time remaining.
 _Avoid_: Entry, log item
