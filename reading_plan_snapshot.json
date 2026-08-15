@@ -18,13 +18,13 @@
             "deadline": "2026-09-13",
             "start_date": "2026-07-05"
           },
-          "current_page": 1000,
+          "current_page": 1041,
           "deadline_override": "2026-09-13",
           "end_page": 1041,
           "id": "ab80c361-b8b9-4b78-91a4-b0d93ea26059",
           "number": 1,
           "pages": 1041,
-          "pages_read": 1000,
+          "pages_read": 1041,
           "reading_sessions": [
             {
               "current_page": 995,
@@ -37,6 +37,12 @@
               "date": "2026-07-15",
               "id": "0d40be13-cc2c-4ea0-af51-2c6b776152e1",
               "pages_read": 5
+            },
+            {
+              "current_page": 1041,
+              "date": "2026-08-06",
+              "id": "b8f67df8-a618-464c-a2a7-a982f2bf41de",
+              "pages_read": 41
             }
           ],
           "start_date_override": null,
@@ -50,13 +56,13 @@
             "deadline": "2026-09-13",
             "start_date": "2026-07-01"
           },
-          "current_page": 354,
+          "current_page": 380,
           "deadline_override": "2026-09-13",
           "end_page": 669,
           "id": "b7aeefac-7132-40d7-8290-e6cf2045e7e0",
           "number": 2,
           "pages": 669,
-          "pages_read": 354,
+          "pages_read": 380,
           "reading_sessions": [
             {
               "current_page": 210,
@@ -131,11 +137,24 @@
               "pages_read": 14
             },
             {
+              "current_page": 380,
+              "date": "2026-08-05",
+              "id": "3a6ce8a5-a5a0-42a1-b938-b10b5b591c30",
+              "pages_read": 26
+            },
+            {
               "current_page": 500,
               "date": "2026-08-05",
               "deleted": true,
               "id": "ca16c524-b858-46ad-be3f-2d7344b6a1be",
               "pages_read": 146
+            },
+            {
+              "current_page": 400,
+              "date": "2026-08-05",
+              "deleted": true,
+              "id": "d58af786-ce0b-4d48-a9b7-ea5a6e7c74c4",
+              "pages_read": 46
             }
           ],
           "start_date_override": "2026-07-01",
@@ -149,13 +168,13 @@
             "deadline": "2026-09-13",
             "start_date": "2026-07-01"
           },
-          "current_page": 255,
+          "current_page": 280,
           "deadline_override": "2026-09-13",
           "end_page": 559,
           "id": "c447bdd5-bd23-439d-a157-9905c99bf373",
           "number": 3,
           "pages": 559,
-          "pages_read": 255,
+          "pages_read": 280,
           "reading_sessions": [
             {
               "current_page": 94,
@@ -225,6 +244,13 @@
               "pages_read": 5
             },
             {
+              "current_page": 300,
+              "date": "2026-08-05",
+              "deleted": true,
+              "id": "6c21580c-07c2-4135-a278-9fb471db85d9",
+              "pages_read": 45
+            },
+            {
               "current_page": 265,
               "date": "2026-08-05",
               "deleted": true,
@@ -237,11 +263,17 @@
               "deleted": true,
               "id": "ac714ad2-0fd4-4c46-a179-d23ff262bfe4",
               "pages_read": 45
+            },
+            {
+              "current_page": 280,
+              "date": "2026-08-06",
+              "id": "7220de7a-d81d-4888-9e50-3aae63049f1b",
+              "pages_read": 25
             }
           ],
           "start_date_override": "2026-07-01",
           "start_page": 1,
-          "target_completed_date": "2026-08-05",
+          "target_completed_date": "2026-08-06",
           "title": "changing order"
         },
         {
@@ -301,13 +333,13 @@
             "deadline": "2026-09-30",
             "start_date": "2026-07-01"
           },
-          "current_page": 161,
+          "current_page": 169,
           "deadline_override": null,
           "end_page": 350,
           "id": "563a6b5d-a979-460d-9158-09e0482c8c7b",
           "number": 1,
           "pages": 350,
-          "pages_read": 161,
+          "pages_read": 169,
           "reading_sessions": [
             {
               "current_page": 71,
@@ -401,23 +433,27 @@
               "pages_read": 3
             },
             {
-              "current_page": 200,
+              "current_page": 163,
               "date": "2026-08-05",
-              "deleted": true,
-              "id": "539aa375-b1de-4dbf-a421-44bbad6095a2",
-              "pages_read": 39
+              "id": "7bd54a4e-027f-4943-b235-c756b7b5d963",
+              "pages_read": 2
             },
             {
-              "current_page": 200,
-              "date": "2026-08-05",
-              "deleted": true,
-              "id": "6ea6b944-6ca9-414f-8bc4-e135e7173f4a",
-              "pages_read": 39
+              "current_page": 165,
+              "date": "2026-08-06",
+              "id": "9e2ebcf7-8646-4e8a-81f5-9f4521b07a06",
+              "pages_read": 2
+            },
+            {
+              "current_page": 169,
+              "date": "2026-08-07",
+              "id": "f05a4a40-d3d1-42fa-bf98-ca8f05f20543",
+              "pages_read": 4
             }
           ],
           "start_date_override": "2026-07-01",
           "start_page": 1,
-          "target_completed_date": "2026-08-05",
+          "target_completed_date": "2026-08-07",
           "title": "react"
         }
       ],
@@ -433,7 +469,7 @@
             "deadline": "2026-08-01",
             "start_date": "2026-07-01"
           },
-          "current_time_seconds": 21840,
+          "current_time_seconds": 29820,
           "deadline_override": "2026-07-31",
           "duration_seconds": 29820,
           "end_time_seconds": 29820,
@@ -488,13 +524,20 @@
               "id": "3f4811d5-2e01-4a25-931b-cb7cea84fa0f",
               "remaining_time_seconds": 7980,
               "time_listened_seconds": 4500
+            },
+            {
+              "current_time_seconds": 29820,
+              "date": "2026-08-06",
+              "id": "1359ce4e-d467-48fb-a5ec-10b5910fc614",
+              "remaining_time_seconds": 0,
+              "time_listened_seconds": 7980
             }
           ],
-          "remaining_time_seconds": 7980,
+          "remaining_time_seconds": 0,
           "start_date_override": "2026-07-01",
           "start_time_seconds": 0,
           "target_completed_date": "2026-07-22",
-          "time_listened_seconds": 21840,
+          "time_listened_seconds": 29820,
           "title": "pane e bugie"
         },
         {
@@ -546,14 +589,6 @@
               "time_listened_seconds": 2759
             },
             {
-              "current_time_seconds": 16837,
-              "date": "2026-08-05",
-              "deleted": true,
-              "id": "9f1e0485-476e-4ceb-aae1-926634a3d566",
-              "remaining_time_seconds": 43577,
-              "time_listened_seconds": 2624
-            },
-            {
               "current_time_seconds": 20814,
               "date": "2026-08-05",
               "deleted": true,
@@ -562,12 +597,12 @@
               "time_listened_seconds": 6601
             },
             {
-              "current_time_seconds": 24414,
+              "current_time_seconds": 16837,
               "date": "2026-08-05",
               "deleted": true,
-              "id": "f71d7997-8495-4fe2-8106-4937257d0604",
-              "remaining_time_seconds": 36000,
-              "time_listened_seconds": 10201
+              "id": "9f1e0485-476e-4ceb-aae1-926634a3d566",
+              "remaining_time_seconds": 43577,
+              "time_listened_seconds": 2624
             },
             {
               "current_time_seconds": 16837,
@@ -575,6 +610,14 @@
               "id": "e3f7ea7a-5f76-489d-b69a-966c6532617a",
               "remaining_time_seconds": 43577,
               "time_listened_seconds": 2624
+            },
+            {
+              "current_time_seconds": 24414,
+              "date": "2026-08-05",
+              "deleted": true,
+              "id": "f71d7997-8495-4fe2-8106-4937257d0604",
+              "remaining_time_seconds": 36000,
+              "time_listened_seconds": 10201
             }
           ],
           "remaining_time_seconds": 43577,

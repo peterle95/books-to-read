@@ -20,6 +20,10 @@ STATUS_COLORS = {"Added": "\033[32m", "Changed": "\033[33m", "Missing": "\033[31
 RESET = "\033[0m"
 
 
+def list_key(item):
+    return item["id"] if isinstance(item, dict) and "id" in item else None
+
+
 def difference(status, path, before, now, section, book):
     context = now if now is not None else before
     if isinstance(context, dict):
@@ -46,12 +50,28 @@ def differences(snapshot, current, path="", section="Reading plan", book="-"):
         return changes
     if isinstance(snapshot, list):
         changes = []
-        for index in range(min(len(snapshot), len(current))):
-            changes.extend(differences(snapshot[index], current[index], "{}[{}]".format(path, index), section, book))
-        for index in range(len(current), len(snapshot)):
-            changes.append(difference("Missing", "{}[{}]".format(path, index), snapshot[index], None, section, book))
-        for index in range(len(snapshot), len(current)):
-            changes.append(difference("Added", "{}[{}]".format(path, index), None, current[index], section, book))
+        keyed = [item for item in snapshot + current if not list_key(item)]
+        if not keyed:
+            current_by_id = {list_key(item): item for item in current}
+            seen = set()
+            for item in snapshot:
+                key = list_key(item)
+                seen.add(key)
+                child_path = "{}[id={}]".format(path, key)
+                if key in current_by_id:
+                    changes.extend(differences(item, current_by_id[key], child_path, section, book))
+                else:
+                    changes.append(difference("Missing", child_path, item, None, section, book))
+            for item in current:
+                if list_key(item) not in seen:
+                    changes.append(difference("Added", "{}[id={}]".format(path, list_key(item)), None, item, section, book))
+        else:
+            for index in range(min(len(snapshot), len(current))):
+                changes.extend(differences(snapshot[index], current[index], "{}[{}]".format(path, index), section, book))
+            for index in range(len(current), len(snapshot)):
+                changes.append(difference("Missing", "{}[{}]".format(path, index), snapshot[index], None, section, book))
+            for index in range(len(snapshot), len(current)):
+                changes.append(difference("Added", "{}[{}]".format(path, index), None, current[index], section, book))
         return changes
     if snapshot != current:
         return [difference("Changed", path, snapshot, current, section, book)]
