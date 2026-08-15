@@ -29,12 +29,12 @@ final class ReadingPlanMetricsView {
         if (activity.metricDetail == null) {
             header.addView(activity.secondaryButton("Back to charts", v -> {
                 activity.metricsSubview = false;
-                activity.showCurrentTab();
+                activity.showMetricsDialog();
             }));
         } else {
             header.addView(activity.secondaryButton("Back to metrics", v -> {
                 activity.metricDetail = null;
-                activity.showCurrentTab();
+                activity.showMetricsDialog();
             }));
         }
         box.addView(header);
@@ -96,6 +96,6 @@ final class ReadingPlanMetricsView {
 
     private void openDetail(String detail) {
         activity.metricDetail = detail;
-        activity.showCurrentTab();
+        activity.showMetricsDialog();
     }
 }

@@ -37,3 +37,25 @@ _Avoid_: Bundle, series
 **Independent schedule**:
 A book schedule that is no longer governed by a simultaneous group's shared deadline, while retaining its assigned start date.
 _Avoid_: Ungrouped book, detached book
+
+## Reading history
+
+**Reading-plan snapshot**:
+A complete record of user-meaningful reading-plan state, including plan dates, books and progress, reading history, rest days, schedules, overrides, groups, and settings.
+_Avoid_: Session export, sync metadata
+
+**Plan difference**:
+A user-meaningful value change, addition, or missing item found by comparing a reading-plan snapshot with the current reading plan.
+_Avoid_: JSON difference, sync update
+
+**Reading session**:
+A recorded instance of reading part of a book on a calendar date, including the resulting page position or time remaining.
+_Avoid_: Entry, log item
+
+**Reading history**:
+The collection of a book's reading sessions, used to review and manage how reading progressed over time.
+_Avoid_: Entries list, activity feed
+
+**Day group**:
+A reading-history summary for one calendar date, combining that day's total reading and, when applicable, its individual reading sessions.
+_Avoid_: Daily entry, date card

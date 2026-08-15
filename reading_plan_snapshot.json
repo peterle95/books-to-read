@@ -1,0 +1,643 @@
+{
+  "end_date": "2026-09-30",
+  "end_label": "Target finish date",
+  "rest_days": [
+    {
+      "end_date": "2026-08-23",
+      "start_date": "2026-08-19"
+    }
+  ],
+  "schema_version": 8,
+  "sections": [
+    {
+      "baseline_needs_recalculation": false,
+      "books": [
+        {
+          "baseline_schedule": {
+            "daily_target": 0,
+            "deadline": "2026-09-13",
+            "start_date": "2026-07-05"
+          },
+          "current_page": 1041,
+          "deadline_override": "2026-09-13",
+          "end_page": 1041,
+          "id": "ab80c361-b8b9-4b78-91a4-b0d93ea26059",
+          "number": 1,
+          "pages": 1041,
+          "pages_read": 1041,
+          "reading_sessions": [
+            {
+              "current_page": 995,
+              "date": "2026-07-06",
+              "id": "e93db9aa-bef0-40d4-b628-feba09404205",
+              "pages_read": 995
+            },
+            {
+              "current_page": 1000,
+              "date": "2026-07-15",
+              "id": "0d40be13-cc2c-4ea0-af51-2c6b776152e1",
+              "pages_read": 5
+            },
+            {
+              "current_page": 1041,
+              "date": "2026-08-06",
+              "id": "b8f67df8-a618-464c-a2a7-a982f2bf41de",
+              "pages_read": 41
+            }
+          ],
+          "start_date_override": null,
+          "start_page": 1,
+          "target_completed_date": null,
+          "title": "capital"
+        },
+        {
+          "baseline_schedule": {
+            "daily_target": 8.513513513513514,
+            "deadline": "2026-09-13",
+            "start_date": "2026-07-01"
+          },
+          "current_page": 380,
+          "deadline_override": "2026-09-13",
+          "end_page": 669,
+          "id": "b7aeefac-7132-40d7-8290-e6cf2045e7e0",
+          "number": 2,
+          "pages": 669,
+          "pages_read": 380,
+          "reading_sessions": [
+            {
+              "current_page": 210,
+              "date": "2026-07-06",
+              "id": "a54d86ef-0dd6-4bfc-ae42-9a91adffb707",
+              "pages_read": 210
+            },
+            {
+              "current_page": 219,
+              "date": "2026-07-06",
+              "id": "be959c52-e0ed-4cba-85f0-ce4db94811e7",
+              "pages_read": 9
+            },
+            {
+              "current_page": 227,
+              "date": "2026-07-07",
+              "id": "9f65538f-f634-4ded-9f51-3dda457f5c59",
+              "pages_read": 8
+            },
+            {
+              "current_page": 244,
+              "date": "2026-07-11",
+              "id": "be407129-a301-4d47-a76e-ed01146a5f55",
+              "pages_read": 17
+            },
+            {
+              "current_page": 260,
+              "date": "2026-07-12",
+              "id": "c22a18fe-7c32-41e1-aa1c-9153823d0fba",
+              "pages_read": 16
+            },
+            {
+              "current_page": 265,
+              "date": "2026-07-13",
+              "id": "6d70aa0b-af98-4623-bef0-ae4fc43dbdff",
+              "pages_read": 5
+            },
+            {
+              "current_page": 274,
+              "date": "2026-07-15",
+              "id": "c8a51e85-0b0b-4910-873a-84d3a62ad2b4",
+              "pages_read": 9
+            },
+            {
+              "current_page": 292,
+              "date": "2026-07-18",
+              "id": "43d4eaff-3892-4e8a-a858-cdab365e5e37",
+              "pages_read": 18
+            },
+            {
+              "current_page": 310,
+              "date": "2026-07-21",
+              "id": "e3444688-1cb5-463d-9f3e-6a71b4817d20",
+              "pages_read": 18
+            },
+            {
+              "current_page": 320,
+              "date": "2026-07-22",
+              "id": "f0b16a1d-bc03-40f3-b147-3abead4f9c33",
+              "pages_read": 10
+            },
+            {
+              "current_page": 340,
+              "date": "2026-07-26",
+              "id": "89346bb1-1266-4807-92dc-dff117d1961c",
+              "pages_read": 20
+            },
+            {
+              "current_page": 354,
+              "date": "2026-07-28",
+              "id": "c4769764-b63b-4757-9e04-932692d12fb0",
+              "pages_read": 14
+            },
+            {
+              "current_page": 380,
+              "date": "2026-08-05",
+              "id": "3a6ce8a5-a5a0-42a1-b938-b10b5b591c30",
+              "pages_read": 26
+            },
+            {
+              "current_page": 500,
+              "date": "2026-08-05",
+              "deleted": true,
+              "id": "ca16c524-b858-46ad-be3f-2d7344b6a1be",
+              "pages_read": 146
+            },
+            {
+              "current_page": 400,
+              "date": "2026-08-05",
+              "deleted": true,
+              "id": "d58af786-ce0b-4d48-a9b7-ea5a6e7c74c4",
+              "pages_read": 46
+            }
+          ],
+          "start_date_override": "2026-07-01",
+          "start_page": 1,
+          "target_completed_date": "2026-08-05",
+          "title": "wild swans"
+        },
+        {
+          "baseline_schedule": {
+            "daily_target": 9.891891891891891,
+            "deadline": "2026-09-13",
+            "start_date": "2026-07-01"
+          },
+          "current_page": 280,
+          "deadline_override": "2026-09-13",
+          "end_page": 559,
+          "id": "c447bdd5-bd23-439d-a157-9905c99bf373",
+          "number": 3,
+          "pages": 559,
+          "pages_read": 280,
+          "reading_sessions": [
+            {
+              "current_page": 94,
+              "date": "2026-07-06",
+              "id": "72751d11-6d46-40d8-9858-7a7584e47bb1",
+              "pages_read": 94
+            },
+            {
+              "current_page": 126,
+              "date": "2026-07-07",
+              "id": "431b40e3-3162-4af6-81b2-616eafa35e70",
+              "pages_read": 32
+            },
+            {
+              "current_page": 138,
+              "date": "2026-07-11",
+              "id": "a1f19a3a-f339-4ca7-90de-dcad79e048c7",
+              "pages_read": 12
+            },
+            {
+              "current_page": 158,
+              "date": "2026-07-17",
+              "id": "4cb4497e-2cf2-4f1b-84b2-d98f4a597bf9",
+              "pages_read": 20
+            },
+            {
+              "current_page": 178,
+              "date": "2026-07-20",
+              "id": "7e275e39-e47b-46aa-a041-aa9b0d09aba7",
+              "pages_read": 20
+            },
+            {
+              "current_page": 193,
+              "date": "2026-07-26",
+              "id": "a2ed00ff-379b-4ba3-802a-5df10d7f549e",
+              "pages_read": 15
+            },
+            {
+              "current_page": 209,
+              "date": "2026-08-01",
+              "id": "342e3a60-aec4-4dfb-b4e9-b707014c2628",
+              "pages_read": 16
+            },
+            {
+              "current_page": 224,
+              "date": "2026-08-02",
+              "id": "04cddb54-a4ad-402a-a0da-532b581ecccd",
+              "pages_read": 15
+            },
+            {
+              "current_page": 243,
+              "date": "2026-08-03",
+              "id": "e161f6de-7bbd-42ba-8409-55eaf1f24a6f",
+              "pages_read": 19
+            },
+            {
+              "current_page": 255,
+              "date": "2026-08-04",
+              "id": "9ef1b540-8079-4ec2-bb1b-30bb8689807c",
+              "pages_read": 12
+            },
+            {
+              "current_page": 270,
+              "date": "2026-08-05",
+              "deleted": true,
+              "id": "42177035-fdca-44d6-97f5-43905c3abf73",
+              "pages_read": 5
+            },
+            {
+              "current_page": 300,
+              "date": "2026-08-05",
+              "deleted": true,
+              "id": "6c21580c-07c2-4135-a278-9fb471db85d9",
+              "pages_read": 45
+            },
+            {
+              "current_page": 265,
+              "date": "2026-08-05",
+              "deleted": true,
+              "id": "a1177054-da74-43e1-a5e5-97110ab48558",
+              "pages_read": 10
+            },
+            {
+              "current_page": 300,
+              "date": "2026-08-05",
+              "deleted": true,
+              "id": "ac714ad2-0fd4-4c46-a179-d23ff262bfe4",
+              "pages_read": 45
+            },
+            {
+              "current_page": 280,
+              "date": "2026-08-06",
+              "id": "7220de7a-d81d-4888-9e50-3aae63049f1b",
+              "pages_read": 25
+            }
+          ],
+          "start_date_override": "2026-07-01",
+          "start_page": 1,
+          "target_completed_date": "2026-08-06",
+          "title": "changing order"
+        },
+        {
+          "baseline_schedule": {
+            "daily_target": 12.333333333333334,
+            "deadline": "2026-09-22",
+            "start_date": "2026-09-14"
+          },
+          "current_page": null,
+          "deadline_override": "2026-09-22",
+          "end_page": 111,
+          "id": "c4300e34-d345-4022-9043-837237404df1",
+          "number": 4,
+          "pages": 111,
+          "pages_read": 0,
+          "reading_sessions": [],
+          "start_date_override": "2026-09-14",
+          "start_page": 1,
+          "target_completed_date": null,
+          "title": "byun chul"
+        },
+        {
+          "baseline_schedule": {
+            "daily_target": 11.5,
+            "deadline": "2026-09-30",
+            "start_date": "2026-09-23"
+          },
+          "current_page": null,
+          "deadline_override": null,
+          "end_page": 92,
+          "id": "92b542d9-e2c0-46de-b480-17a5654ec2af",
+          "number": 5,
+          "pages": 92,
+          "pages_read": 0,
+          "reading_sessions": [],
+          "start_date_override": "2026-09-23",
+          "start_page": 1,
+          "target_completed_date": null,
+          "title": "camus"
+        }
+      ],
+      "label": "Physical books",
+      "simultaneous_groups": [
+        [
+          "ab80c361-b8b9-4b78-91a4-b0d93ea26059",
+          "b7aeefac-7132-40d7-8290-e6cf2045e7e0",
+          "c447bdd5-bd23-439d-a157-9905c99bf373"
+        ]
+      ]
+    },
+    {
+      "baseline_needs_recalculation": false,
+      "books": [
+        {
+          "baseline_schedule": {
+            "daily_target": 3.9814814814814814,
+            "deadline": "2026-09-30",
+            "start_date": "2026-07-01"
+          },
+          "current_page": 169,
+          "deadline_override": null,
+          "end_page": 350,
+          "id": "563a6b5d-a979-460d-9158-09e0482c8c7b",
+          "number": 1,
+          "pages": 350,
+          "pages_read": 169,
+          "reading_sessions": [
+            {
+              "current_page": 71,
+              "date": "2026-07-06",
+              "id": "14524cea-708d-40c6-8200-95b570d9dadc",
+              "pages_read": 71
+            },
+            {
+              "current_page": 76,
+              "date": "2026-07-16",
+              "id": "71dae7c8-f855-4b16-adec-a0f2a33b1ab4",
+              "pages_read": 5
+            },
+            {
+              "current_page": 83,
+              "date": "2026-07-18",
+              "id": "01b03086-c4d2-4ada-a879-9761e9fbde5b",
+              "pages_read": 7
+            },
+            {
+              "current_page": 89,
+              "date": "2026-07-19",
+              "id": "38694f4d-2a7f-4e33-9e71-e427b2c6a746",
+              "pages_read": 6
+            },
+            {
+              "current_page": 122,
+              "date": "2026-07-26",
+              "id": "7c50a46e-18aa-4bb2-a5a4-f216dbecb13b",
+              "pages_read": 33
+            },
+            {
+              "current_page": 126,
+              "date": "2026-07-27",
+              "id": "91d1db41-8db9-4d6b-8e5f-9f45d5143621",
+              "pages_read": 4
+            },
+            {
+              "current_page": 131,
+              "date": "2026-07-28",
+              "id": "9aa05e15-4cf6-4dc3-a7a6-7b789be8acc2",
+              "pages_read": 5
+            },
+            {
+              "current_page": 135,
+              "date": "2026-07-29",
+              "id": "3ba226b6-086e-48ef-8203-0a6a7c535b6f",
+              "pages_read": 4
+            },
+            {
+              "current_page": 140,
+              "date": "2026-07-30",
+              "id": "38044ec5-b548-4fe0-ae24-4b2c650183d7",
+              "pages_read": 5
+            },
+            {
+              "current_page": 143,
+              "date": "2026-07-31",
+              "id": "5b9508ca-0150-4ea4-9c4a-c0b17aad32cd",
+              "pages_read": 3
+            },
+            {
+              "current_page": 148,
+              "date": "2026-08-01",
+              "id": "8e5e3ae5-9a3a-4197-9519-b8757fd944b1",
+              "pages_read": 5
+            },
+            {
+              "current_page": 154,
+              "date": "2026-08-02",
+              "id": "169194c0-ab14-48db-bb56-f9fc30e519c8",
+              "pages_read": 6
+            },
+            {
+              "current_page": 150,
+              "date": "2026-08-02",
+              "deleted": true,
+              "id": "51118a50-af54-4ccd-9d89-918f39e5479f",
+              "pages_read": 0
+            },
+            {
+              "current_page": 158,
+              "date": "2026-08-03",
+              "id": "cb8a1482-bcb3-4bcb-96ee-061a6ffe3a30",
+              "pages_read": 4
+            },
+            {
+              "current_page": 161,
+              "date": "2026-08-04",
+              "id": "ef88360f-0f25-4917-a93e-cbe70e778b7f",
+              "pages_read": 3
+            },
+            {
+              "current_page": 163,
+              "date": "2026-08-05",
+              "id": "7bd54a4e-027f-4943-b235-c756b7b5d963",
+              "pages_read": 2
+            },
+            {
+              "current_page": 165,
+              "date": "2026-08-06",
+              "id": "9e2ebcf7-8646-4e8a-81f5-9f4521b07a06",
+              "pages_read": 2
+            },
+            {
+              "current_page": 169,
+              "date": "2026-08-07",
+              "id": "f05a4a40-d3d1-42fa-bf98-ca8f05f20543",
+              "pages_read": 4
+            }
+          ],
+          "start_date_override": "2026-07-01",
+          "start_page": 1,
+          "target_completed_date": "2026-08-07",
+          "title": "react"
+        }
+      ],
+      "label": "Digital books",
+      "simultaneous_groups": []
+    },
+    {
+      "baseline_needs_recalculation": false,
+      "books": [
+        {
+          "baseline_schedule": {
+            "daily_target": 0,
+            "deadline": "2026-08-01",
+            "start_date": "2026-07-01"
+          },
+          "current_time_seconds": 29820,
+          "deadline_override": "2026-07-31",
+          "duration_seconds": 29820,
+          "end_time_seconds": 29820,
+          "id": "68494fe1-c596-4fdd-aed2-3585a9cfb9dd",
+          "number": 1,
+          "reading_sessions": [
+            {
+              "current_time_seconds": 60,
+              "date": "2026-07-07",
+              "id": "2b5d6521-2596-4c4b-bcfd-daf3074bf9e3",
+              "remaining_time_seconds": 29760,
+              "time_listened_seconds": 60
+            },
+            {
+              "current_time_seconds": 2340,
+              "date": "2026-07-09",
+              "id": "89b3d751-24cc-415e-8579-26deee9d2316",
+              "remaining_time_seconds": 27480,
+              "time_listened_seconds": 2280
+            },
+            {
+              "current_time_seconds": 13200,
+              "date": "2026-07-10",
+              "id": "53d8b596-04db-42bd-8527-5bdba078bcdb",
+              "remaining_time_seconds": 16620,
+              "time_listened_seconds": 10860
+            },
+            {
+              "current_time_seconds": 14040,
+              "date": "2026-07-14",
+              "id": "100add50-50d0-463d-9ce9-8a321401ada8",
+              "remaining_time_seconds": 15780,
+              "time_listened_seconds": 840
+            },
+            {
+              "current_time_seconds": 15780,
+              "date": "2026-07-14",
+              "id": "225ea52d-b909-440e-bac3-9e64ddcdb5df",
+              "remaining_time_seconds": 14040,
+              "time_listened_seconds": 1740
+            },
+            {
+              "current_time_seconds": 17340,
+              "date": "2026-07-18",
+              "id": "68f78d97-59df-497e-ba6f-4c34f2109375",
+              "remaining_time_seconds": 12480,
+              "time_listened_seconds": 1560
+            },
+            {
+              "current_time_seconds": 21840,
+              "date": "2026-07-22",
+              "id": "3f4811d5-2e01-4a25-931b-cb7cea84fa0f",
+              "remaining_time_seconds": 7980,
+              "time_listened_seconds": 4500
+            },
+            {
+              "current_time_seconds": 29820,
+              "date": "2026-08-06",
+              "id": "1359ce4e-d467-48fb-a5ec-10b5910fc614",
+              "remaining_time_seconds": 0,
+              "time_listened_seconds": 7980
+            }
+          ],
+          "remaining_time_seconds": 0,
+          "start_date_override": "2026-07-01",
+          "start_time_seconds": 0,
+          "target_completed_date": "2026-07-22",
+          "time_listened_seconds": 29820,
+          "title": "pane e bugie"
+        },
+        {
+          "baseline_schedule": {
+            "daily_target": 838.0192307692307,
+            "deadline": "2026-09-30",
+            "start_date": "2026-07-25"
+          },
+          "current_time_seconds": 16837,
+          "deadline_override": null,
+          "duration_seconds": 60414,
+          "end_time_seconds": 60414,
+          "id": "76083591-064f-485b-bca2-e78fb723218c",
+          "number": 2,
+          "reading_sessions": [
+            {
+              "current_time_seconds": 1106,
+              "date": "2026-07-27",
+              "id": "345751a9-c1bc-4601-a1e0-fcf820085990",
+              "remaining_time_seconds": 59308,
+              "time_listened_seconds": 1106
+            },
+            {
+              "current_time_seconds": 6107,
+              "date": "2026-07-29",
+              "id": "ce08d73d-75a5-44f4-ab1f-d8816b7e43a8",
+              "remaining_time_seconds": 54307,
+              "time_listened_seconds": 5001
+            },
+            {
+              "current_time_seconds": 9365,
+              "date": "2026-08-03",
+              "id": "7324a4a7-ceba-4b36-9e99-ad7abb5d9258",
+              "remaining_time_seconds": 51049,
+              "time_listened_seconds": 3258
+            },
+            {
+              "current_time_seconds": 11454,
+              "date": "2026-08-03",
+              "id": "b5e2c7f7-593f-4892-96ad-a9a836b3f4a3",
+              "remaining_time_seconds": 48960,
+              "time_listened_seconds": 2089
+            },
+            {
+              "current_time_seconds": 14213,
+              "date": "2026-08-04",
+              "id": "f1c829af-b2dc-415e-b9a5-a47f2cedc92d",
+              "remaining_time_seconds": 46201,
+              "time_listened_seconds": 2759
+            },
+            {
+              "current_time_seconds": 20814,
+              "date": "2026-08-05",
+              "deleted": true,
+              "id": "9a8fce6a-c4d5-40f5-9e4c-2af8327b9946",
+              "remaining_time_seconds": 39600,
+              "time_listened_seconds": 6601
+            },
+            {
+              "current_time_seconds": 16837,
+              "date": "2026-08-05",
+              "deleted": true,
+              "id": "9f1e0485-476e-4ceb-aae1-926634a3d566",
+              "remaining_time_seconds": 43577,
+              "time_listened_seconds": 2624
+            },
+            {
+              "current_time_seconds": 16837,
+              "date": "2026-08-05",
+              "id": "e3f7ea7a-5f76-489d-b69a-966c6532617a",
+              "remaining_time_seconds": 43577,
+              "time_listened_seconds": 2624
+            },
+            {
+              "current_time_seconds": 24414,
+              "date": "2026-08-05",
+              "deleted": true,
+              "id": "f71d7997-8495-4fe2-8106-4937257d0604",
+              "remaining_time_seconds": 36000,
+              "time_listened_seconds": 10201
+            }
+          ],
+          "remaining_time_seconds": 43577,
+          "start_date_override": "2026-07-25",
+          "start_time_seconds": 0,
+          "target_completed_date": "2026-08-05",
+          "time_listened_seconds": 16837,
+          "title": "Red Moon"
+        }
+      ],
+      "label": "Audiobooks",
+      "simultaneous_groups": []
+    }
+  ],
+  "start_date": "2026-07-05",
+  "stats_options": {
+    "average_pages": true,
+    "book_counts": true,
+    "pace_driver": true,
+    "page_share": true,
+    "reading_period": true
+  }
+}

@@ -21,6 +21,7 @@ import android.text.Editable;
 import android.text.InputType;
 import android.text.TextWatcher;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
@@ -122,6 +123,7 @@ public class MainActivity extends Activity {
     private final ReadingPlanPlanView planView = new ReadingPlanPlanView(this);
     private final ReadingPlanBooksView booksView = new ReadingPlanBooksView(this);
     private final ReadingPlanMetricsView metricsView = new ReadingPlanMetricsView(this);
+    private Dialog metricsDialog;
     private final ReadingPlanChartsView chartsView = new ReadingPlanChartsView(this);
     private StatsOptions statsOptions = new StatsOptions(true, true, true, true, true);
     LocalDate startDate;
@@ -571,6 +573,74 @@ public class MainActivity extends Activity {
         saveHandler.postDelayed(pendingSave, 250);
     }
 
+    void showMetricsDialog() {
+        if (metricsDialog != null && metricsDialog.isShowing()) metricsDialog.dismiss();
+        Dialog dialog = new Dialog(this);
+        metricsDialog = dialog;
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(20), dp(12), dp(20), dp(20));
+        panel.setBackgroundColor(CREAM);
+        View handle = new View(this);
+        handle.setBackground(roundedBackground(BORDER, BORDER));
+        LinearLayout.LayoutParams hp = new LinearLayout.LayoutParams(dp(44), dp(5));
+        hp.gravity = Gravity.CENTER_HORIZONTAL;
+        panel.addView(handle, hp);
+        LinearLayout header = row();
+        header.addView(heading("Metrics"), new LinearLayout.LayoutParams(0, -2, 1));
+        header.addView(secondaryButton("Close", v -> closeMetricsDialog(dialog)));
+        panel.addView(header);
+        ScrollView metricsScroll = sheetScrollView(dialog, panel, () -> closeMetricsDialog(dialog));
+        ScrollView metricsContent = metricsView.build();
+        View metricsBody = metricsContent.getChildAt(0);
+        metricsContent.removeView(metricsBody);
+        metricsScroll.addView(metricsBody);
+        panel.addView(metricsScroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        dialog.setContentView(panel);
+        Window window = dialog.getWindow();
+        if (window != null) { window.setBackgroundDrawable(new ColorDrawable(CREAM)); window.setGravity(Gravity.BOTTOM); }
+        dialog.show();
+        if (dialog.getWindow() != null) dialog.getWindow().setLayout(-1, (int) (getResources().getDisplayMetrics().heightPixels * .86f));
+        attachSheetDrag(handle, panel, dialog, () -> closeMetricsDialog(dialog));
+        attachSheetDrag(header, panel, dialog, () -> closeMetricsDialog(dialog));
+    }
+
+    void attachSheetDrag(View source, View panel, Dialog dialog, Runnable close) {
+        final float[] start = {0};
+        source.setOnTouchListener((v, e) -> {
+            if (e.getAction() == MotionEvent.ACTION_DOWN) { start[0] = e.getRawY(); return true; }
+            if (e.getAction() == MotionEvent.ACTION_MOVE) { float dy = e.getRawY() - start[0]; if (dy > 0) panel.setTranslationY(dy); return true; }
+            if (e.getAction() == MotionEvent.ACTION_UP) { if (e.getRawY() - start[0] > dp(120)) close.run(); else panel.animate().translationY(0).setDuration(180).start(); return true; }
+            if (e.getAction() == MotionEvent.ACTION_CANCEL) { start[0] = 0; panel.animate().translationY(0).setDuration(180).start(); return true; }
+            return true;
+        });
+    }
+
+    ScrollView sheetScrollView(Dialog dialog, View panel, Runnable close) {
+        ScrollView scroll = new ScrollView(this) {
+            float start;
+            boolean dragging;
+            @Override public boolean onInterceptTouchEvent(MotionEvent event) {
+                if (event.getAction() == MotionEvent.ACTION_DOWN) { start = event.getRawY(); dragging = false; return super.onInterceptTouchEvent(event); }
+                if (event.getAction() == MotionEvent.ACTION_MOVE && getScrollY() == 0 && event.getRawY() - start > 0) { dragging = true; requestDisallowInterceptTouchEvent(true); return true; }
+                return super.onInterceptTouchEvent(event);
+            }
+            @Override public boolean onTouchEvent(MotionEvent event) {
+                if (!dragging) return super.onTouchEvent(event);
+                if (event.getAction() == MotionEvent.ACTION_MOVE) { panel.setTranslationY(Math.max(0, event.getRawY() - start)); return true; }
+                if (event.getAction() == MotionEvent.ACTION_UP) { if (event.getRawY() - start > dp(120)) close.run(); else panel.animate().translationY(0).setDuration(180).start(); dragging = false; return true; }
+                if (event.getAction() == MotionEvent.ACTION_CANCEL) { start = 0; dragging = false; panel.animate().translationY(0).setDuration(180).start(); return true; }
+                return true;
+            }
+        };
+        return scroll;
+    }
+
+    private void closeMetricsDialog(Dialog dialog) {
+        View view = dialog.getWindow().getDecorView();
+        view.animate().translationY(view.getHeight()).setDuration(180).withEndAction(() -> { dialog.dismiss(); if (metricsDialog == dialog) metricsDialog = null; }).start();
+    }
+
     private void saveJsonNow() {
         if (jsonUri == null) {
             return;
@@ -1017,7 +1087,7 @@ public class MainActivity extends Activity {
                             ? startPage + sessionPagesRead - 1
                             : previousCurrentPage + sessionPagesRead;
                 }
-                if (sessionPagesRead <= 0) {
+                if (sessionPagesRead <= 0 && !deleted) {
                     throw new IllegalArgumentException(isAudiobookSection(sectionLabel)
                             ? "reading session time must be positive"
                             : "reading session pages must be positive");

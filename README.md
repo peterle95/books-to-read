@@ -26,3 +26,12 @@ You can choose consecutive Book IDs within each table to read simultaneously. Th
 ## Requirements
 
 Python 3.7+ (standard library only, no external dependencies).
+
+## Reading-plan snapshots
+
+```bash
+python3 export_reading_sessions.py
+python3 compare_reading_sessions.py
+```
+
+The export command writes `reading_plan_snapshot.json`. The comparison command reports changed or missing plan data in a coloured table with the affected format, book, simple field name, and before/now values. It ignores automatic sync fields: revision, last-modified time, and device identifier.
