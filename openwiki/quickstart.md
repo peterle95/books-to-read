@@ -24,16 +24,16 @@ Books to Read plans physical books, digital books, and audiobooks across a quart
 
 ## Task routing
 
-| Intent | Canonical page | Source entrypoints | Focused validation |
-|---|---|---|---|
-| Change schedule math | [Scheduling](planning/scheduling.md) | `build_plan`, `calculate_deadlines`, `build_remaining_section_plan` in `reading_plan.py` | `python3 -m unittest test_reading_plan.py` |
-| Add/edit progress or sessions | [Progress](planning/progress.md) | `set_book_progress`, `add_reading_session`, `target_units_for_date` | targeted `test_reading_plan.py` session tests |
-| Change JSON/CSV fields | [Persistence](persistence/json.md) | `book_to_json`, `book_from_json`, `load_json_plan`, `CsvSupport` | JSON/CSV tests, then Android build |
-| Change desktop UI behavior | [Desktop](desktop/app.md) | `ReadingPlanApp`, `after_state_change`, `autosave_json` | Python tests; launch Tk manually |
-| Change Android behavior | [Android](android/app.md) | `MainActivity`, `ReadingPlanScheduler`, `PlanPrimitives` | `gradlew.bat assembleDebug`; manual file lifecycle |
-| Add a metric/chart/report | [Metrics](reporting/metrics.md) | `optional_summary_stat_rows`, `ReadingPlanChartData`, `ReadingPlanCsvReport` | Python tests plus Android manual inspection |
-| Review plan changes | [Snapshots](snapshots/comparison.md) | `export_snapshot`, `differences`, `render_table` | `python3 export_reading_sessions.py` then compare |
-| Validate a change | [Testing](testing/validation.md) | `test_reading_plan.py`, `test_plan_snapshot.py` | `python3 -m unittest test_reading_plan.py test_plan_snapshot.py` |
+| Change area or user intent | Relevant wiki page | Exact source entry points | Important symbols or types | Focused tests | Minimal validation command |
+|---|---|---|---|---|---|
+| Change schedule math | [Scheduling](planning/scheduling.md) | `reading_plan.py` | `build_plan`, `calculate_deadlines`, `build_remaining_section_plan` | schedule, rest-day, override tests in `test_reading_plan.py` | `python3 -m unittest test_reading_plan.py` |
+| Add/edit progress or sessions | [Progress](planning/progress.md) | `reading_plan.py`, `reading-plan-android/app/src/main/java/com/petermolnar/readingplan/MainActivity.java` | `set_book_progress`, `add_reading_session`, `target_units_for_date`, `ReadingSessionEntries` | session and progress tests in `test_reading_plan.py` | `python3 -m unittest test_reading_plan.py` |
+| Change JSON/CSV fields | [Persistence](persistence/json.md) | `reading_plan.py`, `reading-plan-android/app/src/main/java/com/petermolnar/readingplan/BookModels.java`, `reading-plan-android/app/src/main/java/com/petermolnar/readingplan/CsvSupport.java` | `book_to_json`, `book_from_json`, `load_json_plan`, `CsvSupport` | schema, migration, CSV, metadata tests in `test_reading_plan.py` | `python3 -m unittest test_reading_plan.py` |
+| Change desktop UI behavior | [Desktop](desktop/app.md) | `reading_plan_gui.py` | `ReadingPlanApp`, `after_state_change`, `autosave_json` | GUI helper tests in `test_reading_plan.py` | `python3 -m unittest test_reading_plan.py` |
+| Change Android behavior | [Android](android/app.md) | `reading-plan-android/app/src/main/java/com/petermolnar/readingplan/MainActivity.java` | `MainActivity`, `ReadingPlanScheduler`, `PlanPrimitives` | no Android test sources; manual lifecycle checks | `(cd reading-plan-android && ./gradlew :app:assembleDebug)` |
+| Add a metric/chart/report | [Metrics](reporting/metrics.md) | `reading_plan.py`, `reading-plan-android/app/src/main/java/com/petermolnar/readingplan/ReadingPlanChartData.java` | `optional_summary_stat_rows`, `ReadingPlanChartData`, `ReadingPlanCsvReport` | summary/chart/report tests where applicable | `python3 -m unittest test_reading_plan.py` |
+| Review plan changes | [Snapshots](snapshots/comparison.md) | `export_reading_sessions.py`, `compare_reading_sessions.py` | `export_snapshot`, `differences`, `render_table` | `test_plan_snapshot.py` | `python3 -m unittest test_plan_snapshot.py` |
+| Validate a change | [Testing](testing/validation.md) | `test_reading_plan.py`, `test_plan_snapshot.py` | standard-library `unittest` suites | both Python suites | `python3 -m unittest test_reading_plan.py test_plan_snapshot.py` |
 
 ## Operating assumptions
 
