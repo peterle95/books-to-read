@@ -1,0 +1,536 @@
+{
+  "C:\\Users\\molze\\GitHub\\books-to-read\\compare_reading_sessions.py": {
+    "mtime": 1786779132.3156714,
+    "seen": 1788076914.6209867,
+    "ast_hash": "58dad2bdc28f30d8f4205a8a235ce938",
+    "semantic_hash": "58dad2bdc28f30d8f4205a8a235ce938"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\export_reading_sessions.py": {
+    "mtime": 1786779132.3176942,
+    "seen": 1788076914.6209867,
+    "ast_hash": "0f5ca139a56c24a637402baf080fb1e4",
+    "semantic_hash": "0f5ca139a56c24a637402baf080fb1e4"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\openwiki\\.last-update.json": {
+    "mtime": 1787043605.5948257,
+    "seen": 1788076914.6209867,
+    "ast_hash": "698aff835ac2e35765a55d47dd264cf7",
+    "semantic_hash": "698aff835ac2e35765a55d47dd264cf7"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading-plan-android\\app\\build.gradle": {
+    "mtime": 1783323778.7907338,
+    "seen": 1788076914.6209867,
+    "ast_hash": "cee1919ef20db5a1d110c219896ffcb9",
+    "semantic_hash": "cee1919ef20db5a1d110c219896ffcb9"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading-plan-android\\app\\src\\main\\java\\com\\petermolnar\\readingplan\\BookCollections.java": {
+    "mtime": 1785772938.108493,
+    "seen": 1788076914.6209867,
+    "ast_hash": "25d1f07cb962c104d3d327e16706711c",
+    "semantic_hash": "25d1f07cb962c104d3d327e16706711c"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading-plan-android\\app\\src\\main\\java\\com\\petermolnar\\readingplan\\BookModels.java": {
+    "mtime": 1785832565.4293032,
+    "seen": 1788076914.6209867,
+    "ast_hash": "de9e13005d3b496431551646ec42d182",
+    "semantic_hash": "de9e13005d3b496431551646ec42d182"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading-plan-android\\app\\src\\main\\java\\com\\petermolnar\\readingplan\\CsvSupport.java": {
+    "mtime": 1785772938.1325853,
+    "seen": 1788076914.6209867,
+    "ast_hash": "565dd4ddbb5abaff3e3f2fbcfad5181a",
+    "semantic_hash": "565dd4ddbb5abaff3e3f2fbcfad5181a"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading-plan-android\\app\\src\\main\\java\\com\\petermolnar\\readingplan\\MainActivity.java": {
+    "mtime": 1786779132.3600433,
+    "seen": 1788076914.6209867,
+    "ast_hash": "98717115f87195308cf4999b2231ec59",
+    "semantic_hash": "98717115f87195308cf4999b2231ec59"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading-plan-android\\app\\src\\main\\java\\com\\petermolnar\\readingplan\\PlanPrimitives.java": {
+    "mtime": 1785772938.1619081,
+    "seen": 1788076914.6209867,
+    "ast_hash": "5f329486aedfb1539340d1134a29c12c",
+    "semantic_hash": "5f329486aedfb1539340d1134a29c12c"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading-plan-android\\app\\src\\main\\java\\com\\petermolnar\\readingplan\\PlanValues.java": {
+    "mtime": 1785772938.1739092,
+    "seen": 1788076914.6209867,
+    "ast_hash": "1b72e47f729d1e7d6f5167839ad001e4",
+    "semantic_hash": "1b72e47f729d1e7d6f5167839ad001e4"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading-plan-android\\app\\src\\main\\java\\com\\petermolnar\\readingplan\\ReadingPlanBookProgress.java": {
+    "mtime": 1785832565.4663446,
+    "seen": 1788076914.6209867,
+    "ast_hash": "0ca57993f3bc0ae14d1bbfa7c4bab8e1",
+    "semantic_hash": "0ca57993f3bc0ae14d1bbfa7c4bab8e1"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading-plan-android\\app\\src\\main\\java\\com\\petermolnar\\readingplan\\ReadingPlanBooksView.java": {
+    "mtime": 1785832565.4932604,
+    "seen": 1788076914.6209867,
+    "ast_hash": "3a282c5c086584ce9873d2c6d8348628",
+    "semantic_hash": "3a282c5c086584ce9873d2c6d8348628"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading-plan-android\\app\\src\\main\\java\\com\\petermolnar\\readingplan\\ReadingPlanCalendar.java": {
+    "mtime": 1785772938.2120078,
+    "seen": 1788076914.6209867,
+    "ast_hash": "646a76d6d2f7a86ca2907468e8314247",
+    "semantic_hash": "646a76d6d2f7a86ca2907468e8314247"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading-plan-android\\app\\src\\main\\java\\com\\petermolnar\\readingplan\\ReadingPlanChartData.java": {
+    "mtime": 1785832565.5078816,
+    "seen": 1788076914.6209867,
+    "ast_hash": "9262e799d5c1bd9ea2c8f5c995913912",
+    "semantic_hash": "9262e799d5c1bd9ea2c8f5c995913912"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading-plan-android\\app\\src\\main\\java\\com\\petermolnar\\readingplan\\ReadingPlanChartView.java": {
+    "mtime": 1785772938.235906,
+    "seen": 1788076914.6209867,
+    "ast_hash": "38215d99ad5eb7000219397f73b54fef",
+    "semantic_hash": "38215d99ad5eb7000219397f73b54fef"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading-plan-android\\app\\src\\main\\java\\com\\petermolnar\\readingplan\\ReadingPlanChartsView.java": {
+    "mtime": 1786779132.3625848,
+    "seen": 1788076914.6209867,
+    "ast_hash": "1e8ea6a4425304ace106ff5186a118be",
+    "semantic_hash": "1e8ea6a4425304ace106ff5186a118be"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading-plan-android\\app\\src\\main\\java\\com\\petermolnar\\readingplan\\ReadingPlanCsvReport.java": {
+    "mtime": 1785772938.2615488,
+    "seen": 1788076914.6209867,
+    "ast_hash": "9b597c7ab78a9e80d6d1e6f4507b6e22",
+    "semantic_hash": "9b597c7ab78a9e80d6d1e6f4507b6e22"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading-plan-android\\app\\src\\main\\java\\com\\petermolnar\\readingplan\\ReadingPlanMetricsView.java": {
+    "mtime": 1786779132.3645868,
+    "seen": 1788076914.6209867,
+    "ast_hash": "3abcbf6aa16c6a67e7772e295020b5f0",
+    "semantic_hash": "3abcbf6aa16c6a67e7772e295020b5f0"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading-plan-android\\app\\src\\main\\java\\com\\petermolnar\\readingplan\\ReadingPlanPlanView.java": {
+    "mtime": 1785772938.2874537,
+    "seen": 1788076914.6209867,
+    "ast_hash": "09da142f586eedb1437b0f57c6d44fd1",
+    "semantic_hash": "09da142f586eedb1437b0f57c6d44fd1"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading-plan-android\\app\\src\\main\\java\\com\\petermolnar\\readingplan\\ReadingPlanScheduler.java": {
+    "mtime": 1785772938.3002632,
+    "seen": 1788076914.6209867,
+    "ast_hash": "bd95615e56b117ecd180602ee5c0d208",
+    "semantic_hash": "bd95615e56b117ecd180602ee5c0d208"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading-plan-android\\app\\src\\main\\java\\com\\petermolnar\\readingplan\\ReadingPlanSessionView.java": {
+    "mtime": 1785772938.3121023,
+    "seen": 1788076914.6209867,
+    "ast_hash": "01dc429bd39ab80914c280476a462d3c",
+    "semantic_hash": "01dc429bd39ab80914c280476a462d3c"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading-plan-android\\app\\src\\main\\java\\com\\petermolnar\\readingplan\\ReadingPlanTables.java": {
+    "mtime": 1785772938.3251057,
+    "seen": 1788076914.6209867,
+    "ast_hash": "4b354146dd03659ef6a48829e91b72e0",
+    "semantic_hash": "4b354146dd03659ef6a48829e91b72e0"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading-plan-android\\app\\src\\main\\java\\com\\petermolnar\\readingplan\\ReadingPlanTargets.java": {
+    "mtime": 1785772938.3378549,
+    "seen": 1788076914.6209867,
+    "ast_hash": "0c7d69480326b8cf6bb01a90576fb6e8",
+    "semantic_hash": "0c7d69480326b8cf6bb01a90576fb6e8"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading-plan-android\\app\\src\\main\\java\\com\\petermolnar\\readingplan\\ReadingPlanUi.java": {
+    "mtime": 1785772938.3508587,
+    "seen": 1788076914.6209867,
+    "ast_hash": "8ec209d393e9649f6280fd106f684a7b",
+    "semantic_hash": "8ec209d393e9649f6280fd106f684a7b"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading-plan-android\\app\\src\\main\\java\\com\\petermolnar\\readingplan\\ReadingSessionEntries.java": {
+    "mtime": 1786779132.3655832,
+    "seen": 1788076914.6209867,
+    "ast_hash": "963672503c0af3e9d0f12052c083f002",
+    "semantic_hash": "963672503c0af3e9d0f12052c083f002"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading-plan-android\\build.gradle": {
+    "mtime": 1783323778.7851958,
+    "seen": 1788076914.6209867,
+    "ast_hash": "1520528d84f9dbed878cd932ec867373",
+    "semantic_hash": "1520528d84f9dbed878cd932ec867373"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading-plan-android\\gradlew": {
+    "mtime": 1783324696.8063476,
+    "seen": 1788076914.6209867,
+    "ast_hash": "266606e78242737ef3da02a80ea0564d",
+    "semantic_hash": "266606e78242737ef3da02a80ea0564d"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading-plan-android\\settings.gradle": {
+    "mtime": 1783323778.7831895,
+    "seen": 1788076914.6209867,
+    "ast_hash": "99e3aeb50c3f3c537fe238e7e425f2ca",
+    "semantic_hash": "99e3aeb50c3f3c537fe238e7e425f2ca"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading_plan.py": {
+    "mtime": 1785832565.5618217,
+    "seen": 1788076914.6209867,
+    "ast_hash": "bcde80c0a11c309f6d4b78c2b1013873",
+    "semantic_hash": "bcde80c0a11c309f6d4b78c2b1013873"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading_plan_gui.py": {
+    "mtime": 1785832565.573088,
+    "seen": 1788076914.6209867,
+    "ast_hash": "6d6e3d4368bd42dac7028485916d6a65",
+    "semantic_hash": "6d6e3d4368bd42dac7028485916d6a65"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading_plan_snapshot.json": {
+    "mtime": 1786779132.3691325,
+    "seen": 1788076914.6209867,
+    "ast_hash": "a8d0f859d22f5114ea53e48f24bfcb55",
+    "semantic_hash": "a8d0f859d22f5114ea53e48f24bfcb55"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\test_plan_snapshot.py": {
+    "mtime": 1786779132.3701308,
+    "seen": 1788076914.6209867,
+    "ast_hash": "b3f721101f96043dfc4eb18388a56f97",
+    "semantic_hash": "b3f721101f96043dfc4eb18388a56f97"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\test_reading_plan.py": {
+    "mtime": 1785832565.5896122,
+    "seen": 1788076914.6209867,
+    "ast_hash": "73ec189f6b1b2003cd339b5fdfed21fa",
+    "semantic_hash": "73ec189f6b1b2003cd339b5fdfed21fa"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\.github\\workflows\\openwiki-update.yml": {
+    "mtime": 1787044026.2070696,
+    "seen": 1788076914.6209867,
+    "ast_hash": "ce0e503bec85de94e651262d4d3de3b8",
+    "semantic_hash": "ce0e503bec85de94e651262d4d3de3b8"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\.stfolder\\syncthing-folder-6e317b.txt": {
+    "mtime": 1783328149.8054562,
+    "seen": 1788076914.6209867,
+    "ast_hash": "1719c4317a0cccf6ffe17eb31b283573",
+    "semantic_hash": "1719c4317a0cccf6ffe17eb31b283573"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\AGENTS.md": {
+    "mtime": 1787043605.5897205,
+    "seen": 1788076914.6209867,
+    "ast_hash": "69478b79611c05ce656c54d3fced5469",
+    "semantic_hash": "69478b79611c05ce656c54d3fced5469"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\CLAUDE.md": {
+    "mtime": 1787043605.5912535,
+    "seen": 1788076914.6209867,
+    "ast_hash": "cbeb5e259a2ef2b692eebeaa9db1aece",
+    "semantic_hash": "cbeb5e259a2ef2b692eebeaa9db1aece"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\CONTEXT.md": {
+    "mtime": 1786779132.3131528,
+    "seen": 1788076914.6209867,
+    "ast_hash": "0f501c6e47cb13659923bb293e097dfb",
+    "semantic_hash": "0f501c6e47cb13659923bb293e097dfb"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\README.md": {
+    "mtime": 1786779132.314153,
+    "seen": 1788076914.6209867,
+    "ast_hash": "09204afc8f4ff528ebec54b7906a7257",
+    "semantic_hash": "09204afc8f4ff528ebec54b7906a7257"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\docs\\adr\\0001-persist-quarterly-baseline-schedules.md": {
+    "mtime": 1784232413.4446118,
+    "seen": 1788076914.6209867,
+    "ast_hash": "ee36d361b155ecc54d312da09d8459d8",
+    "semantic_hash": "ee36d361b155ecc54d312da09d8459d8"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\docs\\adr\\001-calculation-model.md": {
+    "mtime": 1784295894.713666,
+    "seen": 1788076914.6209867,
+    "ast_hash": "cf91a43d3a3016affa6883f1f8b0ba7c",
+    "semantic_hash": "cf91a43d3a3016affa6883f1f8b0ba7c"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\docs\\agents\\domain.md": {
+    "mtime": 1784231424.2083383,
+    "seen": 1788076914.6209867,
+    "ast_hash": "ff3f7a3b215f6493e0a934fe0efa030c",
+    "semantic_hash": "ff3f7a3b215f6493e0a934fe0efa030c"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\docs\\agents\\issue-tracker.md": {
+    "mtime": 1784231424.205338,
+    "seen": 1788076914.6209867,
+    "ast_hash": "ec36c234b5bcbd9540215b7a8db427ea",
+    "semantic_hash": "ec36c234b5bcbd9540215b7a8db427ea"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\docs\\agents\\triage-labels.md": {
+    "mtime": 1784231424.2073364,
+    "seen": 1788076914.6209867,
+    "ast_hash": "f53a01e6026dd81727327b26e4ac7e05",
+    "semantic_hash": "f53a01e6026dd81727327b26e4ac7e05"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\openwiki\\INSTRUCTIONS.md": {
+    "mtime": 1786779132.3232448,
+    "seen": 1788076914.6209867,
+    "ast_hash": "80006233916f40ca2b4915ee42c0c491",
+    "semantic_hash": "80006233916f40ca2b4915ee42c0c491"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\openwiki\\android\\app.md": {
+    "mtime": 1787043605.5973802,
+    "seen": 1788076914.6209867,
+    "ast_hash": "e01908d58a3a89f47b1e82494ea227b7",
+    "semantic_hash": "e01908d58a3a89f47b1e82494ea227b7"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\openwiki\\android\\index.md": {
+    "mtime": 1787043605.600606,
+    "seen": 1788076914.6209867,
+    "ast_hash": "b5dc10bdce421d84138b8b3890f8dcd8",
+    "semantic_hash": "b5dc10bdce421d84138b8b3890f8dcd8"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\openwiki\\architecture\\index.md": {
+    "mtime": 1787043605.6026995,
+    "seen": 1788076914.6209867,
+    "ast_hash": "b180c2d6db1b32cc82056a9a51b83ec4",
+    "semantic_hash": "b180c2d6db1b32cc82056a9a51b83ec4"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\openwiki\\architecture\\overview.md": {
+    "mtime": 1787043605.604988,
+    "seen": 1788076914.6209867,
+    "ast_hash": "2759190c3d66f0ce466c49ebcd197db2",
+    "semantic_hash": "2759190c3d66f0ce466c49ebcd197db2"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\openwiki\\desktop\\app.md": {
+    "mtime": 1787043605.6076627,
+    "seen": 1788076914.6209867,
+    "ast_hash": "a6634dae34d90d3f593ade5ebcdfe4d0",
+    "semantic_hash": "a6634dae34d90d3f593ade5ebcdfe4d0"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\openwiki\\desktop\\index.md": {
+    "mtime": 1787043605.6102166,
+    "seen": 1788076914.6209867,
+    "ast_hash": "c750000b365c519716512040abd3b203",
+    "semantic_hash": "c750000b365c519716512040abd3b203"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\openwiki\\index.md": {
+    "mtime": 1787043605.6132803,
+    "seen": 1788076914.6209867,
+    "ast_hash": "9c8e8d51c1f21eba0acbffc19e4961c5",
+    "semantic_hash": "9c8e8d51c1f21eba0acbffc19e4961c5"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\openwiki\\operations\\index.md": {
+    "mtime": 1787043605.6168487,
+    "seen": 1788076914.6209867,
+    "ast_hash": "0b6ea805958c0a226f1ff1a376e762fd",
+    "semantic_hash": "0b6ea805958c0a226f1ff1a376e762fd"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\openwiki\\operations\\workflow.md": {
+    "mtime": 1787043605.6202197,
+    "seen": 1788076914.6209867,
+    "ast_hash": "22cd6f49869ac3a14efbb2033390e2ef",
+    "semantic_hash": "22cd6f49869ac3a14efbb2033390e2ef"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\openwiki\\persistence\\index.md": {
+    "mtime": 1787043605.6223087,
+    "seen": 1788076914.6209867,
+    "ast_hash": "146e4a25cfeae915caa61a2a4a83c030",
+    "semantic_hash": "146e4a25cfeae915caa61a2a4a83c030"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\openwiki\\persistence\\json.md": {
+    "mtime": 1787043605.6253474,
+    "seen": 1788076914.6209867,
+    "ast_hash": "7e921daad78685f03080fb23456dacea",
+    "semantic_hash": "7e921daad78685f03080fb23456dacea"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\openwiki\\planning\\index.md": {
+    "mtime": 1787043605.628893,
+    "seen": 1788076914.6209867,
+    "ast_hash": "648a540d8a3a6a44b72c1f22c3c33343",
+    "semantic_hash": "648a540d8a3a6a44b72c1f22c3c33343"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\openwiki\\planning\\model.md": {
+    "mtime": 1787043605.6324315,
+    "seen": 1788076914.6209867,
+    "ast_hash": "b6010eb64ac6318f4b7395039fbbe229",
+    "semantic_hash": "b6010eb64ac6318f4b7395039fbbe229"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\openwiki\\planning\\progress.md": {
+    "mtime": 1787043605.6344264,
+    "seen": 1788076914.6209867,
+    "ast_hash": "8154c00df4be5fa3b420e351747715ba",
+    "semantic_hash": "8154c00df4be5fa3b420e351747715ba"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\openwiki\\planning\\scheduling.md": {
+    "mtime": 1787043605.636957,
+    "seen": 1788076914.6209867,
+    "ast_hash": "6932820323d0d79d30bbf7fe5a3dbf01",
+    "semantic_hash": "6932820323d0d79d30bbf7fe5a3dbf01"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\openwiki\\quickstart.md": {
+    "mtime": 1787043605.6390114,
+    "seen": 1788076914.6209867,
+    "ast_hash": "567990d447efca5177441c38aa676d6b",
+    "semantic_hash": "567990d447efca5177441c38aa676d6b"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\openwiki\\reporting\\index.md": {
+    "mtime": 1787043605.6420994,
+    "seen": 1788076914.6209867,
+    "ast_hash": "79a17488c3dbe575ec950ff06d24d62e",
+    "semantic_hash": "79a17488c3dbe575ec950ff06d24d62e"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\openwiki\\reporting\\metrics.md": {
+    "mtime": 1787043605.6451702,
+    "seen": 1788076914.6209867,
+    "ast_hash": "bb3c5bcea47d2526a3255d4854aa205c",
+    "semantic_hash": "bb3c5bcea47d2526a3255d4854aa205c"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\openwiki\\snapshots\\comparison.md": {
+    "mtime": 1787043605.647329,
+    "seen": 1788076914.6209867,
+    "ast_hash": "d158b9f0f6764a1bee05145535f40a7a",
+    "semantic_hash": "d158b9f0f6764a1bee05145535f40a7a"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\openwiki\\snapshots\\index.md": {
+    "mtime": 1787043605.648969,
+    "seen": 1788076914.6209867,
+    "ast_hash": "0077bae4b906dbe1025011720cf056bb",
+    "semantic_hash": "0077bae4b906dbe1025011720cf056bb"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\openwiki\\testing\\index.md": {
+    "mtime": 1787043605.6515968,
+    "seen": 1788076914.6209867,
+    "ast_hash": "ebf7358d441a09605a9e296c812a8529",
+    "semantic_hash": "ebf7358d441a09605a9e296c812a8529"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\openwiki\\testing\\validation.md": {
+    "mtime": 1787043605.6552904,
+    "seen": 1788076914.6209867,
+    "ast_hash": "cfee801263d132fa5158415873ca5bcb",
+    "semantic_hash": "cfee801263d132fa5158415873ca5bcb"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\outputs\\repo-implementation-advisor-report.md": {
+    "mtime": 1784221773.1153574,
+    "seen": 1788076914.6209867,
+    "ast_hash": "4f67adccab8af9cba93889ff6c78941d",
+    "semantic_hash": "4f67adccab8af9cba93889ff6c78941d"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading-plan-android\\README.md": {
+    "mtime": 1785832565.388001,
+    "seen": 1788076914.6209867,
+    "ast_hash": "d2d58a4ed028843f9b8022f88fbbf748",
+    "semantic_hash": "d2d58a4ed028843f9b8022f88fbbf748"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\.codex-remote-attachments\\019f70a4-c377-7c93-bd7a-ebda8c328065\\36612601-bb31-45d2-8455-40807d86bc65\\1-Photo-1.jpg": {
+    "mtime": 1784301279.7462723,
+    "seen": 1788076914.6209867,
+    "ast_hash": "cd6dcfe2e50b49e6ced0d97379431c6a",
+    "semantic_hash": "cd6dcfe2e50b49e6ced0d97379431c6a"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\.codex-remote-attachments\\019f70a4-c377-7c93-bd7a-ebda8c328065\\36612601-bb31-45d2-8455-40807d86bc65\\2-Photo-2.jpg": {
+    "mtime": 1784301279.8992312,
+    "seen": 1788076914.6209867,
+    "ast_hash": "9fea6885959af3da9d2c69a48f1a4608",
+    "semantic_hash": "9fea6885959af3da9d2c69a48f1a4608"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\books-cover.png": {
+    "mtime": 1783329194.053804,
+    "seen": 1788076914.6209867,
+    "ast_hash": "7032bd161288c7b5427dd6733a20eba7",
+    "semantic_hash": "7032bd161288c7b5427dd6733a20eba7"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading-plan-android\\app\\src\\main\\res\\drawable-nodpi\\app_cover.png": {
+    "mtime": 1783329194.053804,
+    "seen": 1788076914.6209867,
+    "ast_hash": "7032bd161288c7b5427dd6733a20eba7",
+    "semantic_hash": "7032bd161288c7b5427dd6733a20eba7"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading-plan-android\\app\\src\\main\\res\\drawable\\books_cover.png": {
+    "mtime": 1783329194.053804,
+    "seen": 1788076914.6209867,
+    "ast_hash": "7032bd161288c7b5427dd6733a20eba7",
+    "semantic_hash": "7032bd161288c7b5427dd6733a20eba7"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading-plan-android\\app\\src\\main\\res\\mipmap-hdpi\\ic_launcher.png": {
+    "mtime": 1783345033.261622,
+    "seen": 1788076914.6209867,
+    "ast_hash": "882aac27a2a81cb1c7879bf7715436d1",
+    "semantic_hash": "882aac27a2a81cb1c7879bf7715436d1"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading-plan-android\\app\\src\\main\\res\\mipmap-hdpi\\ic_launcher_foreground.png": {
+    "mtime": 1783345033.300158,
+    "seen": 1788076914.6209867,
+    "ast_hash": "c4854a39f1faa5b84d24b92416127691",
+    "semantic_hash": "c4854a39f1faa5b84d24b92416127691"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading-plan-android\\app\\src\\main\\res\\mipmap-hdpi\\ic_launcher_round.png": {
+    "mtime": 1783345033.2796211,
+    "seen": 1788076914.6209867,
+    "ast_hash": "882aac27a2a81cb1c7879bf7715436d1",
+    "semantic_hash": "882aac27a2a81cb1c7879bf7715436d1"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading-plan-android\\app\\src\\main\\res\\mipmap-mdpi\\ic_launcher.png": {
+    "mtime": 1783345033.3801587,
+    "seen": 1788076914.6209867,
+    "ast_hash": "5450d6a92f8ed1f66e569f59bede9f97",
+    "semantic_hash": "5450d6a92f8ed1f66e569f59bede9f97"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading-plan-android\\app\\src\\main\\res\\mipmap-mdpi\\ic_launcher_foreground.png": {
+    "mtime": 1783345033.4177334,
+    "seen": 1788076914.6209867,
+    "ast_hash": "0d7ca78ca5bc591eb7bcf2498c8e8632",
+    "semantic_hash": "0d7ca78ca5bc591eb7bcf2498c8e8632"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading-plan-android\\app\\src\\main\\res\\mipmap-mdpi\\ic_launcher_round.png": {
+    "mtime": 1783345033.398734,
+    "seen": 1788076914.6209867,
+    "ast_hash": "5450d6a92f8ed1f66e569f59bede9f97",
+    "semantic_hash": "5450d6a92f8ed1f66e569f59bede9f97"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading-plan-android\\app\\src\\main\\res\\mipmap-xhdpi\\ic_launcher.png": {
+    "mtime": 1783345033.3181605,
+    "seen": 1788076914.6209867,
+    "ast_hash": "44ebd5bf43d2427b8f9ccc37882d7a2a",
+    "semantic_hash": "44ebd5bf43d2427b8f9ccc37882d7a2a"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading-plan-android\\app\\src\\main\\res\\mipmap-xhdpi\\ic_launcher_foreground.png": {
+    "mtime": 1783345033.361158,
+    "seen": 1788076914.6209867,
+    "ast_hash": "b14937c8b2524b97ad4ec41a10ebf02d",
+    "semantic_hash": "b14937c8b2524b97ad4ec41a10ebf02d"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading-plan-android\\app\\src\\main\\res\\mipmap-xhdpi\\ic_launcher_round.png": {
+    "mtime": 1783345033.3361604,
+    "seen": 1788076914.6209867,
+    "ast_hash": "44ebd5bf43d2427b8f9ccc37882d7a2a",
+    "semantic_hash": "44ebd5bf43d2427b8f9ccc37882d7a2a"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading-plan-android\\app\\src\\main\\res\\mipmap-xxhdpi\\ic_launcher.png": {
+    "mtime": 1783345033.1901112,
+    "seen": 1788076914.6209867,
+    "ast_hash": "2bd0a75382f6a0a487d9d26fe2eed1cc",
+    "semantic_hash": "2bd0a75382f6a0a487d9d26fe2eed1cc"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading-plan-android\\app\\src\\main\\res\\mipmap-xxhdpi\\ic_launcher_foreground.png": {
+    "mtime": 1783345033.242634,
+    "seen": 1788076914.6209867,
+    "ast_hash": "dce65f579bd72a88f095c59a5910eb85",
+    "semantic_hash": "dce65f579bd72a88f095c59a5910eb85"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading-plan-android\\app\\src\\main\\res\\mipmap-xxhdpi\\ic_launcher_round.png": {
+    "mtime": 1783345033.211619,
+    "seen": 1788076914.6209867,
+    "ast_hash": "2bd0a75382f6a0a487d9d26fe2eed1cc",
+    "semantic_hash": "2bd0a75382f6a0a487d9d26fe2eed1cc"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading-plan-android\\app\\src\\main\\res\\mipmap-xxxhdpi\\ic_launcher.png": {
+    "mtime": 1783345033.099106,
+    "seen": 1788076914.6209867,
+    "ast_hash": "9cb3d274c659c5ea4b0a9483ccc9317f",
+    "semantic_hash": "9cb3d274c659c5ea4b0a9483ccc9317f"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading-plan-android\\app\\src\\main\\res\\mipmap-xxxhdpi\\ic_launcher_foreground.png": {
+    "mtime": 1783345033.1691058,
+    "seen": 1788076914.6209867,
+    "ast_hash": "53588cc3fb3e2f064d909d0e895bfad0",
+    "semantic_hash": "53588cc3fb3e2f064d909d0e895bfad0"
+  },
+  "C:\\Users\\molze\\GitHub\\books-to-read\\reading-plan-android\\app\\src\\main\\res\\mipmap-xxxhdpi\\ic_launcher_round.png": {
+    "mtime": 1783345033.1241064,
+    "seen": 1788076914.6209867,
+    "ast_hash": "9cb3d274c659c5ea4b0a9483ccc9317f",
+    "semantic_hash": "9cb3d274c659c5ea4b0a9483ccc9317f"
+  }
+}
