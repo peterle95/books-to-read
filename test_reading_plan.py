@@ -1,3 +1,4 @@
+import hashlib
 import json
 import tempfile
 import unittest
@@ -5,10 +6,12 @@ from datetime import date
 from pathlib import Path
 
 from reading_plan import (
+    BUNDLE_DATA_FILES,
     Book,
     BookDeadline,
     BookSection,
     ExternalPlanChangeError,
+    JsonBundleError,
     RestDayRange,
     SummaryStatsOptions,
     available_reading_days,
@@ -20,9 +23,13 @@ from reading_plan import (
     validate_deadline_override,
     build_remaining_section_plans,
     calculate_baseline_schedules,
+    import_legacy_json_plan,
+    load_json_bundle,
     load_json_plan,
+    read_json_bundle_metadata,
     ensure_json_plan_unchanged,
     recalculate_baseline_schedules,
+    write_json_bundle,
     write_json_plan,
 )
 from reading_plan_gui import (
@@ -31,6 +38,168 @@ from reading_plan_gui import (
     target_daily_pace_text,
     target_units_for_date,
 )
+
+
+class BundlePersistenceTests(unittest.TestCase):
+    def make_sections(self):
+        book = Book(1, "One", 1, 100)
+        add_reading_session(book, date(2026, 7, 2), 10)
+        return [
+            BookSection("Physical books", [book], []),
+            BookSection("Digital books", [], []),
+            BookSection("Audiobooks", [], []),
+        ]
+
+    def test_bundle_round_trip_separates_books_and_sessions(self):
+        sections = self.make_sections()
+        with tempfile.TemporaryDirectory() as directory:
+            data_directory = Path(directory) / "reading_plan_data"
+            metadata = write_json_bundle(
+                data_directory,
+                sections,
+                date(2026, 7, 1),
+                date(2026, 9, 30),
+                "Quarter end",
+                SummaryStatsOptions(True, True, True, True, True),
+            )
+            self.assertEqual(1, metadata.revision)
+            self.assertEqual(
+                set(BUNDLE_DATA_FILES) | {"manifest.json"},
+                {path.name for path in data_directory.iterdir()},
+            )
+            books_payload = json.loads((data_directory / "books.json").read_text())
+            sessions_payload = json.loads((data_directory / "sessions.json").read_text())
+            book = sections[0].books[0]
+            self.assertNotIn("reading_sessions", books_payload["sections"][0]["books"][0])
+            self.assertEqual([book.id], list(sessions_payload["sessions"]))
+            self.assertEqual(metadata, read_json_bundle_metadata(data_directory))
+
+            loaded, start, end, *_ = load_json_bundle(data_directory)
+
+        self.assertEqual(date(2026, 7, 1), start)
+        self.assertEqual(date(2026, 9, 30), end)
+        self.assertEqual(book.id, loaded[0].books[0].id)
+        self.assertEqual(book.reading_sessions[0].id, loaded[0].books[0].reading_sessions[0].id)
+
+    def test_bundle_rejects_checksum_mismatch_without_fallback(self):
+        sections = self.make_sections()
+        with tempfile.TemporaryDirectory() as directory:
+            data_directory = Path(directory) / "reading_plan_data"
+            write_json_bundle(
+                data_directory,
+                sections,
+                date(2026, 7, 1),
+                date(2026, 9, 30),
+                "Quarter end",
+                SummaryStatsOptions(True, True, True, True, True),
+            )
+            (data_directory / "sessions.json").write_text("{}", encoding="utf-8")
+
+            with self.assertRaises(JsonBundleError) as error:
+                load_json_bundle(data_directory)
+
+        self.assertIn("sessions.json", str(error.exception))
+        self.assertIn("checksum", str(error.exception))
+
+    def test_bundle_rejects_out_of_range_progress(self):
+        sections = self.make_sections()
+        with tempfile.TemporaryDirectory() as directory:
+            data_directory = Path(directory) / "reading_plan_data"
+            write_json_bundle(
+                data_directory,
+                sections,
+                date(2026, 7, 1),
+                date(2026, 9, 30),
+                "Quarter end",
+                SummaryStatsOptions(True, True, True, True, True),
+            )
+            books_path = data_directory / "books.json"
+            books = json.loads(books_path.read_text(encoding="utf-8"))
+            books["sections"][0]["books"][0]["current_page"] = 101
+            books_raw = (json.dumps(books, indent=2) + "\n").encode("utf-8")
+            books_path.write_bytes(books_raw)
+            manifest_path = data_directory / "manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["files"]["books.json"] = hashlib.sha256(books_raw).hexdigest()
+            manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+
+            with self.assertRaises(JsonBundleError) as error:
+                load_json_bundle(data_directory)
+
+        self.assertIn("current_page", str(error.exception))
+
+    def test_legacy_import_preserves_source_and_deleted_zero_session(self):
+        legacy = {
+            "schema_version": 8,
+            "revision": 4,
+            "start_date": "2026-07-01",
+            "end_date": "2026-09-30",
+            "sections": [
+                {
+                    "label": "Physical books",
+                    "books": [
+                        {
+                            "id": "book-1",
+                            "title": "One",
+                            "start_page": 1,
+                            "end_page": 100,
+                            "current_page": None,
+                            "reading_sessions": [
+                                {
+                                    "id": "deleted-1",
+                                    "date": "2026-07-02",
+                                    "current_page": 10,
+                                    "pages_read": 0,
+                                    "deleted": True,
+                                }
+                            ],
+                        }
+                    ],
+                    "simultaneous_groups": [],
+                }
+            ],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "reading_plan.json"
+            data_directory = Path(directory) / "reading_plan_data"
+            source.write_text(json.dumps(legacy), encoding="utf-8")
+            original = source.read_bytes()
+
+            import_legacy_json_plan(source, data_directory)
+
+            self.assertEqual(original, source.read_bytes())
+            loaded = load_json_bundle(data_directory)[0]
+            session = loaded[0].books[0].reading_sessions[0]
+
+        self.assertTrue(session.deleted)
+        self.assertEqual(0, session.pages_read)
+
+    def test_bundle_metadata_rejects_external_file_changes(self):
+        sections = self.make_sections()
+        with tempfile.TemporaryDirectory() as directory:
+            data_directory = Path(directory) / "reading_plan_data"
+            metadata = write_json_bundle(
+                data_directory,
+                sections,
+                date(2026, 7, 1),
+                date(2026, 9, 30),
+                "Quarter end",
+                SummaryStatsOptions(True, True, True, True, True),
+            )
+            (data_directory / "books.json").write_text(
+                (data_directory / "books.json").read_text(encoding="utf-8") + "\n",
+                encoding="utf-8",
+            )
+            with self.assertRaises(JsonBundleError):
+                write_json_bundle(
+                    data_directory,
+                    sections,
+                    date(2026, 7, 1),
+                    date(2026, 9, 30),
+                    "Quarter end",
+                    SummaryStatsOptions(True, True, True, True, True),
+                    metadata=metadata,
+                )
 
 
 class BaselineSchedulePersistenceTests(unittest.TestCase):
