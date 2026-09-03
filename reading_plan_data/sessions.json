@@ -1,0 +1,693 @@
+{
+  "schema_version": 1,
+  "sessions": {
+    "ab80c361-b8b9-4b78-91a4-b0d93ea26059": [
+      {
+        "id": "e93db9aa-bef0-40d4-b628-feba09404205",
+        "date": "2026-07-06",
+        "current_page": 995,
+        "pages_read": 995
+      },
+      {
+        "id": "0d40be13-cc2c-4ea0-af51-2c6b776152e1",
+        "date": "2026-07-15",
+        "current_page": 1000,
+        "pages_read": 5
+      },
+      {
+        "id": "b8f67df8-a618-464c-a2a7-a982f2bf41de",
+        "date": "2026-08-06",
+        "current_page": 1041,
+        "pages_read": 41
+      }
+    ],
+    "b7aeefac-7132-40d7-8290-e6cf2045e7e0": [
+      {
+        "id": "a54d86ef-0dd6-4bfc-ae42-9a91adffb707",
+        "date": "2026-07-06",
+        "current_page": 210,
+        "pages_read": 210
+      },
+      {
+        "id": "be959c52-e0ed-4cba-85f0-ce4db94811e7",
+        "date": "2026-07-06",
+        "current_page": 219,
+        "pages_read": 9
+      },
+      {
+        "id": "9f65538f-f634-4ded-9f51-3dda457f5c59",
+        "date": "2026-07-07",
+        "current_page": 227,
+        "pages_read": 8
+      },
+      {
+        "id": "be407129-a301-4d47-a76e-ed01146a5f55",
+        "date": "2026-07-11",
+        "current_page": 244,
+        "pages_read": 17
+      },
+      {
+        "id": "c22a18fe-7c32-41e1-aa1c-9153823d0fba",
+        "date": "2026-07-12",
+        "current_page": 260,
+        "pages_read": 16
+      },
+      {
+        "id": "6d70aa0b-af98-4623-bef0-ae4fc43dbdff",
+        "date": "2026-07-13",
+        "current_page": 265,
+        "pages_read": 5
+      },
+      {
+        "id": "c8a51e85-0b0b-4910-873a-84d3a62ad2b4",
+        "date": "2026-07-15",
+        "current_page": 274,
+        "pages_read": 9
+      },
+      {
+        "id": "43d4eaff-3892-4e8a-a858-cdab365e5e37",
+        "date": "2026-07-18",
+        "current_page": 292,
+        "pages_read": 18
+      },
+      {
+        "id": "e3444688-1cb5-463d-9f3e-6a71b4817d20",
+        "date": "2026-07-21",
+        "current_page": 310,
+        "pages_read": 18
+      },
+      {
+        "id": "f0b16a1d-bc03-40f3-b147-3abead4f9c33",
+        "date": "2026-07-22",
+        "current_page": 320,
+        "pages_read": 10
+      },
+      {
+        "id": "89346bb1-1266-4807-92dc-dff117d1961c",
+        "date": "2026-07-26",
+        "current_page": 340,
+        "pages_read": 20
+      },
+      {
+        "id": "c4769764-b63b-4757-9e04-932692d12fb0",
+        "date": "2026-07-28",
+        "current_page": 354,
+        "pages_read": 14
+      },
+      {
+        "id": "3a6ce8a5-a5a0-42a1-b938-b10b5b591c30",
+        "date": "2026-08-05",
+        "current_page": 380,
+        "pages_read": 26
+      },
+      {
+        "id": "ca16c524-b858-46ad-be3f-2d7344b6a1be",
+        "date": "2026-08-05",
+        "current_page": 500,
+        "pages_read": 146,
+        "deleted": true
+      },
+      {
+        "id": "d58af786-ce0b-4d48-a9b7-ea5a6e7c74c4",
+        "date": "2026-08-05",
+        "current_page": 400,
+        "pages_read": 46,
+        "deleted": true
+      },
+      {
+        "id": "88c53e2f-0d5b-42e8-8481-2447da08d3d6",
+        "date": "2026-08-13",
+        "current_page": 383,
+        "pages_read": 3
+      },
+      {
+        "id": "c03bc10a-ffee-40d3-a9e5-ab0efcf29c6a",
+        "date": "2026-08-17",
+        "current_page": 387,
+        "pages_read": 4
+      },
+      {
+        "id": "9abbb0f1-7bdd-429b-95bf-e68b72969038",
+        "date": "2026-08-19",
+        "current_page": 399,
+        "pages_read": 12
+      },
+      {
+        "id": "8cf5d1a7-312a-4215-9631-30c9badbfa33",
+        "date": "2026-08-24",
+        "current_page": 412,
+        "pages_read": 13
+      },
+      {
+        "id": "3e15af4e-6c8f-4e09-b5a8-1f1354323175",
+        "date": "2026-08-25",
+        "current_page": 420,
+        "pages_read": 8
+      },
+      {
+        "id": "d7a2440f-b592-4df4-a998-e4fd9d02095c",
+        "date": "2026-08-26",
+        "current_page": 427,
+        "pages_read": 7
+      },
+      {
+        "id": "30451d30-112c-4ebf-a2d3-3b547cf7a003",
+        "date": "2026-08-27",
+        "current_page": 436,
+        "pages_read": 9
+      },
+      {
+        "id": "f1f0178b-bfdb-4b2a-8ee6-35442318d248",
+        "date": "2026-08-28",
+        "current_page": 444,
+        "pages_read": 8
+      },
+      {
+        "id": "94a6859c-8732-4cd4-bb10-64c62abcda4e",
+        "date": "2026-08-31",
+        "current_page": 464,
+        "pages_read": 20
+      },
+      {
+        "id": "e077dd01-5337-425e-89c8-b765de517d7d",
+        "date": "2026-08-31",
+        "current_page": 474,
+        "pages_read": 10
+      },
+      {
+        "id": "97770392-3db0-476b-aebb-9e58be6f7f9e",
+        "date": "2026-09-01",
+        "current_page": 482,
+        "pages_read": 8
+      }
+    ],
+    "c447bdd5-bd23-439d-a157-9905c99bf373": [
+      {
+        "id": "72751d11-6d46-40d8-9858-7a7584e47bb1",
+        "date": "2026-07-06",
+        "current_page": 94,
+        "pages_read": 94
+      },
+      {
+        "id": "431b40e3-3162-4af6-81b2-616eafa35e70",
+        "date": "2026-07-07",
+        "current_page": 126,
+        "pages_read": 32
+      },
+      {
+        "id": "a1f19a3a-f339-4ca7-90de-dcad79e048c7",
+        "date": "2026-07-11",
+        "current_page": 138,
+        "pages_read": 12
+      },
+      {
+        "id": "4cb4497e-2cf2-4f1b-84b2-d98f4a597bf9",
+        "date": "2026-07-17",
+        "current_page": 158,
+        "pages_read": 20
+      },
+      {
+        "id": "7e275e39-e47b-46aa-a041-aa9b0d09aba7",
+        "date": "2026-07-20",
+        "current_page": 178,
+        "pages_read": 20
+      },
+      {
+        "id": "a2ed00ff-379b-4ba3-802a-5df10d7f549e",
+        "date": "2026-07-26",
+        "current_page": 193,
+        "pages_read": 15
+      },
+      {
+        "id": "342e3a60-aec4-4dfb-b4e9-b707014c2628",
+        "date": "2026-08-01",
+        "current_page": 209,
+        "pages_read": 16
+      },
+      {
+        "id": "04cddb54-a4ad-402a-a0da-532b581ecccd",
+        "date": "2026-08-02",
+        "current_page": 224,
+        "pages_read": 15
+      },
+      {
+        "id": "e161f6de-7bbd-42ba-8409-55eaf1f24a6f",
+        "date": "2026-08-03",
+        "current_page": 243,
+        "pages_read": 19
+      },
+      {
+        "id": "9ef1b540-8079-4ec2-bb1b-30bb8689807c",
+        "date": "2026-08-04",
+        "current_page": 255,
+        "pages_read": 12
+      },
+      {
+        "id": "42177035-fdca-44d6-97f5-43905c3abf73",
+        "date": "2026-08-05",
+        "current_page": 270,
+        "pages_read": 5,
+        "deleted": true
+      },
+      {
+        "id": "6c21580c-07c2-4135-a278-9fb471db85d9",
+        "date": "2026-08-05",
+        "current_page": 300,
+        "pages_read": 45,
+        "deleted": true
+      },
+      {
+        "id": "a1177054-da74-43e1-a5e5-97110ab48558",
+        "date": "2026-08-05",
+        "current_page": 265,
+        "pages_read": 10,
+        "deleted": true
+      },
+      {
+        "id": "ac714ad2-0fd4-4c46-a179-d23ff262bfe4",
+        "date": "2026-08-05",
+        "current_page": 300,
+        "pages_read": 45,
+        "deleted": true
+      },
+      {
+        "id": "7220de7a-d81d-4888-9e50-3aae63049f1b",
+        "date": "2026-08-06",
+        "current_page": 280,
+        "pages_read": 25
+      },
+      {
+        "id": "6c4fad5e-62cf-46ba-89d9-79f24dddf14a",
+        "date": "2026-08-07",
+        "current_page": 307,
+        "pages_read": 27
+      },
+      {
+        "id": "f01adad9-9d18-4e76-bc4e-2c92f50583fa",
+        "date": "2026-08-09",
+        "current_page": 331,
+        "pages_read": 24
+      },
+      {
+        "id": "d8582647-55fe-4554-a229-354ef80f569f",
+        "date": "2026-08-10",
+        "current_page": 363,
+        "pages_read": 32
+      },
+      {
+        "id": "3eda65b9-175f-4d30-a449-4ad99c06cd11",
+        "date": "2026-08-11",
+        "current_page": 382,
+        "pages_read": 19
+      },
+      {
+        "id": "43cb5501-840e-412d-a160-86d5693e45fe",
+        "date": "2026-08-13",
+        "current_page": 423,
+        "pages_read": 41
+      },
+      {
+        "id": "59562370-d8ed-464e-9c4d-7fe6a87848ce",
+        "date": "2026-08-14",
+        "current_page": 463,
+        "pages_read": 40
+      },
+      {
+        "id": "3c8f1bad-52d3-4501-a60e-8ced63e5f5a7",
+        "date": "2026-08-17",
+        "current_page": 559,
+        "pages_read": 96
+      }
+    ],
+    "563a6b5d-a979-460d-9158-09e0482c8c7b": [
+      {
+        "id": "14524cea-708d-40c6-8200-95b570d9dadc",
+        "date": "2026-07-06",
+        "current_page": 71,
+        "pages_read": 71
+      },
+      {
+        "id": "71dae7c8-f855-4b16-adec-a0f2a33b1ab4",
+        "date": "2026-07-16",
+        "current_page": 76,
+        "pages_read": 5
+      },
+      {
+        "id": "01b03086-c4d2-4ada-a879-9761e9fbde5b",
+        "date": "2026-07-18",
+        "current_page": 83,
+        "pages_read": 7
+      },
+      {
+        "id": "38694f4d-2a7f-4e33-9e71-e427b2c6a746",
+        "date": "2026-07-19",
+        "current_page": 89,
+        "pages_read": 6
+      },
+      {
+        "id": "7c50a46e-18aa-4bb2-a5a4-f216dbecb13b",
+        "date": "2026-07-26",
+        "current_page": 122,
+        "pages_read": 33
+      },
+      {
+        "id": "91d1db41-8db9-4d6b-8e5f-9f45d5143621",
+        "date": "2026-07-27",
+        "current_page": 126,
+        "pages_read": 4
+      },
+      {
+        "id": "9aa05e15-4cf6-4dc3-a7a6-7b789be8acc2",
+        "date": "2026-07-28",
+        "current_page": 131,
+        "pages_read": 5
+      },
+      {
+        "id": "3ba226b6-086e-48ef-8203-0a6a7c535b6f",
+        "date": "2026-07-29",
+        "current_page": 135,
+        "pages_read": 4
+      },
+      {
+        "id": "38044ec5-b548-4fe0-ae24-4b2c650183d7",
+        "date": "2026-07-30",
+        "current_page": 140,
+        "pages_read": 5
+      },
+      {
+        "id": "5b9508ca-0150-4ea4-9c4a-c0b17aad32cd",
+        "date": "2026-07-31",
+        "current_page": 143,
+        "pages_read": 3
+      },
+      {
+        "id": "8e5e3ae5-9a3a-4197-9519-b8757fd944b1",
+        "date": "2026-08-01",
+        "current_page": 148,
+        "pages_read": 5
+      },
+      {
+        "id": "169194c0-ab14-48db-bb56-f9fc30e519c8",
+        "date": "2026-08-02",
+        "current_page": 154,
+        "pages_read": 6
+      },
+      {
+        "id": "51118a50-af54-4ccd-9d89-918f39e5479f",
+        "date": "2026-08-02",
+        "current_page": 150,
+        "pages_read": 0,
+        "deleted": true
+      },
+      {
+        "id": "cb8a1482-bcb3-4bcb-96ee-061a6ffe3a30",
+        "date": "2026-08-03",
+        "current_page": 158,
+        "pages_read": 4
+      },
+      {
+        "id": "ef88360f-0f25-4917-a93e-cbe70e778b7f",
+        "date": "2026-08-04",
+        "current_page": 161,
+        "pages_read": 3
+      },
+      {
+        "id": "7bd54a4e-027f-4943-b235-c756b7b5d963",
+        "date": "2026-08-05",
+        "current_page": 163,
+        "pages_read": 2
+      },
+      {
+        "id": "9e2ebcf7-8646-4e8a-81f5-9f4521b07a06",
+        "date": "2026-08-06",
+        "current_page": 165,
+        "pages_read": 2
+      },
+      {
+        "id": "f05a4a40-d3d1-42fa-bf98-ca8f05f20543",
+        "date": "2026-08-07",
+        "current_page": 169,
+        "pages_read": 4
+      },
+      {
+        "id": "ccebc7d9-d520-4893-9ebc-576e0260e6d1",
+        "date": "2026-08-08",
+        "current_page": 170,
+        "pages_read": 1
+      },
+      {
+        "id": "33aa85eb-411b-4e1e-9a00-aa2fa9b48e0f",
+        "date": "2026-08-10",
+        "current_page": 173,
+        "pages_read": 3
+      },
+      {
+        "id": "69a2e1e1-76e6-45f0-9490-caca217b9a0d",
+        "date": "2026-08-13",
+        "current_page": 178,
+        "pages_read": 5
+      },
+      {
+        "id": "e78fac89-6f92-4ae8-9713-9548d4598659",
+        "date": "2026-08-14",
+        "current_page": 182,
+        "pages_read": 4
+      },
+      {
+        "id": "b7a04470-3ae8-495b-bdcb-9491127fae29",
+        "date": "2026-08-18",
+        "current_page": 186,
+        "pages_read": 4
+      },
+      {
+        "id": "4cf06c89-b427-4c9c-a21e-a6b6c1158ecf",
+        "date": "2026-08-19",
+        "current_page": 192,
+        "pages_read": 6
+      },
+      {
+        "id": "0b329e82-bd85-4873-af49-9842c695dbd1",
+        "date": "2026-08-21",
+        "current_page": 199,
+        "pages_read": 7
+      },
+      {
+        "id": "921ff5d0-8304-4a50-8496-3096cd022c45",
+        "date": "2026-08-21",
+        "current_page": 203,
+        "pages_read": 6,
+        "deleted": true
+      },
+      {
+        "id": "3211161a-e93e-4526-a95f-ed599fd89ae2",
+        "date": "2026-08-22",
+        "current_page": 204,
+        "pages_read": 5,
+        "deleted": true
+      },
+      {
+        "id": "539280de-07f0-482d-a3d8-a4feeb4b36da",
+        "date": "2026-08-22",
+        "current_page": 204,
+        "pages_read": 5,
+        "deleted": true
+      },
+      {
+        "id": "b8f040cc-999d-4edf-9fa7-f7138f5ee81c",
+        "date": "2026-08-22",
+        "current_page": 204,
+        "pages_read": 5
+      },
+      {
+        "id": "4dfb660b-72ab-4ff5-b0b4-724db1799d0b",
+        "date": "2026-08-24",
+        "current_page": 209,
+        "pages_read": 5
+      },
+      {
+        "id": "6b115e8a-8027-4fbc-bba3-694a88daef6e",
+        "date": "2026-08-25",
+        "current_page": 213,
+        "pages_read": 4
+      },
+      {
+        "id": "1b6ee9ed-c01c-4053-b16c-32c2eebba2a0",
+        "date": "2026-08-27",
+        "current_page": 217,
+        "pages_read": 4
+      },
+      {
+        "id": "ad1cd629-0cbb-4351-9a41-5d73ef19c9f7",
+        "date": "2026-08-30",
+        "current_page": 227,
+        "pages_read": 10
+      },
+      {
+        "id": "fe5c115b-eca3-4413-a8ee-78e5f0516b36",
+        "date": "2026-08-31",
+        "current_page": 229,
+        "pages_read": 2
+      },
+      {
+        "id": "3738c4d2-d2da-43e4-80d0-f2ae0f41c77b",
+        "date": "2026-09-03",
+        "current_page": 233,
+        "pages_read": 4
+      }
+    ],
+    "68494fe1-c596-4fdd-aed2-3585a9cfb9dd": [
+      {
+        "id": "2b5d6521-2596-4c4b-bcfd-daf3074bf9e3",
+        "date": "2026-07-07",
+        "current_time_seconds": 60,
+        "time_listened_seconds": 60,
+        "remaining_time_seconds": 29760
+      },
+      {
+        "id": "89b3d751-24cc-415e-8579-26deee9d2316",
+        "date": "2026-07-09",
+        "current_time_seconds": 2340,
+        "time_listened_seconds": 2280,
+        "remaining_time_seconds": 27480
+      },
+      {
+        "id": "53d8b596-04db-42bd-8527-5bdba078bcdb",
+        "date": "2026-07-10",
+        "current_time_seconds": 13200,
+        "time_listened_seconds": 10860,
+        "remaining_time_seconds": 16620
+      },
+      {
+        "id": "100add50-50d0-463d-9ce9-8a321401ada8",
+        "date": "2026-07-14",
+        "current_time_seconds": 14040,
+        "time_listened_seconds": 840,
+        "remaining_time_seconds": 15780
+      },
+      {
+        "id": "225ea52d-b909-440e-bac3-9e64ddcdb5df",
+        "date": "2026-07-14",
+        "current_time_seconds": 15780,
+        "time_listened_seconds": 1740,
+        "remaining_time_seconds": 14040
+      },
+      {
+        "id": "68f78d97-59df-497e-ba6f-4c34f2109375",
+        "date": "2026-07-18",
+        "current_time_seconds": 17340,
+        "time_listened_seconds": 1560,
+        "remaining_time_seconds": 12480
+      },
+      {
+        "id": "3f4811d5-2e01-4a25-931b-cb7cea84fa0f",
+        "date": "2026-07-22",
+        "current_time_seconds": 21840,
+        "time_listened_seconds": 4500,
+        "remaining_time_seconds": 7980
+      },
+      {
+        "id": "1359ce4e-d467-48fb-a5ec-10b5910fc614",
+        "date": "2026-08-06",
+        "current_time_seconds": 29820,
+        "time_listened_seconds": 7980,
+        "remaining_time_seconds": 0
+      }
+    ],
+    "76083591-064f-485b-bca2-e78fb723218c": [
+      {
+        "id": "345751a9-c1bc-4601-a1e0-fcf820085990",
+        "date": "2026-07-27",
+        "current_time_seconds": 1106,
+        "time_listened_seconds": 1106,
+        "remaining_time_seconds": 59308
+      },
+      {
+        "id": "ce08d73d-75a5-44f4-ab1f-d8816b7e43a8",
+        "date": "2026-07-29",
+        "current_time_seconds": 6107,
+        "time_listened_seconds": 5001,
+        "remaining_time_seconds": 54307
+      },
+      {
+        "id": "7324a4a7-ceba-4b36-9e99-ad7abb5d9258",
+        "date": "2026-08-03",
+        "current_time_seconds": 9365,
+        "time_listened_seconds": 3258,
+        "remaining_time_seconds": 51049
+      },
+      {
+        "id": "b5e2c7f7-593f-4892-96ad-a9a836b3f4a3",
+        "date": "2026-08-03",
+        "current_time_seconds": 11454,
+        "time_listened_seconds": 2089,
+        "remaining_time_seconds": 48960
+      },
+      {
+        "id": "f1c829af-b2dc-415e-b9a5-a47f2cedc92d",
+        "date": "2026-08-04",
+        "current_time_seconds": 14213,
+        "time_listened_seconds": 2759,
+        "remaining_time_seconds": 46201
+      },
+      {
+        "id": "9a8fce6a-c4d5-40f5-9e4c-2af8327b9946",
+        "date": "2026-08-05",
+        "current_time_seconds": 20814,
+        "time_listened_seconds": 6601,
+        "remaining_time_seconds": 39600,
+        "deleted": true
+      },
+      {
+        "id": "9f1e0485-476e-4ceb-aae1-926634a3d566",
+        "date": "2026-08-05",
+        "current_time_seconds": 16837,
+        "time_listened_seconds": 2624,
+        "remaining_time_seconds": 43577,
+        "deleted": true
+      },
+      {
+        "id": "e3f7ea7a-5f76-489d-b69a-966c6532617a",
+        "date": "2026-08-05",
+        "current_time_seconds": 16837,
+        "time_listened_seconds": 2624,
+        "remaining_time_seconds": 43577
+      },
+      {
+        "id": "f71d7997-8495-4fe2-8106-4937257d0604",
+        "date": "2026-08-05",
+        "current_time_seconds": 24414,
+        "time_listened_seconds": 10201,
+        "remaining_time_seconds": 36000,
+        "deleted": true
+      },
+      {
+        "id": "8df8595a-618f-4d4b-812e-9b86346f16e1",
+        "date": "2026-08-07",
+        "current_time_seconds": 19026,
+        "time_listened_seconds": 2189,
+        "remaining_time_seconds": 41388
+      },
+      {
+        "id": "e5638868-3203-4f14-8bd8-821067ea91bb",
+        "date": "2026-08-08",
+        "current_time_seconds": 21380,
+        "time_listened_seconds": 2354,
+        "remaining_time_seconds": 39034
+      },
+      {
+        "id": "ba48aa2a-853b-4a7d-a985-fd3f2ec9a3ef",
+        "date": "2026-08-12",
+        "current_time_seconds": 28674,
+        "time_listened_seconds": 7294,
+        "remaining_time_seconds": 31740
+      },
+      {
+        "id": "e9b5902e-a1b8-41f8-bcfb-6209501d5717",
+        "date": "2026-08-25",
+        "current_time_seconds": 60414,
+        "time_listened_seconds": 31740,
+        "remaining_time_seconds": 0
+      }
+    ]
+  }
+}

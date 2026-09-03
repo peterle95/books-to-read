@@ -1,0 +1,142 @@
+{
+  "schema_version": 1,
+  "sections": [
+    {
+      "label": "Physical books",
+      "baseline_needs_recalculation": false,
+      "simultaneous_groups": [
+        [
+          "ab80c361-b8b9-4b78-91a4-b0d93ea26059",
+          "b7aeefac-7132-40d7-8290-e6cf2045e7e0",
+          "c447bdd5-bd23-439d-a157-9905c99bf373"
+        ]
+      ],
+      "books": [
+        {
+          "id": "ab80c361-b8b9-4b78-91a4-b0d93ea26059",
+          "number": 1,
+          "title": "capital",
+          "baseline_schedule": {
+            "start_date": "2026-07-05",
+            "deadline": "2026-09-13",
+            "daily_target": 0
+          },
+          "deadline_override": "2026-09-13",
+          "start_date_override": null,
+          "target_completed_date": null,
+          "start_page": 1,
+          "end_page": 1041,
+          "current_page": 1041,
+          "pages": 1041,
+          "pages_read": 1041
+        },
+        {
+          "id": "b7aeefac-7132-40d7-8290-e6cf2045e7e0",
+          "number": 2,
+          "title": "wild swans",
+          "baseline_schedule": {
+            "start_date": "2026-07-01",
+            "deadline": "2026-09-30",
+            "daily_target": 6.568181818181818
+          },
+          "deadline_override": "2026-09-30",
+          "start_date_override": "2026-07-01",
+          "target_completed_date": "2026-09-01",
+          "start_page": 1,
+          "end_page": 669,
+          "current_page": 482,
+          "pages": 669,
+          "pages_read": 482
+        },
+        {
+          "id": "c447bdd5-bd23-439d-a157-9905c99bf373",
+          "number": 3,
+          "title": "changing order",
+          "baseline_schedule": {
+            "start_date": "2026-07-01",
+            "deadline": "2026-09-30",
+            "daily_target": 3.090909090909091
+          },
+          "deadline_override": "2026-09-30",
+          "start_date_override": "2026-07-01",
+          "target_completed_date": "2026-08-14",
+          "start_page": 1,
+          "end_page": 559,
+          "current_page": 559,
+          "pages": 559,
+          "pages_read": 559
+        }
+      ]
+    },
+    {
+      "label": "Digital books",
+      "baseline_needs_recalculation": false,
+      "simultaneous_groups": [],
+      "books": [
+        {
+          "id": "563a6b5d-a979-460d-9158-09e0482c8c7b",
+          "number": 1,
+          "title": "react",
+          "baseline_schedule": {
+            "start_date": "2026-07-01",
+            "deadline": "2026-09-30",
+            "daily_target": 3.9814814814814814
+          },
+          "deadline_override": null,
+          "start_date_override": "2026-07-01",
+          "target_completed_date": "2026-08-30",
+          "start_page": 1,
+          "end_page": 350,
+          "current_page": 233,
+          "pages": 350,
+          "pages_read": 233
+        }
+      ]
+    },
+    {
+      "label": "Audiobooks",
+      "baseline_needs_recalculation": false,
+      "simultaneous_groups": [],
+      "books": [
+        {
+          "id": "68494fe1-c596-4fdd-aed2-3585a9cfb9dd",
+          "number": 1,
+          "title": "pane e bugie",
+          "baseline_schedule": {
+            "start_date": "2026-07-01",
+            "deadline": "2026-08-01",
+            "daily_target": 0
+          },
+          "deadline_override": "2026-07-31",
+          "start_date_override": "2026-07-01",
+          "target_completed_date": "2026-07-22",
+          "start_time_seconds": 0,
+          "end_time_seconds": 29820,
+          "current_time_seconds": 29820,
+          "duration_seconds": 29820,
+          "time_listened_seconds": 29820,
+          "remaining_time_seconds": 0
+        },
+        {
+          "id": "76083591-064f-485b-bca2-e78fb723218c",
+          "number": 2,
+          "title": "Red Moon",
+          "baseline_schedule": {
+            "start_date": "2026-07-25",
+            "deadline": "2026-09-30",
+            "daily_target": 838.0192307692307
+          },
+          "deadline_override": null,
+          "start_date_override": "2026-07-25",
+          "target_completed_date": "2026-08-12",
+          "start_time_seconds": 0,
+          "end_time_seconds": 60414,
+          "current_time_seconds": 60414,
+          "duration_seconds": 60414,
+          "time_listened_seconds": 60414,
+          "remaining_time_seconds": 0
+        }
+      ]
+    }
+  ]
+}
