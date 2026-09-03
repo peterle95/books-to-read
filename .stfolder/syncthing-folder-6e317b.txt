@@ -1,5 +1,0 @@
-# This directory is a Syncthing folder marker.
-# Do not delete.
-
-folderID: books
-created: 2026-07-06T10:55:49+02:00

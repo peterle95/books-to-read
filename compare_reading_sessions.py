@@ -2,6 +2,7 @@ import json
 import sys
 
 from export_reading_sessions import SNAPSHOT_PATH, load_plan, meaningful_plan
+from reading_plan import BUNDLE_DIRECTORY
 
 
 TIME_FIELDS = {"current_time_seconds", "remaining_time_seconds", "time_listened_seconds"}
@@ -143,7 +144,7 @@ def main():
     try:
         current = meaningful_plan(load_plan())
     except FileNotFoundError:
-        print("Current plan missing: reading_plan.json")
+        print("Current plan missing: " + str(BUNDLE_DIRECTORY))
         return 1
     except (OSError, ValueError) as exc:
         print("Error: " + str(exc))

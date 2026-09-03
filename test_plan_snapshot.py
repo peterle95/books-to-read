@@ -1,13 +1,40 @@
 import json
 import tempfile
 import unittest
+from datetime import date
 from pathlib import Path
 
 from compare_reading_sessions import differences, render_table
 from export_reading_sessions import export_snapshot, meaningful_plan
+from reading_plan import Book, BookSection, SummaryStatsOptions, write_json_bundle
 
 
 class PlanSnapshotTests(unittest.TestCase):
+    def test_export_reads_the_split_data_directory(self):
+        sections = [
+            BookSection("Physical books", [Book(1, "One", 1, 10)], []),
+            BookSection("Digital books", [], []),
+            BookSection("Audiobooks", [], []),
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            data_directory = Path(directory) / "reading_plan_data"
+            snapshot = Path(directory) / "reading_plan_snapshot.json"
+            write_json_bundle(
+                data_directory,
+                sections,
+                date(2026, 7, 1),
+                date(2026, 9, 30),
+                "Quarter end",
+                SummaryStatsOptions(True, True, True, True, True),
+            )
+            export_snapshot(data_directory, snapshot)
+
+            payload = json.loads(snapshot.read_text(encoding="utf-8"))
+
+        self.assertIn("sections", payload)
+        self.assertNotIn("files", payload)
+        self.assertNotIn("modified_by", payload)
+
     def test_export_preserves_meaningful_plan_data(self):
         plan = {"revision": 1, "start_date": "2026-07-01", "sections": []}
 
@@ -51,7 +78,7 @@ class PlanSnapshotTests(unittest.TestCase):
         self.assertEqual(
             [
                 ("Changed", "end_date"),
-                ("Missing", "sections[0].books[0].reading_sessions[0]"),
+                ("Missing", "sections[0].books[0].reading_sessions[id=session-1]"),
             ],
             [(change["status"], change["path"]) for change in differences(snapshot, current)],
         )

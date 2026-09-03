@@ -74,9 +74,9 @@ import static com.petermolnar.readingplan.PlanPrimitives.*;
 
 public class MainActivity extends Activity {
     private static final String PREFS = "reading_plan_prefs";
-    private static final String PREF_JSON_URI = "json_uri";
+    private static final String PREF_DATA_TREE_URI = "data_tree_uri";
     private static final String PREF_CLIENT_ID = "client_id";
-    private static final int REQUEST_OPEN_JSON = 100;
+    private static final int REQUEST_OPEN_DATA_DIRECTORY = 100;
     private static final int REQUEST_OPEN_CSV = 101;
     private static final int REQUEST_CREATE_CSV = 102;
     static final String PHYSICAL_BOOKS_LABEL = "Physical books";
@@ -130,7 +130,7 @@ public class MainActivity extends Activity {
     LocalDate endDate;
     String endLabel = "Quarter end";
     final List<RestDayRange> restDays = new ArrayList<>();
-    private Uri jsonUri;
+    private Uri dataDirectoryUri;
     private String currentTab = "Session";
     boolean metricsSubview = false;
     String metricDetail = null;
@@ -143,9 +143,9 @@ public class MainActivity extends Activity {
     private boolean restoring = false;
     private final Handler saveHandler = new Handler(Looper.getMainLooper());
     private Runnable pendingSave;
-    private String loadedHash;
-    private int loadedRevision;
+    private ReadingPlanBundleCodec.Metadata loadedBundleMetadata;
     private boolean localDirty;
+    private boolean discardLocalChangesForDirectory;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -296,6 +296,10 @@ public class MainActivity extends Activity {
         refreshHeader();
         renderTabBar();
         content.removeAllViews();
+        if (!jsonLoaded) {
+            content.addView(buildDataUnavailableView());
+            return;
+        }
         if ("Session".equals(currentTab)) {
             content.addView(buildSessionView());
         } else if ("Plan".equals(currentTab)) {
@@ -324,6 +328,14 @@ public class MainActivity extends Activity {
 
     private View buildSessionView() { return sessionView.build(); }
 
+    private View buildDataUnavailableView() {
+        LinearLayout box = verticalBox();
+        box.addView(heading("Reading plan data unavailable"));
+        box.addView(label("Choose the synced reading_plan_data directory to load the plan."));
+        box.addView(actionButton("Choose directory", v -> openJsonPicker()));
+        return box;
+    }
+
     void showEntriesSheet() {
         sessionEntries.show();
     }
@@ -344,11 +356,11 @@ public class MainActivity extends Activity {
         settingsHeader.addView(actionButton("Done", v -> closeSettings()));
         box.addView(settingsHeader);
 
-        box.addView(sectionTitle("Synced file"));
+        box.addView(sectionTitle("Synced directory"));
         box.addView(label("Loaded from"));
         box.addView(monoText(fileLocationText()));
-        box.addView(actionButton("Connect synced reading_plan.json", v -> openJsonPicker()));
-        box.addView(actionButton("Reload from synced file", v -> reloadFromJson()));
+        box.addView(actionButton("Connect synced reading-plan directory", v -> openJsonPicker()));
+        box.addView(actionButton("Reload from synced directory", v -> reloadFromJson()));
 
         box.addView(sectionTitle("CSV files"));
         box.addView(actionButton("Import CSV", v -> openCsvPicker()));
@@ -391,11 +403,11 @@ public class MainActivity extends Activity {
     private Spinner spinner(List<String> values, String selected, int backgroundColor, int selectedTextColor) { return ui.spinner(values, selected, backgroundColor, selectedTextColor); }
 
     private String fileLocationText() {
-        return jsonUri == null ? "Not connected" : jsonUri.toString();
+        return dataDirectoryUri == null ? "Not connected" : dataDirectoryUri.toString();
     }
 
     void updateJsonStatus() {
-        boolean healthy = jsonLoaded && jsonUri != null;
+        boolean healthy = jsonLoaded && dataDirectoryUri != null;
         if (jsonStatusButton == null) {
             return;
         }
@@ -406,7 +418,7 @@ public class MainActivity extends Activity {
     }
 
     private void setJsonLoaded(boolean loaded) {
-        jsonLoaded = loaded && jsonUri != null;
+        jsonLoaded = loaded && dataDirectoryUri != null;
         updateJsonStatus();
     }
 
@@ -468,21 +480,35 @@ public class MainActivity extends Activity {
 
     private void loadSavedJsonUri() {
         SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
-        String savedUri = prefs.getString(PREF_JSON_URI, null);
+        String savedUri = prefs.getString(PREF_DATA_TREE_URI, null);
         if (savedUri == null) {
             setJsonLoaded(false);
             return;
         }
-        jsonUri = Uri.parse(savedUri);
+        dataDirectoryUri = Uri.parse(savedUri);
         reloadFromJson();
     }
 
     private void openJsonPicker() {
-        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("*/*");
-        intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"application/json", "text/json", "text/plain"});
-        startActivityForResult(intent, REQUEST_OPEN_JSON);
+        if (localDirty && !discardLocalChangesForDirectory) {
+            new AlertDialog.Builder(this)
+                    .setTitle("Unsaved reading plan")
+                    .setMessage("Choosing another directory will discard local changes that could not be saved.")
+                    .setPositiveButton("Discard and choose", (dialog, which) -> {
+                        discardLocalChangesForDirectory = true;
+                        openJsonPicker();
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show();
+            return;
+        }
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+        intent.addFlags(
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                        | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+        );
+        startActivityForResult(intent, REQUEST_OPEN_DATA_DIRECTORY);
     }
 
     private void openCsvPicker() {
@@ -505,17 +531,33 @@ public class MainActivity extends Activity {
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (resultCode != RESULT_OK || data == null || data.getData() == null) {
+            if (requestCode == REQUEST_OPEN_DATA_DIRECTORY) {
+                discardLocalChangesForDirectory = false;
+            }
             return;
         }
         Uri uri = data.getData();
-        if (requestCode == REQUEST_OPEN_JSON) {
-            int flags = data.getFlags() & (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+        if (requestCode == REQUEST_OPEN_DATA_DIRECTORY) {
+            int requiredFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION;
+            int flags = data.getFlags() & requiredFlags;
+            if (flags != requiredFlags) {
+                discardLocalChangesForDirectory = false;
+                showLoadError("The selected directory did not grant both read and write access.");
+                return;
+            }
             try {
                 getContentResolver().takePersistableUriPermission(uri, flags);
-            } catch (SecurityException ignored) {
+            } catch (SecurityException error) {
+                discardLocalChangesForDirectory = false;
+                showLoadError("Could not keep access to the selected directory: " + error.getMessage());
+                return;
             }
-            jsonUri = uri;
-            getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(PREF_JSON_URI, uri.toString()).apply();
+            if (discardLocalChangesForDirectory) {
+                discardLocalChanges();
+                discardLocalChangesForDirectory = false;
+            }
+            dataDirectoryUri = uri;
+            getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(PREF_DATA_TREE_URI, uri.toString()).apply();
             reloadFromJson();
         } else if (requestCode == REQUEST_OPEN_CSV) {
             try {
@@ -537,31 +579,95 @@ public class MainActivity extends Activity {
     }
 
     private void reloadFromJson() {
-        if (jsonUri == null) {
+        if (localDirty) {
+            new AlertDialog.Builder(this)
+                    .setTitle("Unsaved reading plan")
+                    .setMessage("Reloading will discard local changes that could not be saved.")
+                    .setPositiveButton("Discard and reload", (dialog, which) -> {
+                        discardLocalChanges();
+                        reloadFromJson();
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show();
+            return;
+        }
+        if (dataDirectoryUri == null) {
             setJsonLoaded(false);
-            showError("Connect a JSON file first");
+            showCurrentTab();
             return;
         }
         try {
-            String raw = readText(jsonUri);
-            CsvPlan plan = loadJson(raw);
+            ReadingPlanDataStore store = new ReadingPlanDataStore(getContentResolver(), dataDirectoryUri);
+            if (!store.hasAnyManagedFile()) {
+                if (!store.hasLegacyFile()) {
+                    throw new IOException("manifest.json $: file is missing");
+                }
+                String legacy = store.readLegacy();
+                CsvPlan normalizedPlan = loadJson(legacy);
+                String normalized = jsonText(normalizedPlan, 1);
+                ReadingPlanBundleCodec.Encoded encoded = ReadingPlanBundleCodec.encodeLegacy(
+                        normalized,
+                        clientId(),
+                        1
+                );
+                store.write(encoded, null);
+            }
+            ReadingPlanBundleCodec.ReadResult bundle = store.read();
+            CsvPlan plan = loadJson(ReadingPlanBundleCodec.toLegacyJson(bundle), true);
             applyPlan(plan);
-            loadedHash = sha256(raw);
-            loadedRevision = new JSONObject(raw).optInt("revision", 0);
+            loadedBundleMetadata = bundle.metadata;
             localDirty = false;
             setJsonLoaded(true);
             showCurrentTab();
+        } catch (SecurityException ex) {
+            showLoadError("Could not load reading-plan data: " + ex.getMessage(), true);
         } catch (IOException | JSONException | IllegalArgumentException ex) {
-            setJsonLoaded(false);
-            showError("Could not load JSON: " + ex.getMessage());
+            showLoadError("Could not load reading-plan data: " + ex.getMessage());
+        } catch (RuntimeException ex) {
+            showLoadError("Could not load reading-plan data: " + ex.getMessage());
         }
+    }
+
+    private void showLoadError(String message) {
+        showLoadError(message, false);
+    }
+
+    private void showLoadError(String message, boolean clearSavedDirectory) {
+        String location = fileLocationText();
+        if (clearSavedDirectory) {
+            getSharedPreferences(PREFS, MODE_PRIVATE).edit().remove(PREF_DATA_TREE_URI).apply();
+            dataDirectoryUri = null;
+        }
+        setJsonLoaded(false);
+        loadedBundleMetadata = null;
+        showCurrentTab();
+        AlertDialog.Builder dialog = new AlertDialog.Builder(this)
+                .setTitle("Reading plan data unavailable")
+                .setMessage("The reading plan was not loaded from " + location + ".\n\n" + message)
+                .setCancelable(false);
+        if (clearSavedDirectory) {
+            dialog.setPositiveButton("Choose directory", (ignored, which) -> openJsonPicker());
+            dialog.setNegativeButton("Close", null);
+        } else {
+            dialog.setPositiveButton("Retry", (ignored, which) -> reloadFromJson());
+            dialog.setNegativeButton("Choose directory", (ignored, which) -> openJsonPicker());
+        }
+        dialog.show();
+    }
+
+    private void discardLocalChanges() {
+        if (pendingSave != null) {
+            saveHandler.removeCallbacks(pendingSave);
+        }
+        pendingSave = null;
+        localDirty = false;
     }
 
     void autosaveJson(String successMessage) {
         if (restoring) {
             return;
         }
-        if (jsonUri == null) {
+        if (dataDirectoryUri == null) {
             setJsonLoaded(false);
             return;
         }
@@ -642,30 +748,36 @@ public class MainActivity extends Activity {
     }
 
     private void saveJsonNow() {
-        if (jsonUri == null) {
+        if (dataDirectoryUri == null) {
             return;
         }
+        pendingSave = null;
         try {
-            if (loadedHash == null) {
+            if (loadedBundleMetadata == null) {
                 throw new IOException("reload the JSON successfully before saving");
             }
-            String current = readText(jsonUri);
-            if (!loadedHash.equals(sha256(current))
-                    || loadedRevision != new JSONObject(current).optInt("revision", 0)) {
-                throw new IOException("reading_plan.json changed on another device; reload or merge it before saving");
+            ReadingPlanDataStore store = new ReadingPlanDataStore(getContentResolver(), dataDirectoryUri);
+            ReadingPlanBundleCodec.Metadata current = store.readMetadata();
+            if (!current.sameAs(loadedBundleMetadata)) {
+                throw new IOException("reading-plan data changed on another device; reload or merge it before saving");
             }
-            String written = jsonText(loadedRevision + 1);
-            writeText(jsonUri, written);
-            if (!sha256(written).equals(sha256(readText(jsonUri)))) {
-                throw new IOException("reading_plan.json changed while it was being saved");
-            }
-            loadedHash = sha256(written);
-            loadedRevision++;
+            int revision = loadedBundleMetadata.revision + 1;
+            String written = jsonText(revision);
+            ReadingPlanBundleCodec.Encoded encoded = ReadingPlanBundleCodec.encodeLegacy(
+                    written,
+                    clientId(),
+                    revision
+            );
+            store.write(encoded, loadedBundleMetadata);
+            loadedBundleMetadata = store.readMetadata();
             localDirty = false;
             setJsonLoaded(true);
-        } catch (IOException | JSONException ex) {
-            setJsonLoaded(false);
-            showError("Autosave failed: " + ex.getMessage());
+        } catch (SecurityException ex) {
+            showLoadError("Autosave failed: " + ex.getMessage(), true);
+        } catch (IOException | JSONException | IllegalArgumentException ex) {
+            showLoadError("Autosave failed: " + ex.getMessage());
+        } catch (RuntimeException ex) {
+            showLoadError("Autosave failed: " + ex.getMessage());
         }
     }
 
@@ -679,20 +791,26 @@ public class MainActivity extends Activity {
     }
 
     private void checkForExternalChange() {
-        if (jsonUri == null || loadedHash == null) {
+        if (dataDirectoryUri == null || loadedBundleMetadata == null) {
             return;
         }
         try {
-            if (loadedHash.equals(sha256(readText(jsonUri)))) {
+            ReadingPlanDataStore store = new ReadingPlanDataStore(getContentResolver(), dataDirectoryUri);
+            ReadingPlanBundleCodec.Metadata current = store.readMetadata();
+            if (current.sameAs(loadedBundleMetadata)) {
                 return;
             }
             if (localDirty) {
-                showError("reading_plan.json changed on another device while this app has unsaved changes");
+                showLoadError("reading-plan data changed on another device while this app has unsaved changes");
                 return;
             }
             reloadFromJson();
-        } catch (IOException ex) {
-            showError("Could not check synced JSON: " + ex.getMessage());
+        } catch (SecurityException ex) {
+            showLoadError("Could not check reading-plan data: " + ex.getMessage(), true);
+        } catch (IOException | JSONException | IllegalArgumentException ex) {
+            showLoadError("Could not check reading-plan data: " + ex.getMessage());
+        } catch (RuntimeException ex) {
+            showLoadError("Could not check reading-plan data: " + ex.getMessage());
         }
     }
 
@@ -765,6 +883,10 @@ public class MainActivity extends Activity {
     }
 
     private CsvPlan loadJson(String raw) throws JSONException {
+        return loadJson(raw, false);
+    }
+
+    private CsvPlan loadJson(String raw, boolean strictBundle) throws JSONException {
         JSONObject payload = new JSONObject(raw);
         int schemaVersion = payload.optInt("schema_version", 4);
         if (schemaVersion > 8) {
@@ -789,7 +911,7 @@ public class MainActivity extends Activity {
             for (int i = 0; i < rawSections.length(); i++) {
                 String defaultLabel = i < BOOK_SECTION_LABELS.size() ? BOOK_SECTION_LABELS.get(i) : "Section " + (i + 1);
                 BookSection section = bookSectionFromJson(
-                        rawSections.getJSONObject(i), defaultLabel, schemaVersion >= 8
+                        rawSections.getJSONObject(i), defaultLabel, schemaVersion >= 8, strictBundle
                 );
                 if (BOOK_SECTION_LABELS.contains(section.label)) {
                     byLabel.put(section.label, section);
@@ -806,35 +928,70 @@ public class MainActivity extends Activity {
             restDays.addAll(loadedRestDays);
             calculateBaselineSchedules(loadedSections, loadedStart, loadedEnd);
         }
+        Object rawStatsOptions = payload.opt("stats_options");
+        if (strictBundle
+                && rawStatsOptions != null
+                && rawStatsOptions != JSONObject.NULL
+                && !(rawStatsOptions instanceof JSONObject)) {
+            throw new IllegalArgumentException("stats_options must be an object");
+        }
         return new CsvPlan(
                 loadedSections,
                 loadedStart,
                 loadedEnd,
                 loadedEndLabel,
-                statsOptionsFromJson(payload.optJSONObject("stats_options")),
+                statsOptionsFromJson(
+                        rawStatsOptions instanceof JSONObject ? (JSONObject) rawStatsOptions : null,
+                        strictBundle
+                ),
                 loadedRestDays
         );
     }
 
     private String jsonText(int revision) throws JSONException {
         initializeMissingBaselineSchedules();
+        return jsonText(sections, startDate, endDate, endLabel, statsOptions, restDays, revision);
+    }
+
+    private String jsonText(CsvPlan plan, int revision) throws JSONException {
+        initializeMissingBaselineSchedules(plan.sections, plan.startDate, plan.endDate);
+        return jsonText(
+                plan.sections,
+                plan.startDate,
+                plan.endDate,
+                plan.endLabel,
+                plan.statsOptions,
+                plan.restDays,
+                revision
+        );
+    }
+
+    private String jsonText(
+            List<BookSection> planSections,
+            LocalDate planStart,
+            LocalDate planEnd,
+            String planEndLabel,
+            StatsOptions planStatsOptions,
+            List<RestDayRange> planRestDays,
+            int revision
+    ) throws JSONException {
         JSONObject payload = new JSONObject();
         payload.put("schema_version", 8);
         payload.put("revision", revision);
         payload.put("last_modified", OffsetDateTime.now().withNano(0).toString());
         payload.put("modified_by", clientId());
-        payload.put("start_date", startDate.toString());
-        payload.put("end_date", endDate.toString());
-        payload.put("end_label", endLabel);
+        payload.put("start_date", planStart.toString());
+        payload.put("end_date", planEnd.toString());
+        payload.put("end_label", planEndLabel);
         JSONObject stats = new JSONObject();
-        stats.put("book_counts", statsOptions.bookCounts);
-        stats.put("page_share", statsOptions.pageShare);
-        stats.put("average_pages", statsOptions.averagePages);
-        stats.put("reading_period", statsOptions.readingPeriod);
-        stats.put("pace_driver", statsOptions.paceDriver);
+        stats.put("book_counts", planStatsOptions.bookCounts);
+        stats.put("page_share", planStatsOptions.pageShare);
+        stats.put("average_pages", planStatsOptions.averagePages);
+        stats.put("reading_period", planStatsOptions.readingPeriod);
+        stats.put("pace_driver", planStatsOptions.paceDriver);
         payload.put("stats_options", stats);
         JSONArray jsonRestDays = new JSONArray();
-        for (RestDayRange range : restDays) {
+        for (RestDayRange range : planRestDays) {
             JSONObject object = new JSONObject();
             object.put("start_date", range.startDate.toString());
             object.put("end_date", range.endDate.toString());
@@ -842,7 +999,7 @@ public class MainActivity extends Activity {
         }
         payload.put("rest_days", jsonRestDays);
         JSONArray jsonSections = new JSONArray();
-        for (BookSection section : sections) {
+        for (BookSection section : planSections) {
             jsonSections.put(bookSectionToJson(section));
         }
         payload.put("sections", jsonSections);
@@ -850,16 +1007,24 @@ public class MainActivity extends Activity {
     }
 
     private void initializeMissingBaselineSchedules() {
+        initializeMissingBaselineSchedules(sections, startDate, endDate);
+    }
+
+    private void initializeMissingBaselineSchedules(
+            List<BookSection> planSections,
+            LocalDate planStart,
+            LocalDate planEnd
+    ) {
         boolean dirty = false;
         boolean missing = false;
-        for (BookSection section : sections) {
+        for (BookSection section : planSections) {
             dirty = dirty || section.baselineNeedsRecalculation;
             for (Book book : section.books) {
                 missing = missing || book.baselineSchedule == null;
             }
         }
         if (!dirty && missing) {
-            calculateBaselineSchedules(sections, startDate, endDate);
+            calculateBaselineSchedules(planSections, planStart, planEnd);
         }
     }
     private JSONObject bookSectionToJson(BookSection section) throws JSONException {
@@ -940,7 +1105,10 @@ public class MainActivity extends Activity {
     }
 
     private BookSection bookSectionFromJson(
-            JSONObject object, String defaultLabel, boolean deriveProgressFromSessions
+            JSONObject object,
+            String defaultLabel,
+            boolean deriveProgressFromSessions,
+            boolean strictBundle
     ) throws JSONException {
         String label = canonicalSectionLabel(object.optString("label", defaultLabel), defaultLabel);
         BookSection section = new BookSection(label);
@@ -952,7 +1120,7 @@ public class MainActivity extends Activity {
         if (rawBooks != null) {
             for (int i = 0; i < rawBooks.length(); i++) {
                 section.books.add(bookFromJson(
-                        rawBooks.getJSONObject(i), i + 1, label, deriveProgressFromSessions
+                        rawBooks.getJSONObject(i), i + 1, label, deriveProgressFromSessions, strictBundle
                 ));
             }
         }
@@ -967,11 +1135,6 @@ public class MainActivity extends Activity {
                     Object value = rawGroup.get(j);
                     if (value instanceof String) {
                         String id = (String) value;
-                        try {
-                            group.add(Integer.parseInt(id));
-                            continue;
-                        } catch (NumberFormatException ignored) {
-                        }
                         int number = -1;
                         for (Book book : section.books) {
                             if (book.id.equals(id)) {
@@ -979,10 +1142,16 @@ public class MainActivity extends Activity {
                                 break;
                             }
                         }
-                        if (number < 0) {
-                            throw new IllegalArgumentException("simultaneous group references an unknown book");
+                        if (number >= 0) {
+                            group.add(number);
+                            continue;
                         }
-                        group.add(number);
+                        try {
+                            group.add(Integer.parseInt(id));
+                            continue;
+                        } catch (NumberFormatException ignored) {
+                        }
+                        throw new IllegalArgumentException("simultaneous group references an unknown book");
                     } else {
                         group.add(rawGroup.getInt(j));
                     }
@@ -998,7 +1167,8 @@ public class MainActivity extends Activity {
             JSONObject object,
             int fallbackNumber,
             String sectionLabel,
-            boolean deriveProgressFromSessions
+            boolean deriveProgressFromSessions,
+            boolean strictBundle
     ) throws JSONException {
         String title = object.optString("title", "").trim();
         if (title.isEmpty()) {
@@ -1024,6 +1194,19 @@ public class MainActivity extends Activity {
             endPage = pages;
         }
         validateBookRange(sectionLabel, startPage, endPage);
+        int totalUnits = isAudiobookSection(sectionLabel)
+                ? endPage - startPage
+                : endPage - startPage + 1;
+        if (strictBundle
+                && isAudiobookSection(sectionLabel)
+                && object.has("current_time_seconds")
+                && !object.isNull("current_time_seconds")
+                && object.has("remaining_time_seconds")
+                && !object.isNull("remaining_time_seconds")
+                && object.getInt("current_time_seconds")
+                != endPage - object.getInt("remaining_time_seconds")) {
+            throw new IllegalArgumentException("remaining time conflicts with current time");
+        }
 
         Integer currentPage = null;
         if (isAudiobookSection(sectionLabel) && object.has("remaining_time_seconds") && !object.isNull("remaining_time_seconds")) {
@@ -1036,10 +1219,23 @@ public class MainActivity extends Activity {
         int pagesRead = isAudiobookSection(sectionLabel)
                 ? object.optInt("time_listened_seconds", 0)
                 : object.optInt("pages_read", 0);
-        if (pagesRead < 0) {
+        if (pagesRead < 0 || (strictBundle && pagesRead > totalUnits)) {
             throw new IllegalArgumentException(isAudiobookSection(sectionLabel)
-                    ? "time listened cannot be negative"
-                    : "pages read cannot be negative");
+                    ? "time listened is outside the book range"
+                    : "pages read is outside the book range");
+        }
+        if (strictBundle && currentPage != null && (currentPage < startPage || currentPage > endPage)) {
+            throw new IllegalArgumentException("book progress is outside the book range");
+        }
+        if (strictBundle && currentPage != null) {
+            int expected = isAudiobookSection(sectionLabel)
+                    ? currentPage - startPage
+                    : currentPage - startPage + 1;
+            if (pagesRead != expected) {
+                throw new IllegalArgumentException(isAudiobookSection(sectionLabel)
+                        ? "time listened conflicts with current time"
+                        : "pages read conflicts with current page");
+            }
         }
 
         List<ReadingSession> sessions = new ArrayList<>();
@@ -1087,16 +1283,44 @@ public class MainActivity extends Activity {
                             ? startPage + sessionPagesRead - 1
                             : previousCurrentPage + sessionPagesRead;
                 }
-                if (sessionPagesRead <= 0 && !deleted) {
+                if (strictBundle) {
+                    String amountField = isAudiobookSection(sectionLabel)
+                            ? "time_listened_seconds"
+                            : "pages_read";
+                    if (!deleted && rawSession.has(amountField) && !rawSession.isNull(amountField)) {
+                        int previousTotal = previousCurrentPage == null
+                                ? 0
+                                : previousCurrentPage - startPage + (isAudiobookSection(sectionLabel) ? 0 : 1);
+                        int expected = sessionCurrentPage - startPage
+                                - previousTotal
+                                + (isAudiobookSection(sectionLabel) ? 0 : 1);
+                        if (sessionPagesRead != expected) {
+                            throw new IllegalArgumentException(isAudiobookSection(sectionLabel)
+                                    ? "time listened conflicts with session progress"
+                                    : "pages read conflicts with session progress");
+                        }
+                    }
+                }
+                if (sessionPagesRead < 0 || (strictBundle && sessionPagesRead > totalUnits)) {
+                    throw new IllegalArgumentException(isAudiobookSection(sectionLabel)
+                            ? "reading session time is outside the book range"
+                            : "reading session pages are outside the book range");
+                }
+                if (sessionPagesRead == 0 && !deleted) {
                     throw new IllegalArgumentException(isAudiobookSection(sectionLabel)
                             ? "reading session time must be positive"
                             : "reading session pages must be positive");
                 }
+                if (strictBundle && (sessionCurrentPage < startPage || sessionCurrentPage > endPage)) {
+                    throw new IllegalArgumentException("reading session progress is outside the book range");
+                }
                 sessionCurrentPage = clamp(sessionCurrentPage, startPage, endPage);
                 sessions.add(new ReadingSession(sessionId, sessionDate, sessionCurrentPage, sessionPagesRead, deleted));
-                previousCurrentPage = previousCurrentPage == null
-                        ? sessionCurrentPage
-                        : Math.max(previousCurrentPage, sessionCurrentPage);
+                if (!deleted) {
+                    previousCurrentPage = previousCurrentPage == null
+                            ? sessionCurrentPage
+                            : Math.max(previousCurrentPage, sessionCurrentPage);
+                }
             }
         }
         Map<String, ReadingSession> sessionsById = new HashMap<>();
@@ -1129,6 +1353,9 @@ public class MainActivity extends Activity {
             currentPage = isAudiobookSection(sectionLabel)
                     ? startPage + pagesRead
                     : startPage + pagesRead - 1;
+        }
+        if (currentPage != null && strictBundle && (currentPage < startPage || currentPage > endPage)) {
+            throw new IllegalArgumentException("book progress is outside the book range");
         }
         if (currentPage != null) {
             currentPage = clamp(currentPage, startPage, endPage);
@@ -1196,9 +1423,18 @@ public class MainActivity extends Activity {
         return ranges;
     }
 
-    private StatsOptions statsOptionsFromJson(JSONObject object) {
+    private StatsOptions statsOptionsFromJson(JSONObject object, boolean strictBundle) throws JSONException {
         if (object == null) {
             return new StatsOptions(true, true, true, true, true);
+        }
+        if (strictBundle) {
+            for (String key : Arrays.asList(
+                    "book_counts", "page_share", "average_pages", "reading_period", "pace_driver"
+            )) {
+                if (object.has(key) && !(object.get(key) instanceof Boolean)) {
+                    throw new IllegalArgumentException("stats option " + key + " must be a boolean");
+                }
+            }
         }
         return new StatsOptions(
                 object.optBoolean("book_counts", true),

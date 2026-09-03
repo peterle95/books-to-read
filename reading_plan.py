@@ -20,6 +20,10 @@ PHYSICAL_BOOKS_LABEL = "Physical books"
 DIGITAL_BOOKS_LABEL = "Digital books"
 AUDIOBOOKS_LABEL = "Audiobooks"
 BOOK_SECTION_LABELS = (PHYSICAL_BOOKS_LABEL, DIGITAL_BOOKS_LABEL, AUDIOBOOKS_LABEL)
+BUNDLE_SCHEMA_VERSION = 1
+BUNDLE_DIRECTORY = Path("reading_plan_data")
+BUNDLE_DATA_FILES = ("plan.json", "books.json", "sessions.json")
+BUNDLE_FILES = BUNDLE_DATA_FILES + ("manifest.json",)
 
 
 def canonical_section_label(label: object, default_label: str) -> str:
@@ -68,6 +72,24 @@ class JsonPlanMetadata:
     last_modified: str | None
     modified_by: str | None
     sha256: str
+
+
+@dataclass(frozen=True)
+class JsonBundleMetadata:
+    revision: int
+    last_modified: str
+    modified_by: str
+    sha256: str
+    file_hashes: dict[str, str]
+
+
+class JsonBundleError(ValueError):
+    """A split reading-plan file failed structural or semantic validation."""
+
+    def __init__(self, filename: str, json_path: str, message: str) -> None:
+        self.filename = filename
+        self.json_path = json_path
+        super().__init__(f"{filename} {json_path}: {message}")
 
 
 class ExternalPlanChangeError(ValueError):
@@ -2083,7 +2105,7 @@ def book_from_json(
                 )
         except (KeyError, TypeError, ValueError) as error:
             raise ValueError("invalid reading session") from error
-        if session_pages_read <= 0:
+        if session_pages_read <= 0 and not deleted:
             if is_audiobook_section(section_label):
                 raise ValueError("reading session time must be positive")
             raise ValueError("reading session pages must be positive")
@@ -2216,10 +2238,8 @@ def book_section_from_json(
         try:
             groups.append(
                 tuple(
-                    int(book_id)
-                    if isinstance(book_id, str) and book_id.strip().isdigit()
-                    else book_numbers_by_id[str(book_id)]
-                    if isinstance(book_id, str)
+                    book_numbers_by_id[book_id]
+                    if isinstance(book_id, str) and book_id in book_numbers_by_id
                     else int(book_id)
                     for book_id in raw_group
                 )
@@ -2489,4 +2509,804 @@ def load_json_plan(
         end_name,
         summary_stats_options_from_json(payload.get("stats_options")),
         rest_days,
+    )
+
+
+def _bundle_json_file(path: Path, filename: str) -> tuple[dict[str, object], bytes]:
+    try:
+        raw = path.read_bytes()
+    except FileNotFoundError as error:
+        raise JsonBundleError(filename, "$", "file is missing") from error
+    except OSError as error:
+        raise JsonBundleError(filename, "$", f"could not read file: {error}") from error
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise JsonBundleError(filename, "$", "file must be UTF-8") from error
+    try:
+        value = json.loads(text)
+    except json.JSONDecodeError as error:
+        raise JsonBundleError(
+            filename,
+            f"$ (line {error.lineno}, column {error.colno})",
+            "invalid JSON",
+        ) from error
+    if not isinstance(value, dict):
+        raise JsonBundleError(filename, "$", "the file must contain a JSON object")
+    return value, raw
+
+
+def _bundle_schema(value: dict[str, object], filename: str) -> None:
+    schema_version = value.get("schema_version")
+    if not isinstance(schema_version, int) or isinstance(schema_version, bool) or schema_version != BUNDLE_SCHEMA_VERSION:
+        if isinstance(schema_version, int) and schema_version > BUNDLE_SCHEMA_VERSION:
+            message = "unsupported newer schema version"
+        else:
+            message = "invalid schema version"
+        raise JsonBundleError(filename, "$.schema_version", message)
+
+
+def _bundle_manifest(
+    directory: str | Path,
+) -> tuple[JsonBundleMetadata, dict[str, dict[str, object]], dict[str, bytes]]:
+    root = Path(directory)
+    if not root.exists():
+        raise FileNotFoundError(f"reading-plan data directory missing: {root}")
+    if not root.is_dir():
+        raise JsonBundleError("manifest.json", "$", "data path is not a directory")
+
+    manifest, manifest_raw = _bundle_json_file(root / "manifest.json", "manifest.json")
+    _bundle_schema(manifest, "manifest.json")
+
+    revision = manifest.get("revision")
+    if isinstance(revision, bool) or not isinstance(revision, int) or revision < 0:
+        raise JsonBundleError("manifest.json", "$.revision", "revision must be a non-negative integer")
+    last_modified = manifest.get("last_modified")
+    if not isinstance(last_modified, str) or not last_modified:
+        raise JsonBundleError("manifest.json", "$.last_modified", "last_modified is required")
+    modified_by = manifest.get("modified_by")
+    if not isinstance(modified_by, str) or not modified_by:
+        raise JsonBundleError("manifest.json", "$.modified_by", "modified_by is required")
+    raw_files = manifest.get("files")
+    if not isinstance(raw_files, dict) or set(raw_files) != set(BUNDLE_DATA_FILES):
+        raise JsonBundleError(
+            "manifest.json",
+            "$.files",
+            "must list exactly plan.json, books.json, and sessions.json",
+        )
+
+    file_hashes: dict[str, str] = {}
+    values: dict[str, dict[str, object]] = {}
+    raw_files_by_name: dict[str, bytes] = {}
+    for filename in BUNDLE_DATA_FILES:
+        expected = raw_files.get(filename)
+        if not isinstance(expected, str) or len(expected) != 64:
+            raise JsonBundleError(
+                "manifest.json",
+                f"$.files.{filename}",
+                "must be a SHA-256 hex digest",
+            )
+        try:
+            int(expected, 16)
+        except ValueError as error:
+            raise JsonBundleError(
+                "manifest.json",
+                f"$.files.{filename}",
+                "must be a SHA-256 hex digest",
+            ) from error
+        value, raw = _bundle_json_file(root / filename, filename)
+        actual = hashlib.sha256(raw).hexdigest()
+        if actual != expected.lower():
+            raise JsonBundleError(filename, "$", "checksum does not match manifest.json")
+        _bundle_schema(value, filename)
+        file_hashes[filename] = actual
+        values[filename] = value
+        raw_files_by_name[filename] = raw
+
+    return (
+        JsonBundleMetadata(
+            revision=revision,
+            last_modified=last_modified,
+            modified_by=modified_by,
+            sha256=hashlib.sha256(manifest_raw).hexdigest(),
+            file_hashes=file_hashes,
+        ),
+        values,
+        raw_files_by_name,
+    )
+
+
+def read_json_bundle_metadata(directory: str | Path) -> JsonBundleMetadata:
+    metadata, _values, _raw_files = _bundle_manifest(directory)
+    return metadata
+
+
+def ensure_json_bundle_unchanged(
+    directory: str | Path, loaded: JsonBundleMetadata
+) -> None:
+    current = read_json_bundle_metadata(directory)
+    if (
+        current.revision != loaded.revision
+        or current.sha256 != loaded.sha256
+        or current.file_hashes != loaded.file_hashes
+    ):
+        raise ExternalPlanChangeError(
+            "reading-plan data changed on another device; reload or merge it before saving"
+        )
+
+
+def _bundle_plan_values(
+    value: dict[str, object],
+) -> tuple[date, date, str, str, SummaryStatsOptions, list[RestDayRange]]:
+    filename = "plan.json"
+    try:
+        start_date = parse_date(str(value["start_date"]))
+        end_date = parse_date(str(value["end_date"]))
+    except KeyError as error:
+        raise JsonBundleError(filename, f"$.{error.args[0]}", "required field is missing") from error
+    except ValueError as error:
+        raise JsonBundleError(filename, "$.start_date", "invalid date") from error
+    if end_date < start_date:
+        raise JsonBundleError(
+            filename,
+            "$.end_date",
+            "finish date must be on or after the start date",
+        )
+    end_label = value.get("end_label")
+    if not isinstance(end_label, str) or end_label.strip() not in {
+        "Target finish date",
+        "Quarter end",
+    }:
+        raise JsonBundleError(
+            filename,
+            "$.end_label",
+            "must be Target finish date or Quarter end",
+        )
+    end_label = end_label.strip()
+    end_name = end_name_for_bundle_label(end_label)
+    try:
+        rest_days = rest_day_ranges_from_json(value.get("rest_days"))
+    except ValueError as error:
+        raise JsonBundleError(filename, "$.rest_days", str(error)) from error
+    raw_stats = value.get("stats_options")
+    if raw_stats is not None and not isinstance(raw_stats, dict):
+        raise JsonBundleError(filename, "$.stats_options", "must be an object")
+    if raw_stats is not None:
+        for option in (
+            "book_counts",
+            "page_share",
+            "average_pages",
+            "reading_period",
+            "pace_driver",
+        ):
+            if option in raw_stats and not isinstance(raw_stats[option], bool):
+                raise JsonBundleError(
+                    filename,
+                    f"$.stats_options.{option}",
+                    "must be a boolean",
+                )
+    return (
+        start_date,
+        end_date,
+        end_label,
+        end_name,
+        summary_stats_options_from_json(raw_stats),
+        rest_days,
+    )
+
+
+def end_name_for_bundle_label(end_label: str) -> str:
+    return "target finish date" if end_label == "Target finish date" else "quarter end date"
+
+
+def _validate_bundle_progress(
+    value: object,
+    path: str,
+    lower: int,
+    upper: int,
+    field_name: str,
+    filename: str,
+) -> None:
+    if value is None:
+        return
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise JsonBundleError(filename, path, f"{field_name} must be a whole number")
+    if value < lower or value > upper:
+        raise JsonBundleError(
+            filename,
+            path,
+            f"{field_name} must be between {lower} and {upper}",
+        )
+
+
+def _validate_bundle_book_progress(
+    raw_book: dict[str, object], book: Book, section_label: str, path: str
+) -> None:
+    if is_audiobook_section(section_label):
+        total = book.end_page - book.start_page
+        _validate_bundle_progress(
+            raw_book.get("current_time_seconds"),
+            f"{path}.current_time_seconds",
+            book.start_page,
+            book.end_page,
+            "current time",
+            "books.json",
+        )
+        _validate_bundle_progress(
+            raw_book.get("remaining_time_seconds"),
+            f"{path}.remaining_time_seconds",
+            0,
+            book.end_page - book.start_page,
+            "remaining time",
+            "books.json",
+        )
+        _validate_bundle_progress(
+            raw_book.get("time_listened_seconds"),
+            f"{path}.time_listened_seconds",
+            0,
+            total,
+            "time listened",
+            "books.json",
+        )
+        current = raw_book.get("current_time_seconds")
+        listened = raw_book.get("time_listened_seconds")
+        remaining = raw_book.get("remaining_time_seconds")
+        if current is not None and listened is not None and listened != current - book.start_page:
+            raise JsonBundleError(
+                "books.json",
+                path,
+                "time listened conflicts with current time",
+            )
+        if current is not None and remaining is not None and remaining != book.end_page - current:
+            raise JsonBundleError(
+                "books.json",
+                path,
+                "remaining time conflicts with current time",
+            )
+    else:
+        _validate_bundle_progress(
+            raw_book.get("current_page"),
+            f"{path}.current_page",
+            book.start_page,
+            book.end_page,
+            "current page",
+            "books.json",
+        )
+        _validate_bundle_progress(
+            raw_book.get("pages_read"),
+            f"{path}.pages_read",
+            0,
+            book.pages,
+            "pages read",
+            "books.json",
+        )
+        current = raw_book.get("current_page")
+        pages_read = raw_book.get("pages_read")
+        if current is not None and pages_read is not None and pages_read != current - book.start_page + 1:
+            raise JsonBundleError(
+                "books.json",
+                path,
+                "pages read conflicts with current page",
+            )
+
+
+def _validate_bundle_session_progress(
+    raw_session: dict[str, object],
+    book: Book,
+    section_label: str,
+    path: str,
+) -> None:
+    if is_audiobook_section(section_label):
+        total = book.end_page - book.start_page
+        _validate_bundle_progress(
+            raw_session.get("current_time_seconds"),
+            f"{path}.current_time_seconds",
+            book.start_page,
+            book.end_page,
+            "current time",
+            "sessions.json",
+        )
+        _validate_bundle_progress(
+            raw_session.get("remaining_time_seconds"),
+            f"{path}.remaining_time_seconds",
+            0,
+            book.end_page - book.start_page,
+            "remaining time",
+            "sessions.json",
+        )
+        _validate_bundle_progress(
+            raw_session.get("time_listened_seconds"),
+            f"{path}.time_listened_seconds",
+            0,
+            total,
+            "time listened",
+            "sessions.json",
+        )
+    else:
+        _validate_bundle_progress(
+            raw_session.get("current_page"),
+            f"{path}.current_page",
+            book.start_page,
+            book.end_page,
+            "current page",
+            "sessions.json",
+        )
+        _validate_bundle_progress(
+            raw_session.get("pages_read"),
+            f"{path}.pages_read",
+            0,
+            book.pages,
+            "pages read",
+            "sessions.json",
+        )
+    amount = raw_session.get(
+        "time_listened_seconds" if is_audiobook_section(section_label) else "pages_read"
+    )
+    if amount is not None and amount <= 0 and raw_session.get("deleted") is not True:
+        raise JsonBundleError(
+            "sessions.json",
+            path,
+            "reading session progress must be positive",
+        )
+
+
+def _validate_bundle_baseline(raw_book: dict[str, object], path: str) -> None:
+    raw_baseline = raw_book.get("baseline_schedule")
+    if raw_baseline is None:
+        return
+    if not isinstance(raw_baseline, dict):
+        raise JsonBundleError("books.json", f"{path}.baseline_schedule", "must be an object")
+    for field_name in ("start_date", "deadline"):
+        value = raw_baseline.get(field_name)
+        if not isinstance(value, str):
+            raise JsonBundleError(
+                "books.json",
+                f"{path}.baseline_schedule.{field_name}",
+                "must be a date",
+            )
+        try:
+            parse_date(value)
+        except ValueError as error:
+            raise JsonBundleError(
+                "books.json",
+                f"{path}.baseline_schedule.{field_name}",
+                "must be a date",
+            ) from error
+    daily_target = raw_baseline.get("daily_target")
+    if (
+        isinstance(daily_target, bool)
+        or not isinstance(daily_target, (int, float))
+        or not math.isfinite(daily_target)
+        or daily_target < 0
+    ):
+        raise JsonBundleError(
+            "books.json",
+            f"{path}.baseline_schedule.daily_target",
+            "must be a finite non-negative number",
+        )
+
+
+def _bundle_books_values(value: dict[str, object]) -> list[BookSection]:
+    raw_sections = value.get("sections")
+    if not isinstance(raw_sections, list):
+        raise JsonBundleError("books.json", "$.sections", "sections must be a list")
+
+    sections_by_label: dict[str, BookSection] = {}
+    book_ids: set[str] = set()
+    for section_index, raw_section in enumerate(raw_sections):
+        path = f"$.sections[{section_index}]"
+        if not isinstance(raw_section, dict):
+            raise JsonBundleError("books.json", path, "each section must be a JSON object")
+        default_label = (
+            BOOK_SECTION_LABELS[section_index]
+            if section_index < len(BOOK_SECTION_LABELS)
+            else f"Section {section_index + 1}"
+        )
+        raw_label = raw_section.get("label")
+        if not isinstance(raw_label, str) or raw_label.strip() not in BOOK_SECTION_LABELS:
+            raise JsonBundleError("books.json", f"{path}.label", "unknown book section")
+        label = canonical_section_label(raw_label, default_label)
+        if label not in BOOK_SECTION_LABELS:
+            raise JsonBundleError("books.json", f"{path}.label", "unknown book section")
+        if label in sections_by_label:
+            raise JsonBundleError("books.json", f"{path}.label", "duplicate book section")
+        raw_books = raw_section.get("books", [])
+        if not isinstance(raw_books, list):
+            raise JsonBundleError("books.json", f"{path}.books", "books must be a list")
+        for book_index, raw_book in enumerate(raw_books):
+            book_path = f"{path}.books[{book_index}]"
+            if not isinstance(raw_book, dict):
+                raise JsonBundleError("books.json", book_path, "each book must be a JSON object")
+            book_id = raw_book.get("id")
+            if not isinstance(book_id, str) or not book_id.strip():
+                raise JsonBundleError("books.json", f"{book_path}.id", "stable book ID is required")
+            if "reading_sessions" in raw_book:
+                raise JsonBundleError(
+                    "books.json",
+                    f"{book_path}.reading_sessions",
+                    "reading history belongs in sessions.json",
+                )
+            if book_id in book_ids:
+                raise JsonBundleError("books.json", f"{book_path}.id", "duplicate book ID")
+            book_ids.add(book_id)
+            _validate_bundle_baseline(raw_book, book_path)
+        try:
+            section = book_section_from_json(
+                raw_section,
+                default_label,
+                derive_progress_from_sessions=False,
+            )
+        except (TypeError, ValueError) as error:
+            raise JsonBundleError("books.json", path, str(error)) from error
+        for book_index, raw_book in enumerate(raw_books):
+            _validate_bundle_book_progress(
+                raw_book,
+                section.books[book_index],
+                label,
+                f"{path}.books[{book_index}]",
+            )
+        sections_by_label[label] = section
+
+    if set(sections_by_label) != set(BOOK_SECTION_LABELS):
+        raise JsonBundleError(
+            "books.json",
+            "$.sections",
+            "must contain Physical books, Digital books, and Audiobooks",
+        )
+    return [sections_by_label[label] for label in BOOK_SECTION_LABELS]
+
+
+def _bundle_sessions_values(
+    value: dict[str, object], sections: list[BookSection]
+) -> None:
+    raw_sessions = value.get("sessions")
+    if not isinstance(raw_sessions, dict):
+        raise JsonBundleError("sessions.json", "$.sessions", "sessions must be an object")
+
+    books_by_id: dict[str, tuple[Book, str]] = {}
+    for section in sections:
+        for book in section.books:
+            books_by_id[book.id] = (book, section.label)
+    if set(raw_sessions) != set(books_by_id):
+        unknown = sorted(set(raw_sessions) - set(books_by_id))
+        missing = sorted(set(books_by_id) - set(raw_sessions))
+        if unknown:
+            raise JsonBundleError(
+                "sessions.json",
+                "$.sessions",
+                f"unknown book ID {unknown[0]}",
+            )
+        raise JsonBundleError(
+            "sessions.json",
+            "$.sessions",
+            f"missing session list for book ID {missing[0]}",
+        )
+
+    session_ids: set[str] = set()
+    for book_id, (book, section_label) in books_by_id.items():
+        raw_book_sessions = raw_sessions[book_id]
+        path = f"$.sessions[{json.dumps(book_id)}]"
+        if not isinstance(raw_book_sessions, list):
+            raise JsonBundleError("sessions.json", path, "session list must be an array")
+        for index, raw_session in enumerate(raw_book_sessions):
+            if not isinstance(raw_session, dict):
+                raise JsonBundleError(
+                    "sessions.json",
+                    f"{path}[{index}]",
+                    "each reading session must be a JSON object",
+                )
+            session_id = raw_session.get("id")
+            if not isinstance(session_id, str) or not session_id.strip():
+                raise JsonBundleError(
+                    "sessions.json",
+                    f"{path}[{index}].id",
+                    "stable reading session ID is required",
+                )
+            if session_id in session_ids:
+                raise JsonBundleError(
+                    "sessions.json",
+                    f"{path}[{index}].id",
+                    "duplicate reading session ID",
+                )
+            session_ids.add(session_id)
+            _validate_bundle_session_progress(
+                raw_session,
+                book,
+                section_label,
+                f"{path}[{index}]",
+            )
+        book_payload = book_to_json(book, section_label)
+        book_payload["reading_sessions"] = raw_book_sessions
+        try:
+            parsed_book = book_from_json(
+                book_payload,
+                book.number,
+                section_label,
+                derive_progress_from_sessions=True,
+            )
+        except (TypeError, ValueError) as error:
+            raise JsonBundleError("sessions.json", path, str(error)) from error
+        if parsed_book.current_page != book.current_page:
+            raise JsonBundleError(
+                "sessions.json",
+                path,
+                "book progress conflicts with reading sessions",
+            )
+        book.reading_sessions = parsed_book.reading_sessions
+        book.current_page = parsed_book.current_page
+
+
+def _bundle_state(
+    values: dict[str, dict[str, object]],
+) -> tuple[
+    list[BookSection],
+    date,
+    date,
+    str,
+    str,
+    SummaryStatsOptions,
+    list[RestDayRange],
+]:
+    try:
+        start_date, end_date, end_label, end_name, stats_options, rest_days = _bundle_plan_values(
+            values["plan.json"]
+        )
+        sections = _bundle_books_values(values["books.json"])
+        _bundle_sessions_values(values["sessions.json"], sections)
+    except JsonBundleError:
+        raise
+    except (TypeError, ValueError) as error:
+        raise JsonBundleError("plan.json", "$", str(error)) from error
+    return sections, start_date, end_date, end_label, end_name, stats_options, rest_days
+
+
+def load_json_bundle(
+    directory: str | Path,
+) -> tuple[
+    list[BookSection],
+    date,
+    date,
+    str,
+    str,
+    SummaryStatsOptions,
+    list[RestDayRange],
+]:
+    _metadata, values, _raw_files = _bundle_manifest(directory)
+    return _bundle_state(values)
+
+
+def _bundle_book_to_json(book: Book, section_label: str) -> dict[str, object]:
+    value = book_to_json(book, section_label)
+    value.pop("reading_sessions", None)
+    return value
+
+
+def _bundle_section_to_json(section: BookSection) -> dict[str, object]:
+    book_ids = {book.number: book.id for book in section.books}
+    try:
+        groups = [
+            [book_ids[book_number] for book_number in group]
+            for group in section.simultaneous_groups
+        ]
+    except KeyError as error:
+        raise ValueError("simultaneous group references an unknown book") from error
+    return {
+        "label": section.label,
+        "baseline_needs_recalculation": section.baseline_needs_recalculation,
+        "books": [_bundle_book_to_json(book, section.label) for book in section.books],
+        "simultaneous_groups": groups,
+    }
+
+
+def _bundle_json_text(value: dict[str, object]) -> bytes:
+    return (json.dumps(value, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
+
+
+def _bundle_payloads(
+    sections: list[BookSection],
+    start_date: date,
+    end_date: date,
+    end_label: str,
+    stats_options: SummaryStatsOptions,
+    rest_days: list[RestDayRange] | None,
+    revision: int,
+    last_modified: str,
+    modified_by: str,
+) -> dict[str, bytes]:
+    if (
+        not any(section.baseline_needs_recalculation for section in sections)
+        and any(
+            book.baseline_schedule is None
+            for section in sections
+            for book in section.books
+        )
+    ):
+        calculate_baseline_schedules(sections, start_date, end_date, rest_days)
+
+    plan = {
+        "schema_version": BUNDLE_SCHEMA_VERSION,
+        "start_date": start_date.isoformat(),
+        "end_date": end_date.isoformat(),
+        "end_label": end_label,
+        "stats_options": summary_stats_options_to_json(stats_options),
+        "rest_days": rest_day_ranges_to_json(rest_days),
+    }
+    books = {
+        "schema_version": BUNDLE_SCHEMA_VERSION,
+        "sections": [_bundle_section_to_json(section) for section in sections],
+    }
+    sessions: dict[str, list[dict[str, object]]] = {}
+    for section in sections:
+        for book in section.books:
+            sessions[book.id] = [
+                reading_session_to_json(session, section.label, book)
+                for session in book.reading_sessions
+            ]
+    session_payload = {
+        "schema_version": BUNDLE_SCHEMA_VERSION,
+        "sessions": sessions,
+    }
+    data = {
+        "plan.json": _bundle_json_text(plan),
+        "books.json": _bundle_json_text(books),
+        "sessions.json": _bundle_json_text(session_payload),
+    }
+    manifest = {
+        "schema_version": BUNDLE_SCHEMA_VERSION,
+        "revision": revision,
+        "last_modified": last_modified,
+        "modified_by": modified_by,
+        "files": {
+            filename: hashlib.sha256(raw).hexdigest()
+            for filename, raw in data.items()
+        },
+    }
+    data["manifest.json"] = _bundle_json_text(manifest)
+    return data
+
+
+def _stage_bundle_file(directory: Path, filename: str, raw: bytes) -> Path:
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{filename}.", suffix=".tmp", dir=directory
+    )
+    temporary_path = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "wb") as temporary:
+            temporary.write(raw)
+            temporary.flush()
+            os.fsync(temporary.fileno())
+        if temporary_path.read_bytes() != raw:
+            raise OSError(f"{filename} changed while it was being staged")
+        json.loads(raw.decode("utf-8"))
+        return temporary_path
+    except BaseException:
+        temporary_path.unlink(missing_ok=True)
+        raise
+
+
+def write_json_bundle(
+    directory: str | Path,
+    sections: list[BookSection],
+    start_date: date,
+    end_date: date,
+    end_label: str,
+    stats_options: SummaryStatsOptions,
+    rest_days: list[RestDayRange] | None = None,
+    metadata: JsonBundleMetadata | None = None,
+    modified_by: str = "desktop",
+) -> JsonBundleMetadata:
+    root = Path(directory)
+    root.mkdir(parents=True, exist_ok=True)
+    if metadata is None:
+        if any((root / filename).exists() for filename in BUNDLE_FILES):
+            raise ExternalPlanChangeError(
+                "reading-plan data directory already exists; reload it before saving"
+            )
+        revision = 1
+    else:
+        ensure_json_bundle_unchanged(root, metadata)
+        revision = metadata.revision + 1
+    last_modified = datetime.now().astimezone().isoformat(timespec="seconds")
+    payloads = _bundle_payloads(
+        sections,
+        start_date,
+        end_date,
+        end_label,
+        stats_options,
+        rest_days,
+        revision,
+        last_modified,
+        modified_by,
+    )
+    candidate_values: dict[str, dict[str, object]] = {}
+    for filename in BUNDLE_DATA_FILES:
+        try:
+            value = json.loads(payloads[filename].decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise JsonBundleError(filename, "$", "generated invalid JSON") from error
+        if not isinstance(value, dict):
+            raise JsonBundleError(filename, "$", "generated JSON must be an object")
+        _bundle_schema(value, filename)
+        candidate_values[filename] = value
+    _bundle_state(candidate_values)
+    staged: dict[str, Path] = {}
+    try:
+        for filename in BUNDLE_DATA_FILES:
+            staged[filename] = _stage_bundle_file(root, filename, payloads[filename])
+        staged["manifest.json"] = _stage_bundle_file(root, "manifest.json", payloads["manifest.json"])
+        if metadata is None:
+            if any((root / filename).exists() for filename in BUNDLE_FILES):
+                raise ExternalPlanChangeError(
+                    "reading-plan data directory changed while it was being saved"
+                )
+        else:
+            ensure_json_bundle_unchanged(root, metadata)
+        for filename in BUNDLE_DATA_FILES:
+            os.replace(staged.pop(filename), root / filename)
+        os.replace(staged.pop("manifest.json"), root / "manifest.json")
+    finally:
+        for temporary_path in staged.values():
+            temporary_path.unlink(missing_ok=True)
+
+    current = read_json_bundle_metadata(root)
+    expected_hashes = {
+        filename: hashlib.sha256(payloads[filename]).hexdigest()
+        for filename in BUNDLE_DATA_FILES
+    }
+    if (
+        current.revision != revision
+        or current.last_modified != last_modified
+        or current.modified_by != modified_by
+        or current.file_hashes != expected_hashes
+    ):
+        raise ExternalPlanChangeError(
+            "reading-plan data changed while it was being saved"
+        )
+    return current
+
+
+def import_legacy_json_plan(
+    source: str | Path,
+    directory: str | Path,
+    modified_by: str = "desktop",
+) -> JsonBundleMetadata:
+    (
+        sections,
+        start_date,
+        end_date,
+        end_label,
+        _end_name,
+        stats_options,
+        rest_days,
+    ) = load_json_plan(str(source))
+    return write_json_bundle(
+        directory,
+        sections,
+        start_date,
+        end_date,
+        end_label,
+        stats_options,
+        rest_days,
+        modified_by=modified_by,
+    )
+
+
+def json_bundle_snapshot_payload(directory: str | Path) -> dict[str, object]:
+    (
+        sections,
+        start_date,
+        end_date,
+        end_label,
+        _end_name,
+        stats_options,
+        rest_days,
+    ) = load_json_bundle(directory)
+    return json_plan_payload(
+        sections,
+        start_date,
+        end_date,
+        end_label,
+        stats_options,
+        rest_days,
+        modified_by="snapshot",
     )

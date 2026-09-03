@@ -2,22 +2,25 @@
 
 Native Android companion app for the desktop `reading_plan_gui.py` program.
 
-The app reads and writes the same `reading_plan.json` schema as the computer program:
+The app reads and writes the same `reading_plan_data/` directory as the computer program:
 
-- `schema_version: 8 (with revision metadata, stable book/session IDs, and per-book baseline schedules)`
+- `plan.json` contains dates, rest days, and summary settings.
+- `books.json` contains stable book IDs, per-book baseline schedules, progress, overrides, and groups.
+- `sessions.json` contains reading history keyed by stable book ID.
+- `manifest.json` contains the revision metadata and checksums for the three data files.
 - physical, digital, and audiobook sections
-- start/end dates and optional summary settings
-- reading sessions, current-page progress, and audiobook time left
-- simultaneous reading groups
+- normal startup and reload validate all four files before applying any state
 
 ## Syncthing setup
 
-1. Sync the desktop `reading_plan.json` file to the Android phone with Syncthing.
+1. Sync the desktop `reading_plan_data/` directory to the Android phone with Syncthing.
 2. Open the Android app.
-3. Tap **Connect synced reading_plan.json** and choose the synced JSON file through Android's file picker.
-4. The app keeps that document permission and auto-saves changes back to the same file.
+3. Tap **Connect synced reading-plan directory** and choose the synced directory through Android's folder picker.
+4. The app keeps that directory permission and auto-saves changes back to the four files.
 
-The apps compare the loaded revision and SHA-256 hash before saving. If another device changed the file, the app stops rather than overwriting it; reload or resolve the conflict first.
+If the selected directory contains only the legacy `reading_plan.json`, the app imports it once and leaves the original untouched. Verify the new files before deleting the legacy file yourself. A damaged or incomplete directory stops loading and offers **Retry** or **Choose directory**; it does not restore, copy, or fall back to another file.
+
+The apps compare the loaded revision and SHA-256 hashes before saving. If another device changed any managed file, the app stops rather than overwriting it; reload or resolve the conflict first. Older Android builds that only understand the mono file must be updated before using the directory format.
 
 ## Features
 
