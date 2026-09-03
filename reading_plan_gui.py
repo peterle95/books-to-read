@@ -9,6 +9,7 @@ from tkinter import filedialog, messagebox, ttk
 
 from reading_plan import (
     AUDIOBOOKS_LABEL,
+    BUNDLE_DIRECTORY,
     BOOK_SECTION_LABELS,
     DIGITAL_BOOKS_LABEL,
     PHYSICAL_BOOKS_LABEL,
@@ -16,7 +17,7 @@ from reading_plan import (
     BookDeadline,
     BookSection,
     ExternalPlanChangeError,
-    JsonPlanMetadata,
+    JsonBundleMetadata,
     RestDayRange,
     SummaryStatsOptions,
     add_reading_session,
@@ -30,12 +31,12 @@ from reading_plan import (
     current_time_from_remaining,
     final_result_message,
     format_duration,
+    import_legacy_json_plan,
     insertion_splits_simultaneous_group,
     is_audiobook_section,
     load_csv_plan,
-    load_json_plan,
-    read_json_plan_metadata,
-    ensure_json_plan_unchanged,
+    load_json_bundle,
+    read_json_bundle_metadata,
     next_quarter_start,
     normalize_rest_day_ranges,
     optional_summary_stat_rows,
@@ -54,11 +55,12 @@ from reading_plan import (
     total_units,
     validate_simultaneous_groups,
     write_csv,
-    write_json_plan_with_metadata,
+    write_json_bundle,
 )
 
 
-DEFAULT_JSON_FILE = Path("reading_plan.json")
+DEFAULT_DATA_DIRECTORY = BUNDLE_DIRECTORY
+LEGACY_JSON_FILE = Path("reading_plan.json")
 
 PAGE_PLAN_COLUMNS = (
     "Book",
@@ -238,18 +240,19 @@ class ReadingPlanApp(tk.Tk):
 
         self.sections = blank_sections()
         self.rest_days: list[RestDayRange] = []
-        self.file_path = DEFAULT_JSON_FILE
+        self.data_directory = DEFAULT_DATA_DIRECTORY
         self.cached_plan: tuple[object, ...] | None = None
         self.suspend_autosave = False
-        self.loaded_metadata: JsonPlanMetadata | None = None
+        self.loaded_metadata: JsonBundleMetadata | None = None
         self.has_unsaved_changes = False
         self.save_blocked = False
+        self.plan_loaded = False
 
         self.start_var = tk.StringVar()
         self.end_var = tk.StringVar()
         self.custom_target_var = tk.BooleanVar(value=False)
         self.status_var = tk.StringVar(value="Ready")
-        self.file_var = tk.StringVar(value=str(self.file_path))
+        self.file_var = tk.StringVar(value=str(self.data_directory))
 
         self.session_section_var = tk.StringVar(value=PHYSICAL_BOOKS_LABEL)
         self.session_book_var = tk.StringVar()
@@ -375,17 +378,17 @@ class ReadingPlanApp(tk.Tk):
         self.columnconfigure(0, weight=1)
         self.rowconfigure(0, weight=1)
 
-        notebook = ttk.Notebook(self)
-        notebook.grid(row=0, column=0, sticky="nsew")
+        self.notebook = ttk.Notebook(self)
+        self.notebook.grid(row=0, column=0, sticky="nsew")
 
-        session_tab = ttk.Frame(notebook, padding=12)
-        plan_tab = ttk.Frame(notebook, padding=12)
-        books_tab = ttk.Frame(notebook, padding=12)
-        summary_tab = ttk.Frame(notebook, padding=12)
-        notebook.add(session_tab, text="Session")
-        notebook.add(plan_tab, text="Plan")
-        notebook.add(books_tab, text="Books")
-        notebook.add(summary_tab, text="Summary")
+        session_tab = ttk.Frame(self.notebook, padding=12)
+        plan_tab = ttk.Frame(self.notebook, padding=12)
+        books_tab = ttk.Frame(self.notebook, padding=12)
+        summary_tab = ttk.Frame(self.notebook, padding=12)
+        self.notebook.add(session_tab, text="Session")
+        self.notebook.add(plan_tab, text="Plan")
+        self.notebook.add(books_tab, text="Books")
+        self.notebook.add(summary_tab, text="Summary")
 
         self._build_session_tab(session_tab)
         self._build_plan_tab(plan_tab)
@@ -478,7 +481,7 @@ class ReadingPlanApp(tk.Tk):
         toolbar.grid(row=0, column=0, sticky="ew", pady=(0, 12))
         actions = [
             ("New", self.new_plan),
-            ("Open JSON", self.open_json),
+            ("Open directory", self.open_json),
             ("Import CSV", self.import_csv),
             ("Export CSV", self.export_csv),
             ("Recalculate", self.recalculate_plan),
@@ -491,7 +494,7 @@ class ReadingPlanApp(tk.Tk):
         file_row = ttk.Frame(parent)
         file_row.grid(row=1, column=0, sticky="ew", pady=(0, 12))
         file_row.columnconfigure(1, weight=1)
-        ttk.Label(file_row, text="JSON file").grid(row=0, column=0, sticky="w")
+        ttk.Label(file_row, text="Data directory").grid(row=0, column=0, sticky="w")
         ttk.Label(file_row, textvariable=self.file_var).grid(
             row=0, column=1, sticky="ew", padx=(8, 0)
         )
@@ -747,18 +750,80 @@ class ReadingPlanApp(tk.Tk):
             )
             self.plan_tables[label] = table
 
-    def load_initial_plan(self) -> None:
-        if self.file_path.exists():
+    def _set_plan_available(self, available: bool) -> None:
+        self.plan_loaded = available
+        for index in range(self.notebook.index("end")):
+            self.notebook.tab(index, state="normal" if available else "disabled")
+
+    def _directory_has_bundle_files(self, path: Path) -> bool:
+        return any((path / filename).exists() for filename in ("plan.json", "books.json", "sessions.json", "manifest.json"))
+
+    def _load_directory(self, path: Path, legacy_source: Path | None = None) -> None:
+        if not self._directory_has_bundle_files(path):
+            source = legacy_source or (path / "reading_plan.json")
+            if source.exists():
+                import_legacy_json_plan(source, path)
+        self.load_plan_from_json(path)
+
+    def _show_load_error(self, message: str, clear_state: bool = True) -> None:
+        self.plan_loaded = False
+        self.save_blocked = True
+        self.loaded_metadata = None
+        if clear_state:
+            self.has_unsaved_changes = False
+            self.sections = blank_sections()
+            self.rest_days = []
+            self.start_var.set("")
+            self.end_var.set("")
+            self.clear_plan_output()
+        self._set_plan_available(False)
+        dialog = tk.Toplevel(self)
+        dialog.title("Reading plan data unavailable")
+        dialog.transient(self)
+        dialog.grab_set()
+        ttk.Label(
+            dialog,
+            text="The reading plan was not loaded from "
+            + str(self.data_directory)
+            + ".\n\n"
+            + message,
+            justify="left",
+            wraplength=620,
+        ).pack(padx=20, pady=(20, 12))
+        buttons = ttk.Frame(dialog)
+        buttons.pack(padx=20, pady=(0, 20))
+
+        def retry() -> None:
+            dialog.destroy()
             try:
-                self.load_plan_from_json(self.file_path)
-                self.set_status(f"Loaded {self.file_path}")
+                legacy_source = LEGACY_JSON_FILE if self.data_directory == DEFAULT_DATA_DIRECTORY else None
+                self._load_directory(self.data_directory, legacy_source)
+                self.set_status(f"Loaded {self.data_directory}")
+            except (OSError, ValueError) as error:
+                self._show_load_error(str(error), clear_state=clear_state)
+
+        def choose() -> None:
+            dialog.destroy()
+            self.open_json()
+
+        ttk.Button(buttons, text="Retry", command=retry).pack(side="left", padx=4)
+        ttk.Button(buttons, text="Choose directory", command=choose).pack(side="left", padx=4)
+        dialog.protocol("WM_DELETE_WINDOW", retry)
+        self.wait_window(dialog)
+
+    def load_initial_plan(self) -> None:
+        if self.data_directory.exists() or LEGACY_JSON_FILE.exists():
+            try:
+                self._load_directory(self.data_directory, LEGACY_JSON_FILE)
+                self.set_status(f"Loaded {self.data_directory}")
                 return
             except (OSError, ValueError) as error:
-                self.set_status(f"Could not load {self.file_path}: {error}", error=True)
-                self.save_blocked = True
-            self.reset_to_blank_plan(autosave=False)
-            return
-        self.reset_to_blank_plan(autosave=True)
+                self._show_load_error(str(error))
+                return
+        self.plan_loaded = True
+        self.save_blocked = False
+        self.reset_to_blank_plan(autosave=False)
+        self.set_status("No reading plan yet; use New to create one")
 
     def reset_to_blank_plan(self, autosave: bool) -> None:
         start_date = next_quarter_start()
@@ -775,11 +840,12 @@ class ReadingPlanApp(tk.Tk):
         if not messagebox.askyesno("Reading Plan", "Replace the current plan?"):
             return
         self.save_blocked = False
+        self.plan_loaded = True
         self.reset_to_blank_plan(autosave=True)
-        self.set_status(f"New plan saved to {self.file_path}")
+        self.set_status(f"New plan saved to {self.data_directory}")
 
     def load_plan_from_json(self, path: Path) -> None:
-        metadata = read_json_plan_metadata(str(path))
+        metadata = read_json_bundle_metadata(path)
         (
             sections,
             start_date,
@@ -788,46 +854,49 @@ class ReadingPlanApp(tk.Tk):
             _end_name,
             stats_options,
             rest_days,
-        ) = load_json_plan(str(path))
-        if read_json_plan_metadata(str(path)) != metadata:
+        ) = load_json_bundle(path)
+        if read_json_bundle_metadata(path) != metadata:
             raise ExternalPlanChangeError(
-                "reading_plan.json changed while it was loading; reload it again"
+                "reading-plan data changed while it was loading; reload it again"
             )
         self.suspend_autosave = True
         try:
             self.sections = sections
             self.rest_days = rest_days
-            self.file_path = path
-            self.file_var.set(str(path))
+            self.data_directory = path
+            self.file_var.set(str(self.data_directory))
             self.start_var.set(start_date.isoformat())
             self.end_var.set(end_date.isoformat())
             self.custom_target_var.set(end_label == "Target finish date")
             self.set_stats_options(stats_options)
             self.toggle_custom_target(refresh=False)
+            self._set_plan_available(True)
             self.refresh_all(autosave=False)
         finally:
             self.suspend_autosave = False
         self.loaded_metadata = metadata
         self.has_unsaved_changes = False
         self.save_blocked = False
+        self.plan_loaded = True
 
     def _check_for_external_change(self, _event: object | None = None) -> None:
-        if self.loaded_metadata is None or self.has_unsaved_changes:
+        if not self.plan_loaded or self.loaded_metadata is None or self.has_unsaved_changes:
             return
         try:
-            current = read_json_plan_metadata(str(self.file_path))
-        except (OSError, ValueError):
+            current = read_json_bundle_metadata(self.data_directory)
+        except (OSError, ValueError) as error:
+            self._show_load_error(str(error), clear_state=False)
             return
         if (
             current.revision != self.loaded_metadata.revision
             or current.sha256 != self.loaded_metadata.sha256
         ):
             try:
-                self.load_plan_from_json(self.file_path)
+                self.load_plan_from_json(self.data_directory)
             except (OSError, ValueError) as error:
-                self.set_status(f"Could not reload changed plan: {error}", error=True)
+                self._show_load_error(str(error), clear_state=False)
                 return
-            self.set_status(f"Reloaded externally changed {self.file_path}")
+            self.set_status(f"Reloaded externally changed {self.data_directory}")
 
     def _on_close(self) -> None:
         if self.has_unsaved_changes and not messagebox.askyesno(
@@ -837,17 +906,22 @@ class ReadingPlanApp(tk.Tk):
         self.destroy()
 
     def open_json(self) -> None:
-        filename = filedialog.askopenfilename(
-            title="Open JSON plan",
-            filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
-        )
-        if not filename:
+        if self.has_unsaved_changes and not messagebox.askyesno(
+            "Unsaved reading plan",
+            "Discard local changes that could not be saved?",
+        ):
             return
-        path = Path(filename)
+        directory = filedialog.askdirectory(title="Open reading-plan data directory")
+        if not directory:
+            return
+        path = Path(directory)
+        previous_directory = self.data_directory
         try:
-            self.load_plan_from_json(path)
+            self._load_directory(path)
         except (OSError, ValueError) as error:
-            self.show_error(f"Could not open JSON: {error}")
+            self.data_directory = previous_directory
+            self.file_var.set(str(previous_directory))
+            self._show_load_error(f"{path}: {error}", clear_state=False)
             return
         self.set_status(f"Loaded {path}")
 
@@ -864,17 +938,17 @@ class ReadingPlanApp(tk.Tk):
             self.show_error(f"Could not import CSV: {error}")
             return
 
-        target_path = Path(filename).with_suffix(".json")
         try:
-            target_metadata = (
-                read_json_plan_metadata(str(target_path)) if target_path.exists() else None
+            target_metadata = write_json_bundle(
+                self.data_directory,
+                sections,
+                start_date,
+                end_date,
+                end_label,
+                SummaryStatsOptions(True, True, True, True, True),
+                rest_days,
+                self.loaded_metadata,
             )
-            if target_metadata is not None:
-                if target_path != self.file_path or self.loaded_metadata is None:
-                    raise ExternalPlanChangeError(
-                        f"refusing to overwrite existing {target_path.name}; open it first"
-                    )
-                ensure_json_plan_unchanged(str(target_path), self.loaded_metadata)
         except (OSError, ValueError) as error:
             self.show_error(f"Could not save imported CSV: {error}")
             return
@@ -883,20 +957,21 @@ class ReadingPlanApp(tk.Tk):
         try:
             self.sections = sections
             self.rest_days = rest_days
-            self.file_path = target_path
             self.loaded_metadata = target_metadata
             self.has_unsaved_changes = False
-            self.file_var.set(str(self.file_path))
+            self.plan_loaded = True
+            self.save_blocked = False
+            self.file_var.set(str(self.data_directory))
             self.start_var.set(start_date.isoformat())
             self.end_var.set(end_date.isoformat())
             self.custom_target_var.set(end_label == "Target finish date")
             self.set_stats_options(SummaryStatsOptions(True, True, True, True, True))
             self.toggle_custom_target(refresh=False)
+            self._set_plan_available(True)
             self.refresh_all(autosave=False)
         finally:
             self.suspend_autosave = False
-        self.autosave_json()
-        self.set_status(f"Imported {Path(filename).name} and saved {self.file_path.name}")
+        self.set_status(f"Imported {Path(filename).name} and saved {self.data_directory}")
 
     def export_csv(self) -> None:
         try:
@@ -1423,16 +1498,18 @@ class ReadingPlanApp(tk.Tk):
     def autosave_json(self) -> None:
         if self.suspend_autosave:
             return
-        if self.save_blocked:
-            self.set_status("Autosave blocked until the existing JSON loads successfully", error=True)
+        if self.save_blocked or not self.plan_loaded:
+            self.set_status("Save blocked until reading-plan data loads successfully", error=True)
             return
         self.has_unsaved_changes = True
         try:
             start_date, end_date, end_label, _end_name = self.current_dates()
-            if self.loaded_metadata is not None:
-                ensure_json_plan_unchanged(str(self.file_path), self.loaded_metadata)
-            self.loaded_metadata = write_json_plan_with_metadata(
-                str(self.file_path),
+        except ValueError as error:
+            self.show_error(str(error))
+            return
+        try:
+            self.loaded_metadata = write_json_bundle(
+                self.data_directory,
                 self.sections,
                 start_date,
                 end_date,
@@ -1442,11 +1519,11 @@ class ReadingPlanApp(tk.Tk):
                 self.loaded_metadata,
             )
         except (OSError, ValueError) as error:
-            self.set_status(f"Autosave failed: {error}", error=True)
+            self._show_load_error(f"Autosave failed: {error}", clear_state=False)
             return
         self.has_unsaved_changes = False
-        self.file_var.set(str(self.file_path))
-        self.set_status(f"Saved {self.file_path}")
+        self.file_var.set(str(self.data_directory))
+        self.set_status(f"Saved {self.data_directory}")
 
     def current_plan_for_save(self):
         self.refresh_plan(autosave=False)
