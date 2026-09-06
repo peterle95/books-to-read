@@ -7,7 +7,7 @@ tags: [snapshots, cli, comparison]
 
 # Reading-plan snapshots and comparison
 
-`python3 export_reading_sessions.py` loads `reading_plan.json`, validates that it is an object, removes automatic fields (`revision`, `last_modified`, `modified_by`), and writes sorted, indented `reading_plan_snapshot.json`. `python3 compare_reading_sessions.py` compares that snapshot with the current plan and exits 0 when equal, 1 when differences or an input error occur.
+`python3 export_reading_sessions.py` loads the default `reading_plan_data/` directory through `json_bundle_snapshot_payload`, validates the bundle, removes automatic fields (`revision`, `last_modified`, `modified_by`), and writes sorted, indented `reading_plan_snapshot.json`. It can still read a legacy single JSON path when explicitly supplied. `python3 compare_reading_sessions.py` compares that snapshot with the current bundle and exits 0 when equal, 1 when differences or an input error occur.
 
 `differences` recursively compares dictionaries, scalar values, and lists. Lists containing `id` are matched by stable identity, so reorder does not look like deletion/addition; unkeyed lists are compared by position. Each result records Added/Changed/Missing, path, before/now values, section, and book. `render_table` labels fields, formats audiobook seconds, shortens columns, and applies terminal colors only when stdout is a TTY.
 
