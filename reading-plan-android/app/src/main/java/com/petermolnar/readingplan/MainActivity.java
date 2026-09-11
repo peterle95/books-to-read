@@ -1686,6 +1686,10 @@ public class MainActivity extends Activity {
 
     boolean isTargetCompleteToday(Book book) { return targets.isTargetCompleteToday(book); }
 
+    void clearTargetCompletionIfNotReached(Book book, String sectionLabel) {
+        targets.clearTargetCompletionIfNotReached(book, sectionLabel);
+    }
+
     private String summaryText(PlanSummary summary, boolean includeSectionDetails) {
         SectionPlan physical = sectionPlanByLabel(summary.sectionPlans, PHYSICAL_BOOKS_LABEL);
         SectionPlan digital = sectionPlanByLabel(summary.sectionPlans, DIGITAL_BOOKS_LABEL);

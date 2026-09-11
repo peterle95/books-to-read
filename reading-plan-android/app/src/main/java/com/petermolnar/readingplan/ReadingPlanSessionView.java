@@ -114,7 +114,7 @@ final class ReadingPlanSessionView {
         pageInput.addTextChangedListener(new MainActivity.SimpleTextWatcher(updateTargetCompletion));
         updateTarget.run();
 
-        Button add = activity.actionButton("Add session", v -> {
+        Runnable addSession = () -> {
             Book book = selectedSessionBook();
             if (book == null) {
                 activity.showError("Select a book first");
@@ -135,7 +135,17 @@ final class ReadingPlanSessionView {
             } catch (IllegalArgumentException ex) {
                 activity.showError(ex.getMessage());
             }
+        };
+        pageInput.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_DONE);
+        pageInput.setOnEditorActionListener((view, actionId, event) -> {
+            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_DONE
+                    || (event != null && event.getKeyCode() == android.view.KeyEvent.KEYCODE_ENTER)) {
+                addSession.run();
+                return true;
+            }
+            return false;
         });
+        Button add = activity.actionButton("Add session", v -> addSession.run());
         add.setEnabled(selected != null);
         detailsCard.addView(add);
         box.addView(detailsCard);

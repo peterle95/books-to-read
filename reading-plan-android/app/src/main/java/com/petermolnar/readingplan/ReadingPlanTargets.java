@@ -129,6 +129,25 @@ final class ReadingPlanTargets {
         return LocalDate.now().toString().equals(book.targetCompletedDate);
     }
 
+    void clearTargetCompletionIfNotReached(Book book, String sectionLabel) {
+        if (!isTargetCompleteToday(book)) {
+            return;
+        }
+        if (book.currentPage == null) {
+            book.targetCompletedDate = null;
+            return;
+        }
+        PlanSummary summary = activity.buildRemainingPlans();
+        BookDeadline deadline = deadlineForBook(
+                sectionPlanByLabel(summary.sectionPlans, sectionLabel), book
+        );
+        if (deadline == null
+                || completedUnits(book, sectionLabel)
+                < targetUnitsForDate(book, sectionLabel, deadline, LocalDate.now())) {
+            book.targetCompletedDate = null;
+        }
+    }
+
     private static String targetDisplayValue(String sectionLabel, Book book, int targetUnits) {
         if (isAudiobookSection(sectionLabel)) {
             return formatDuration(Math.max(totalUnits(book, sectionLabel) - targetUnits, 0));
