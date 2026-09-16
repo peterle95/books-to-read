@@ -32,7 +32,7 @@ final class ReadingPlanChartsView {
             activity.showCurrentTab();
         });
         all.setSelected(activity.showAllCharts);
-        all.setContentDescription(activity.showAllCharts ? "All books, on" : "All books, off; unfinished books only");
+        all.setContentDescription(activity.showAllCharts ? "All books, on" : "All books, off; currently reading books only");
         all.setTextColor(MainActivity.CREAM);
         all.setBackground(activity.roundedBackground(activity.showAllCharts ? MainActivity.SUCCESS : 0xff475569,
                 activity.showAllCharts ? MainActivity.SUCCESS_DARK : 0xff334155));
@@ -44,11 +44,11 @@ final class ReadingPlanChartsView {
             activity.showMetricsDialog();
         }));
         box.addView(header);
-        box.addView(activity.label(activity.showAllCharts ? "All books" : "Unfinished books"));
+        box.addView(activity.label(activity.showAllCharts ? "All books" : "Currently reading"));
 
         List<ReadingPlanChartData> charts = chartData();
         if (charts.isEmpty()) {
-            box.addView(activity.label(activity.showAllCharts ? "Add a book to see its chart." : "No unfinished books. Turn on All to see completed books."));
+            box.addView(activity.label(activity.showAllCharts ? "Add a book to see its chart." : "No currently reading books. Turn on All to see all books."));
             return scroll;
         }
 
@@ -95,7 +95,7 @@ final class ReadingPlanChartsView {
             SectionPlan plan = sectionPlanByLabel(summary.sectionPlans, sectionLabel);
             for (BookDeadline deadline : plan.deadlines) {
                 if (totalUnits(deadline.book, sectionLabel) > 0
-                        && (activity.showAllCharts || unitsRemaining(deadline.book, sectionLabel) > 0)) {
+                        && (activity.showAllCharts || (completedUnits(deadline.book, sectionLabel) > 0 && unitsRemaining(deadline.book, sectionLabel) > 0))) {
                     charts.add(new ReadingPlanChartData(activity, sectionLabel, deadline.book, deadline));
                 }
             }

@@ -948,7 +948,7 @@ class ReadingPlanApp(tk.Tk):
         self.all_button = tk.Button(toolbar, text="All", bg="#475569", fg="white", width=8,
                                     command=self.toggle_all_charts)
         self.all_button.pack(side="left", padx=12)
-        self.chart_state = ttk.Label(toolbar, text="Unfinished books")
+        self.chart_state = ttk.Label(toolbar, text="Currently reading")
         self.chart_state.pack(side="left")
         self.chart_canvas = tk.Canvas(parent, background="white", highlightthickness=0)
         self.chart_canvas.pack(fill="both", expand=True, pady=12)
@@ -958,7 +958,7 @@ class ReadingPlanApp(tk.Tk):
     def toggle_all_charts(self) -> None:
         self.show_all_charts = not self.show_all_charts
         self.all_button.configure(bg="#15803d" if self.show_all_charts else "#475569", relief="sunken")
-        self.chart_state.configure(text="All books" if self.show_all_charts else "Unfinished books")
+        self.chart_state.configure(text="All books" if self.show_all_charts else "Currently reading")
         # A brief press/colour pulse also works for keyboard activation.
         self.all_button.configure(activebackground="#22c55e" if self.show_all_charts else "#64748b", pady=5)
         self.after(140, lambda: self.all_button.configure(relief="raised", pady=1))
@@ -967,7 +967,7 @@ class ReadingPlanApp(tk.Tk):
     def refresh_charts(self) -> None:
         selected = self.chart_books[self.chart_combo.current()][1].id if 0 <= self.chart_combo.current() < len(self.chart_books) else None
         self.chart_books = [(s.label, b) for s in self.sections for b in s.books
-                            if self.show_all_charts or remaining_units(b, s.label) > 0]
+                            if self.show_all_charts or (completed_units(b, s.label) > 0 and remaining_units(b, s.label) > 0)]
         self.chart_combo.configure(values=[f"{label} — {book.number}. {book.title}" for label, book in self.chart_books])
         if self.chart_books:
             index = next((i for i, (_, b) in enumerate(self.chart_books) if b.id == selected), 0)
@@ -981,7 +981,7 @@ class ReadingPlanApp(tk.Tk):
         canvas.delete("all")
         index = self.chart_combo.current()
         if not 0 <= index < len(self.chart_books):
-            canvas.create_text(30, 30, anchor="nw", text="No unfinished books. Turn on All to see completed books." if not self.show_all_charts else "Add a book to see its chart.")
+            canvas.create_text(30, 30, anchor="nw", text="No currently reading books. Turn on All to see all books." if not self.show_all_charts else "Add a book to see its chart.")
             return
         label, book = self.chart_books[index]
         baseline = book.baseline_schedule

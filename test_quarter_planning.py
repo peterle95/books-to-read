@@ -120,7 +120,7 @@ class QuarterPlanningTests(unittest.TestCase):
                 self.skipTest(str(error))
         app.withdraw()
         try:
-            app.sections = sections(Book(1, "Done", 1, 20, current_page=20), Book(2, "Continue", 1, 100))
+            app.sections = sections(Book(1, "Done", 1, 20, current_page=20), Book(2, "Continue", 1, 100, current_page=10))
             app.refresh_charts()
             self.assertEqual(["Continue"], [b.title for _, b in app.chart_books])
             app.toggle_all_charts()

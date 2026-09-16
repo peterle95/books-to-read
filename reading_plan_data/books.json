@@ -15,8 +15,8 @@
           "pages": 1041,
           "pages_read": 1041,
           "baseline_schedule": {
-            "start_date": "2026-07-05",
-            "deadline": "2026-09-13",
+            "start_date": "2026-09-30",
+            "deadline": "2026-09-30",
             "daily_target": 0.0
           },
           "deadline_override": "2026-09-13",
@@ -33,9 +33,9 @@
           "pages": 669,
           "pages_read": 546,
           "baseline_schedule": {
-            "start_date": "2026-07-01",
-            "deadline": "2026-09-30",
-            "daily_target": 6.568181818181818
+            "start_date": "2026-07-05",
+            "deadline": "2026-07-27",
+            "daily_target": 5.3478260869565215
           },
           "deadline_override": "2026-09-30",
           "start_date_override": "2026-07-01",
@@ -51,13 +51,31 @@
           "pages": 559,
           "pages_read": 559,
           "baseline_schedule": {
-            "start_date": "2026-07-01",
-            "deadline": "2026-09-30",
-            "daily_target": 3.090909090909091
+            "start_date": "2026-07-27",
+            "deadline": "2026-07-27",
+            "daily_target": 0.0
           },
           "deadline_override": "2026-09-30",
           "start_date_override": "2026-07-01",
           "target_completed_date": "2026-08-14"
+        },
+        {
+          "id": "54111276-499d-4e83-84c2-5980b2c1ad80",
+          "number": 4,
+          "title": "test",
+          "start_page": 1,
+          "end_page": 333,
+          "current_page": null,
+          "pages": 333,
+          "pages_read": 0,
+          "baseline_schedule": {
+            "start_date": "2026-09-01",
+            "deadline": "2026-09-30",
+            "daily_target": 22.2
+          },
+          "deadline_override": null,
+          "start_date_override": "2026-09-01",
+          "target_completed_date": null
         }
       ],
       "simultaneous_groups": [
