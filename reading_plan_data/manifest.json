@@ -1,11 +1,11 @@
 {
   "schema_version": 2,
-  "revision": 34,
-  "last_modified": "2026-09-16T17:57:48+02:00",
+  "revision": 37,
+  "last_modified": "2026-09-16T18:22:22+02:00",
   "modified_by": "desktop",
   "files": {
     "plan.json": "98d49e9527907b3bf3245abd6c7b37fbb2c924f44a6c471687978b13f2eaea8e",
-    "books.json": "bbe6542f52def1c08f1512f73793632b40a24aff7ba0ab2de4cd81a5c902d2e6",
+    "books.json": "0c333692a20cab9c2b53e421a45cf0206d4bd307751389b07fc8e68e884d30a7",
     "sessions.json": "29eaf18f1d3be63dd14064aeb7fb84e119595d2f12e94b19e66a0f3ae73134f0"
   }
 }

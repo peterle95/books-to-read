@@ -201,6 +201,20 @@
             "deadline_override": null,
             "start_date_override": null,
             "target_completed_date": null
+          },
+          {
+            "id": "0f7de496-f893-4666-8b07-debcec074463",
+            "number": 5,
+            "title": "specchio americano",
+            "start_page": 3,
+            "end_page": 177,
+            "current_page": null,
+            "pages": 175,
+            "pages_read": 0,
+            "baseline_schedule": null,
+            "deadline_override": null,
+            "start_date_override": null,
+            "target_completed_date": null
           }
         ],
         "simultaneous_groups": []
