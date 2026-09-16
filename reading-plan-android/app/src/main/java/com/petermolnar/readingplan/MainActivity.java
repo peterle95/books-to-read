@@ -134,12 +134,23 @@ public class MainActivity extends Activity {
     private String currentTab = "Session";
     boolean metricsSubview = false;
     String metricDetail = null;
+    boolean showNextPlanMetrics = false;
     private String previousTabBeforeSettings = "Session";
     String selectedBookSection = PHYSICAL_BOOKS_LABEL;
     int selectedBookIndex = -1;
     int selectedSessionBookNumber = -1;
     boolean showPlanDateFields = false;
     boolean showActualPaceProjection = true;
+    boolean showAllCharts = false;
+    PlannedQuarter plannedQuarter;
+    Dialog quarterDialog;
+    private final Runnable quarterTick = new Runnable() {
+        @Override public void run() {
+            checkForExternalChange();
+            checkQuarterRollover();
+            saveHandler.postDelayed(this, 30000);
+        }
+    };
     private boolean restoring = false;
     private final Handler saveHandler = new Handler(Looper.getMainLooper());
     private Runnable pendingSave;
@@ -161,10 +172,13 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         checkForExternalChange();
+        checkQuarterRollover();
+        saveHandler.postDelayed(quarterTick, 30000);
     }
 
     @Override
     protected void onPause() {
+        saveHandler.removeCallbacks(quarterTick);
         flushPendingSave();
         super.onPause();
     }
@@ -263,7 +277,7 @@ public class MainActivity extends Activity {
     Button actionButton(String label, View.OnClickListener listener) { return ui.actionButton(label, listener); }
     Button secondaryButton(String label, View.OnClickListener listener) { return ui.secondaryButton(label, listener); }
     Button selectionButton(String label, boolean selected) { return ui.selectionButton(label, selected); }
-    private void attachButtonAnimation(View view, int normalFill, int normalBorder) { ui.attachButtonAnimation(view, normalFill, normalBorder); }
+    void attachButtonAnimation(View view, int normalFill, int normalBorder) { ui.attachButtonAnimation(view, normalFill, normalBorder); }
     LinearLayout metricColumn(String label, TextView value) { return ui.metricColumn(label, value); }
     TextView metricValue() { return ui.metricValue(); }
     GradientDrawable roundedBackground(int fillColor, int borderColor) { return ui.roundedBackground(fillColor, borderColor); }
@@ -613,11 +627,15 @@ public class MainActivity extends Activity {
                 store.write(encoded, null);
             }
             ReadingPlanBundleCodec.ReadResult bundle = store.read();
-            CsvPlan plan = loadJson(ReadingPlanBundleCodec.toLegacyJson(bundle), true);
+            String raw = ReadingPlanBundleCodec.toLegacyJson(bundle);
+            CsvPlan plan = loadJson(raw, true);
+            PlannedQuarter loadedQuarter = PlannedQuarter.fromJson(this, new JSONObject(raw).opt("planned_quarter"), plan.sections);
             applyPlan(plan);
+            plannedQuarter = loadedQuarter;
             loadedBundleMetadata = bundle.metadata;
             localDirty = false;
             setJsonLoaded(true);
+            checkQuarterRollover();
             showCurrentTab();
         } catch (SecurityException ex) {
             showLoadError("Could not load reading-plan data: " + ex.getMessage(), true);
@@ -950,7 +968,9 @@ public class MainActivity extends Activity {
 
     private String jsonText(int revision) throws JSONException {
         initializeMissingBaselineSchedules();
-        return jsonText(sections, startDate, endDate, endLabel, statsOptions, restDays, revision);
+        JSONObject payload = new JSONObject(jsonText(sections, startDate, endDate, endLabel, statsOptions, restDays, revision));
+        payload.put("planned_quarter", plannedQuarter == null ? JSONObject.NULL : plannedQuarter.toJson(this));
+        return payload.toString(2) + "\n";
     }
 
     private String jsonText(CsvPlan plan, int revision) throws JSONException {
@@ -1010,6 +1030,28 @@ public class MainActivity extends Activity {
         initializeMissingBaselineSchedules(sections, startDate, endDate);
     }
 
+    void checkQuarterRollover() {
+        if (!jsonLoaded || plannedQuarter == null) return;
+        LocalDate today = LocalDate.now();
+        List<BookSection> activated = plannedQuarter.activate(sections, today);
+        if (activated == null) return;
+        if (quarterDialog != null) quarterDialog.dismiss();
+        startDate = LocalDate.of(today.getYear(), (today.getMonthValue() - 1) / 3 * 3 + 1, 1);
+        endDate = periodEndFromStart(startDate);
+        endLabel = "Quarter end";
+        sections.clear();
+        sections.addAll(activated);
+        plannedQuarter = null;
+        restDays.removeIf(range -> range.endDate.isBefore(startDate));
+        recalculateBaselineSchedules(sections, startDate, endDate);
+        selectedBookIndex = -1;
+        selectedSessionBookNumber = -1;
+        localDirty = true;
+        if (pendingSave != null) saveHandler.removeCallbacks(pendingSave);
+        saveJsonNow();
+        showCurrentTab();
+    }
+
     private void initializeMissingBaselineSchedules(
             List<BookSection> planSections,
             LocalDate planStart,
@@ -1027,7 +1069,7 @@ public class MainActivity extends Activity {
             calculateBaselineSchedules(planSections, planStart, planEnd);
         }
     }
-    private JSONObject bookSectionToJson(BookSection section) throws JSONException {
+    JSONObject bookSectionToJson(BookSection section) throws JSONException {
         JSONObject object = new JSONObject();
         object.put("label", section.label);
         object.put("baseline_needs_recalculation", section.baselineNeedsRecalculation);
@@ -1104,7 +1146,7 @@ public class MainActivity extends Activity {
         return object;
     }
 
-    private BookSection bookSectionFromJson(
+    BookSection bookSectionFromJson(
             JSONObject object,
             String defaultLabel,
             boolean deriveProgressFromSessions,
@@ -1749,8 +1791,14 @@ public class MainActivity extends Activity {
 
     PlanSummary buildRemainingPlans() { return scheduler.buildRemainingPlans(); }
 
+    PlanSummary buildNextQuarterPlans() { return scheduler.buildNextQuarterPlans(); }
+
     List<String[]> allOptionalSummaryRows(List<SectionPlan> sectionPlans, double highestDailyPace) {
         return optionalSummaryRows(sectionPlans, highestDailyPace, new StatsOptions(true, true, true, true, true));
+    }
+
+    List<String[]> allOptionalSummaryRowsForPeriod(List<SectionPlan> sectionPlans, double highestDailyPace, LocalDate periodStart, LocalDate periodEnd) {
+        return optionalSummaryRows(sectionPlans, highestDailyPace, new StatsOptions(true, true, true, true, true), periodStart, periodEnd);
     }
 
     List<String[]> optionalSummaryRows(List<SectionPlan> sectionPlans, double highestDailyPace) {
@@ -1758,6 +1806,10 @@ public class MainActivity extends Activity {
     }
 
     private List<String[]> optionalSummaryRows(List<SectionPlan> sectionPlans, double highestDailyPace, StatsOptions options) {
+        return optionalSummaryRows(sectionPlans, highestDailyPace, options, startDate, endDate);
+    }
+
+    private List<String[]> optionalSummaryRows(List<SectionPlan> sectionPlans, double highestDailyPace, StatsOptions options, LocalDate periodStart, LocalDate periodEnd) {
         SectionPlan physical = sectionPlanByLabel(sectionPlans, PHYSICAL_BOOKS_LABEL);
         SectionPlan digital = sectionPlanByLabel(sectionPlans, DIGITAL_BOOKS_LABEL);
         SectionPlan audiobook = sectionPlanByLabel(sectionPlans, AUDIOBOOKS_LABEL);
@@ -1780,7 +1832,7 @@ public class MainActivity extends Activity {
             rows.add(new String[]{"Audiobook average duration", formatDuration(averagePages(audiobook))});
         }
         if (options.readingPeriod) {
-            rows.add(new String[]{"Reading period", availableReadingDaysCount(startDate, endDate) + " days"});
+            rows.add(new String[]{"Reading period", availableReadingDaysCount(periodStart, periodEnd) + " days"});
         }
         if (options.paceDriver) {
             List<String> drivers = new ArrayList<>();

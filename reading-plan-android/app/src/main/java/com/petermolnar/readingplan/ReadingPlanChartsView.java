@@ -2,6 +2,7 @@ package com.petermolnar.readingplan;
 
 import android.view.ViewGroup;
 import android.widget.CheckBox;
+import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.Spinner;
@@ -26,14 +27,28 @@ final class ReadingPlanChartsView {
         scroll.addView(box);
         LinearLayout header = activity.row();
         header.addView(activity.heading("Charts"), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        Button all = activity.secondaryButton("All", v -> {
+            activity.showAllCharts = !activity.showAllCharts;
+            activity.showCurrentTab();
+        });
+        all.setSelected(activity.showAllCharts);
+        all.setContentDescription(activity.showAllCharts ? "All books, on" : "All books, off; currently reading books only");
+        all.setTextColor(MainActivity.CREAM);
+        all.setBackground(activity.roundedBackground(activity.showAllCharts ? MainActivity.SUCCESS : 0xff475569,
+                activity.showAllCharts ? MainActivity.SUCCESS_DARK : 0xff334155));
+        activity.attachButtonAnimation(all, activity.showAllCharts ? MainActivity.SUCCESS : 0xff475569,
+                activity.showAllCharts ? MainActivity.SUCCESS_DARK : 0xff334155);
+        header.addView(all);
         header.addView(activity.secondaryButton("Metrics", v -> {
+            activity.showNextPlanMetrics = false;
             activity.showMetricsDialog();
         }));
         box.addView(header);
+        box.addView(activity.label(activity.showAllCharts ? "All books" : "Currently reading"));
 
         List<ReadingPlanChartData> charts = chartData();
         if (charts.isEmpty()) {
-            box.addView(activity.label("Add a book to see its chart."));
+            box.addView(activity.label(activity.showAllCharts ? "Add a book to see its chart." : "No currently reading books. Turn on All to see all books."));
             return scroll;
         }
 
@@ -79,7 +94,8 @@ final class ReadingPlanChartsView {
         for (String sectionLabel : MainActivity.BOOK_SECTION_LABELS) {
             SectionPlan plan = sectionPlanByLabel(summary.sectionPlans, sectionLabel);
             for (BookDeadline deadline : plan.deadlines) {
-                if (totalUnits(deadline.book, sectionLabel) > 0) {
+                if (totalUnits(deadline.book, sectionLabel) > 0
+                        && (activity.showAllCharts || (completedUnits(deadline.book, sectionLabel) > 0 && unitsRemaining(deadline.book, sectionLabel) > 0))) {
                     charts.add(new ReadingPlanChartData(activity, sectionLabel, deadline.book, deadline));
                 }
             }

@@ -24,8 +24,23 @@ final class ReadingPlanMetricsView {
         LinearLayout box = activity.verticalBox();
         scroll.addView(box);
 
+        if (activity.showNextPlanMetrics && activity.plannedQuarter == null) {
+            activity.showNextPlanMetrics = false;
+        }
+        boolean showingNext = activity.showNextPlanMetrics && activity.plannedQuarter != null;
+        java.time.LocalDate periodStart = showingNext ? activity.plannedQuarter.startDate : activity.startDate;
+        java.time.LocalDate periodEnd = showingNext
+                ? ReadingPlanCalendar.periodEndFromStart(activity.plannedQuarter.startDate)
+                : activity.endDate;
+        String periodLabel = showingNext ? "Quarter end" : activity.endLabel;
+        String periodEndName = showingNext ? "quarter end date" : activity.endName();
+        String planName = showingNext ? "Next plan" : "Current plan";
+
+        String headingText = activity.metricDetail == null
+                ? (showingNext ? "Metrics — Next plan" : "Metrics")
+                : (showingNext ? activity.metricDetail + " — Next plan" : activity.metricDetail);
         LinearLayout header = activity.row();
-        header.addView(activity.heading(activity.metricDetail == null ? "Metrics" : activity.metricDetail), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        header.addView(activity.heading(headingText), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
         if (activity.metricDetail == null) {
             header.addView(activity.secondaryButton("Back to charts", v -> {
                 activity.metricsSubview = false;
@@ -39,11 +54,23 @@ final class ReadingPlanMetricsView {
         }
         box.addView(header);
         TextView helper = activity.label(activity.metricDetail == null
-                ? "Your current book schedules."
+                ? (showingNext ? "Your next-quarter book schedules." : "Your current book schedules.")
                 : "Choose Back to metrics to return to the schedules.");
         helper.setTextColor(MainActivity.MOCHA);
         box.addView(helper);
-        PlanSummary summary = activity.buildRemainingPlans();
+        if (activity.plannedQuarter != null) {
+            box.addView(activity.secondaryButton(
+                    showingNext ? "Show current plan" : "Show next plan — " + activity.plannedQuarter.startDate,
+                    v -> {
+                        activity.showNextPlanMetrics = !showingNext;
+                        activity.showMetricsDialog();
+                    }));
+        }
+        PlanSummary summary = showingNext ? activity.buildNextQuarterPlans() : activity.buildRemainingPlans();
+        if (summary == null) {
+            box.addView(activity.label("No next-quarter plan."));
+            return scroll;
+        }
         if (activity.metricDetail == null) {
             for (SectionPlan sectionPlan : summary.sectionPlans) {
                 LinearLayout scheduleCard = activity.surfaceCard();
@@ -67,23 +94,26 @@ final class ReadingPlanMetricsView {
         if ("Key metrics".equals(activity.metricDetail)) {
             activity.addMetricRow(table, "Overview", "Remaining pages", String.valueOf(summary.totalPages), "Physical + digital");
             activity.addMetricRow(table, "Overview", "Audiobook remaining time", formatDuration(audiobook.totalPages), "All audiobook titles");
-            activity.addMetricRow(table, "Plan", "Reading days", String.valueOf(activity.availableReadingDaysCount(activity.startDate, activity.endDate)), "Rest days excluded");
+            activity.addMetricRow(table, "Plan", "Reading days", String.valueOf(activity.availableReadingDaysCount(periodStart, periodEnd)), "Rest days excluded");
             activity.addMetricRow(table, "Plan", "Highest daily pace", MainActivity.format2(summary.highestDailyPace) + " pages/day", "Physical and digital");
-            activity.addMetricRow(table, "Plan", "Status", summary.overallStatus, "Current plan");
+            activity.addMetricRow(table, "Plan", "Status", summary.overallStatus, planName);
         } else if ("Summary metrics".equals(activity.metricDetail)) {
-            for (String[] metric : activity.allOptionalSummaryRows(summary.sectionPlans, summary.highestDailyPace)) {
+            java.util.List<String[]> rows = showingNext
+                    ? activity.allOptionalSummaryRowsForPeriod(summary.sectionPlans, summary.highestDailyPace, periodStart, periodEnd)
+                    : activity.allOptionalSummaryRows(summary.sectionPlans, summary.highestDailyPace);
+            for (String[] metric : rows) {
                 activity.addMetricRow(table, "Summary", metric[0], metric[1], "Optional metric");
             }
         } else if ("Schedule information".equals(activity.metricDetail)) {
-            activity.addMetricRow(table, "Schedule", "Plan period", activity.startDate + " to " + activity.endDate, activity.endLabel);
+            activity.addMetricRow(table, "Schedule", "Plan period", periodStart + " to " + periodEnd, periodLabel);
             for (SectionPlan sectionPlan : summary.sectionPlans) {
                 String pace = activity.sectionDailyPace(sectionPlan);
                 String result = sectionPlan.deadlines.isEmpty()
                         ? "No books"
                         : activity.finalResultMessage(
                                 sectionPlan.deadlines.get(sectionPlan.deadlines.size() - 1).deadline,
-                                activity.endDate,
-                                activity.endName()
+                                periodEnd,
+                                periodEndName
                         );
                 activity.addMetricRow(table, sectionPlan.section.label, "Daily pace", pace, result);
             }

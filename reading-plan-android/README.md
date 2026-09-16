@@ -28,6 +28,8 @@ The apps compare the loaded revision and SHA-256 hashes before saving. If anothe
 - Plan tab: manage plan-wide rest-day ranges and recalculate; start and finish dates appear after pressing New plan.
 - Books tab: view today's reading targets with planned starts and deadlines, and add, insert, replace, delete, reorder, and group physical, digital, or audiobook entries. Audiobook times use `HH:MM` and also accept `HH:MM:SS`.
 - Charts tab: view charts directly, then open Metrics to see key metrics or one focused detail view at a time.
+- Charts **All** toggle: slate/off shows unfinished books by default; green/on includes completed books, with press animation.
+- Plan **Plan next quarter**: save and edit a separate book list. On the next quarter boundary (January/April/July/October 1), unfinished books continue before the planned books with their progress and history. See [quarter-planning details](../README.md#planning-the-next-quarter).
 - CSV import/export is included for compatibility with the desktop program's CSV flow.
 
 ## Build
@@ -39,3 +41,9 @@ gradle :app:assembleDebug
 ```
 
 The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
+
+Run the standalone quarter-rollover regression check with the Gradle wrapper:
+
+```powershell
+.\gradlew.bat :app:checkQuarterPlanning
+```

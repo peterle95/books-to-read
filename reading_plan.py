@@ -20,7 +20,7 @@ PHYSICAL_BOOKS_LABEL = "Physical books"
 DIGITAL_BOOKS_LABEL = "Digital books"
 AUDIOBOOKS_LABEL = "Audiobooks"
 BOOK_SECTION_LABELS = (PHYSICAL_BOOKS_LABEL, DIGITAL_BOOKS_LABEL, AUDIOBOOKS_LABEL)
-BUNDLE_SCHEMA_VERSION = 1
+BUNDLE_SCHEMA_VERSION = 2
 BUNDLE_DIRECTORY = Path("reading_plan_data")
 BUNDLE_DATA_FILES = ("plan.json", "books.json", "sessions.json")
 BUNDLE_FILES = BUNDLE_DATA_FILES + ("manifest.json",)
@@ -2538,7 +2538,7 @@ def _bundle_json_file(path: Path, filename: str) -> tuple[dict[str, object], byt
 
 def _bundle_schema(value: dict[str, object], filename: str) -> None:
     schema_version = value.get("schema_version")
-    if not isinstance(schema_version, int) or isinstance(schema_version, bool) or schema_version != BUNDLE_SCHEMA_VERSION:
+    if not isinstance(schema_version, int) or isinstance(schema_version, bool) or schema_version not in (1, BUNDLE_SCHEMA_VERSION):
         if isinstance(schema_version, int) and schema_version > BUNDLE_SCHEMA_VERSION:
             message = "unsupported newer schema version"
         else:
@@ -3053,6 +3053,10 @@ def _bundle_state(
         )
         sections = _bundle_books_values(values["books.json"])
         _bundle_sessions_values(values["sessions.json"], sections)
+        try:
+            planned_quarter_from_json(values["books.json"].get("planned_quarter"), sections)
+        except (TypeError, ValueError) as error:
+            raise JsonBundleError("books.json", "$.planned_quarter", str(error)) from error
     except JsonBundleError:
         raise
     except (TypeError, ValueError) as error:
@@ -3062,17 +3066,78 @@ def _bundle_state(
 
 def load_json_bundle(
     directory: str | Path,
-) -> tuple[
-    list[BookSection],
-    date,
-    date,
-    str,
-    str,
-    SummaryStatsOptions,
-    list[RestDayRange],
-]:
+    *, include_planned: bool = False,
+) -> tuple:
     _metadata, values, _raw_files = _bundle_manifest(directory)
-    return _bundle_state(values)
+    state = _bundle_state(values)
+    if include_planned:
+        return (*state, planned_quarter_from_json(values["books.json"].get("planned_quarter"), state[0]))
+    return state
+
+
+@dataclass
+class PlannedQuarter:
+    start_date: date
+    sections: list[BookSection]
+
+
+def planned_quarter_from_json(value: object, current: list[BookSection]) -> PlannedQuarter | None:
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise ValueError("planned_quarter must be an object")
+    start = parse_date(str(value.get("start_date", "")))
+    if start.day != 1 or start.month not in (1, 4, 7, 10):
+        raise ValueError("planned quarter must start on a calendar quarter boundary")
+    sections = _bundle_books_values(value)
+    ids = {book.id for section in current for book in section.books}
+    for section in sections:
+        for book in section.books:
+            if book.id in ids or completed_units(book, section.label):
+                raise ValueError("planned books must have unique IDs and no reading progress")
+    return PlannedQuarter(start, sections)
+
+
+def planned_quarter_to_json(planned: PlannedQuarter | None) -> dict[str, object] | None:
+    if planned is None:
+        return None
+    return {"start_date": planned.start_date.isoformat(),
+            "sections": [_bundle_section_to_json(section) for section in planned.sections]}
+
+
+def activate_planned_quarter(current: list[BookSection], planned: PlannedQuarter,
+                             today: date, rest_days: list[RestDayRange] | None = None,
+                             ) -> tuple[list[BookSection], date, date] | None:
+    """Carry unfinished books first, preserving identity/history and surviving groups."""
+    if today < planned.start_date:
+        return None
+    from copy import deepcopy
+    start = date(today.year, (today.month - 1) // 3 * 3 + 1, 1)
+    sections = []
+    for label in BOOK_SECTION_LABELS:
+        merged = BookSection(label, [], [])
+        for source in (current, planned.sections):
+            section = next(s for s in source if s.label == label)
+            mapping = {}
+            for book in section.books:
+                if remaining_units(book, label) <= 0:
+                    continue
+                copied = deepcopy(book)
+                copied.number = len(merged.books) + 1
+                mapping[book.number] = copied.number
+                copied.baseline_schedule = None
+                copied.deadline_override = None
+                copied.start_date_override = None
+                copied.target_completed_date = None
+                merged.books.append(copied)
+            for group in section.simultaneous_groups:
+                kept = tuple(mapping[number] for number in group if number in mapping)
+                if len(kept) > 1:
+                    merged.simultaneous_groups.append(kept)
+        sections.append(merged)
+    end = period_end_from_start(start)
+    recalculate_baseline_schedules(sections, start, end, rest_days)
+    return sections, start, end
 
 
 def _bundle_book_to_json(book: Book, section_label: str) -> dict[str, object]:
@@ -3112,6 +3177,7 @@ def _bundle_payloads(
     revision: int,
     last_modified: str,
     modified_by: str,
+    planned_quarter: PlannedQuarter | None = None,
 ) -> dict[str, bytes]:
     if (
         not any(section.baseline_needs_recalculation for section in sections)
@@ -3134,6 +3200,7 @@ def _bundle_payloads(
     books = {
         "schema_version": BUNDLE_SCHEMA_VERSION,
         "sections": [_bundle_section_to_json(section) for section in sections],
+        "planned_quarter": planned_quarter_to_json(planned_quarter),
     }
     sessions: dict[str, list[dict[str, object]]] = {}
     for section in sections:
@@ -3184,6 +3251,9 @@ def _stage_bundle_file(directory: Path, filename: str, raw: bytes) -> Path:
         raise
 
 
+_PRESERVE_PLANNED = object()
+
+
 def write_json_bundle(
     directory: str | Path,
     sections: list[BookSection],
@@ -3194,6 +3264,7 @@ def write_json_bundle(
     rest_days: list[RestDayRange] | None = None,
     metadata: JsonBundleMetadata | None = None,
     modified_by: str = "desktop",
+    planned_quarter: PlannedQuarter | None | object = _PRESERVE_PLANNED,
 ) -> JsonBundleMetadata:
     root = Path(directory)
     root.mkdir(parents=True, exist_ok=True)
@@ -3207,6 +3278,8 @@ def write_json_bundle(
         ensure_json_bundle_unchanged(root, metadata)
         revision = metadata.revision + 1
     last_modified = datetime.now().astimezone().isoformat(timespec="seconds")
+    if planned_quarter is _PRESERVE_PLANNED:
+        planned_quarter = load_json_bundle(root, include_planned=True)[-1] if metadata else None
     payloads = _bundle_payloads(
         sections,
         start_date,
@@ -3217,6 +3290,7 @@ def write_json_bundle(
         revision,
         last_modified,
         modified_by,
+        planned_quarter,
     )
     candidate_values: dict[str, dict[str, object]] = {}
     for filename in BUNDLE_DATA_FILES:
@@ -3300,8 +3374,9 @@ def json_bundle_snapshot_payload(directory: str | Path) -> dict[str, object]:
         _end_name,
         stats_options,
         rest_days,
-    ) = load_json_bundle(directory)
-    return json_plan_payload(
+        planned_quarter,
+    ) = load_json_bundle(directory, include_planned=True)
+    payload = json_plan_payload(
         sections,
         start_date,
         end_date,
@@ -3310,3 +3385,6 @@ def json_bundle_snapshot_payload(directory: str | Path) -> dict[str, object]:
         rest_days,
         modified_by="snapshot",
     )
+    if planned_quarter is not None:
+        payload["planned_quarter"] = planned_quarter_to_json(planned_quarter)
+    return payload
