@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "sessions": {
     "ab80c361-b8b9-4b78-91a4-b0d93ea26059": [
       {
@@ -633,17 +633,17 @@
         "pages_read": 9
       },
       {
-        "id": "e992fc57-a236-4cc1-8d07-2cac28b79a4a",
-        "date": "2026-09-16",
-        "current_page": 284,
-        "pages_read": 4
-      },
-      {
         "id": "c91700c0-3ebe-4adf-b408-74dbf037b330",
         "date": "2026-09-16",
         "current_page": 285,
         "pages_read": 1,
         "deleted": true
+      },
+      {
+        "id": "e992fc57-a236-4cc1-8d07-2cac28b79a4a",
+        "date": "2026-09-16",
+        "current_page": 284,
+        "pages_read": 4
       }
     ],
     "68494fe1-c596-4fdd-aed2-3585a9cfb9dd": [

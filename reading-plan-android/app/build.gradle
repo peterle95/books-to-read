@@ -2,6 +2,16 @@ plugins {
     id "com.android.application"
 }
 
+tasks.register("checkQuarterPlanning", JavaExec) {
+    dependsOn "compileDebugUnitTestJavaWithJavac"
+    mainClass = "com.petermolnar.readingplan.PlannedQuarterCheck"
+    enableAssertions = true
+    classpath = files(
+            tasks.named("compileDebugJavaWithJavac").map { it.destinationDirectory },
+            tasks.named("compileDebugUnitTestJavaWithJavac").map { it.destinationDirectory },
+            androidComponents.sdkComponents.bootClasspath)
+}
+
 android {
     namespace "com.petermolnar.readingplan"
     compileSdk 35

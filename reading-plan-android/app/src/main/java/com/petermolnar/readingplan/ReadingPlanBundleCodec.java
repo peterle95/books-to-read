@@ -21,7 +21,7 @@ import java.util.Map;
 import java.util.Set;
 
 final class ReadingPlanBundleCodec {
-    static final int SCHEMA_VERSION = 1;
+    static final int SCHEMA_VERSION = 2;
     static final List<String> DATA_FILES = Arrays.asList("plan.json", "books.json", "sessions.json");
 
     private ReadingPlanBundleCodec() {
@@ -144,6 +144,7 @@ final class ReadingPlanBundleCodec {
         JSONObject books = new JSONObject();
         books.put("schema_version", SCHEMA_VERSION);
         books.put("sections", booksSections);
+        copyIfPresent(legacy, books, "planned_quarter");
         JSONObject sessionFile = new JSONObject();
         sessionFile.put("schema_version", SCHEMA_VERSION);
         sessionFile.put("sessions", sessions);
@@ -300,6 +301,7 @@ final class ReadingPlanBundleCodec {
         copyIfPresent(plan, legacy, "stats_options");
         copyIfPresent(plan, legacy, "rest_days");
         legacy.put("sections", sections);
+        copyIfPresent(books, legacy, "planned_quarter");
         return legacy.toString();
     }
 
@@ -332,7 +334,7 @@ final class ReadingPlanBundleCodec {
         if (schema > SCHEMA_VERSION) {
             throw new IllegalArgumentException(filename + " $.schema_version: unsupported newer schema version");
         }
-        if (schema != SCHEMA_VERSION) {
+        if (schema != 1 && schema != SCHEMA_VERSION) {
             throw new IllegalArgumentException(filename + " $.schema_version: invalid schema version");
         }
     }

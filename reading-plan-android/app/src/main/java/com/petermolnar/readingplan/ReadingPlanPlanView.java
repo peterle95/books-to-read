@@ -29,6 +29,8 @@ final class ReadingPlanPlanView {
         header.addView(activity.heading("Plan"), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
         header.addView(activity.secondaryButton("New plan", v -> activity.confirmNewPlan()));
         box.addView(header);
+        box.addView(activity.actionButton(activity.plannedQuarter == null ? "Plan next quarter" : "Edit next quarter — " + activity.plannedQuarter.startDate,
+                v -> new PlannedQuarterEditor(activity).show()));
 
         if (activity.showPlanDateFields) {
             EditText startInput = activity.editText(activity.startDate.toString(), InputType.TYPE_CLASS_TEXT);

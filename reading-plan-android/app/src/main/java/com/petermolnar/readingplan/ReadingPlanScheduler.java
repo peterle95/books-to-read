@@ -198,6 +198,43 @@ final class ReadingPlanScheduler {
         return new PlanSummary(plans, totalPages, highestPace, achievable ? "achievable" : "not achievable");
     }
 
+    PlanSummary buildNextQuarterPlans() {
+        if (activity.plannedQuarter == null) {
+            return null;
+        }
+        LocalDate nextStart = activity.plannedQuarter.startDate;
+        LocalDate nextEnd = ReadingPlanCalendar.periodEndFromStart(nextStart);
+        List<SectionPlan> plans = new ArrayList<>();
+        for (BookSection section : activity.plannedQuarter.sections) {
+            int sectionUnits = 0;
+            for (Book book : section.books) {
+                sectionUnits += totalUnits(book, section.label);
+            }
+            double dailyPace = section.books.isEmpty()
+                    || activity.availableReadingDaysCount(nextStart, nextEnd) == 0
+                    ? 0.0
+                    : (double) sectionUnits / activity.availableReadingDaysCount(nextStart, nextEnd);
+            plans.add(buildPlan(
+                    section,
+                    nextStart,
+                    nextEnd,
+                    dailyPace,
+                    book -> totalUnits(book, section.label)
+            ));
+        }
+        int totalPages = 0;
+        double highestPace = 0.0;
+        boolean achievable = true;
+        for (SectionPlan plan : plans) {
+            if (!isAudiobookSection(plan.section.label)) {
+                totalPages += plan.totalPages;
+                highestPace = Math.max(highestPace, plan.dailyPace);
+            }
+            achievable = achievable && "achievable".equals(plan.overallStatus);
+        }
+        return new PlanSummary(plans, totalPages, highestPace, achievable ? "achievable" : "not achievable");
+    }
+
     private SectionPlan buildRemainingSectionPlan(BookSection section, LocalDate start, LocalDate end, LocalDate today) {
         if (section.books.isEmpty()) {
             return new SectionPlan(section, new ArrayList<>(), 0.0, 0, 0.0, "achievable");

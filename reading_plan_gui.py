@@ -16,6 +16,9 @@ from reading_plan import (
     Book,
     BookDeadline,
     BookSection,
+    PlannedQuarter,
+    activate_planned_quarter,
+    validate_book_range,
     ExternalPlanChangeError,
     JsonBundleMetadata,
     RestDayRange,
@@ -26,6 +29,7 @@ from reading_plan import (
     available_reading_days_count,
     effective_remaining_start_date,
     build_remaining_section_plans,
+    build_section_plans,
     completed_units,
     recalculate_baseline_schedules,
     current_time_from_remaining,
@@ -239,6 +243,9 @@ class ReadingPlanApp(tk.Tk):
         self.minsize(1020, 640)
 
         self.sections = blank_sections()
+        self.planned_quarter = None
+        self.show_all_charts = False
+        self.quarter_dialog = None
         self.rest_days: list[RestDayRange] = []
         self.data_directory = DEFAULT_DATA_DIRECTORY
         self.cached_plan: tuple[object, ...] | None = None
@@ -283,6 +290,183 @@ class ReadingPlanApp(tk.Tk):
         self.bind("<FocusIn>", self._check_for_external_change, add=True)
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         self.load_initial_plan()
+        self.after(30000, self._quarter_tick)
+
+    def _quarter_tick(self) -> None:
+        self._check_for_external_change()
+        self.check_quarter_rollover()
+        self.after(30000, self._quarter_tick)
+
+    def check_quarter_rollover(self) -> None:
+        if not self.plan_loaded or self.save_blocked or self.planned_quarter is None:
+            return
+        result = activate_planned_quarter(self.sections, self.planned_quarter, date.today(), self.rest_days)
+        if result is None:
+            return
+        if self.quarter_dialog is not None and self.quarter_dialog.winfo_exists():
+            self.quarter_dialog.destroy()
+        self.sections, start, end = result
+        self.planned_quarter = None
+        self.rest_days = [r for r in self.rest_days if r.end_date >= start]
+        self.start_var.set(start.isoformat())
+        self.end_var.set(end.isoformat())
+        self.custom_target_var.set(False)
+        self.toggle_custom_target(refresh=False)
+        self.refresh_all(autosave=True)
+
+    def edit_next_quarter(self) -> None:
+        from copy import deepcopy
+        self.check_quarter_rollover()
+        original = self.planned_quarter
+        try:
+            draft = deepcopy(original) or PlannedQuarter(
+                next_quarter_start(max(date.today(), self.current_dates()[0])), blank_sections())
+        except ValueError as error:
+            self.show_error(str(error))
+            return
+        dialog = tk.Toplevel(self)
+        self.quarter_dialog = dialog
+        dialog.title(f"Next quarter — {draft.start_date}")
+        dialog.transient(self)
+        dialog.grab_set()
+        ttk.Label(dialog, text="Unfinished current books will continue before these books.").pack(padx=12, pady=12)
+        listing = tk.Listbox(dialog, width=75, height=12, exportselection=False)
+        listing.pack(fill="both", expand=True, padx=12)
+        fields = ttk.Frame(dialog, padding=12)
+        fields.pack(fill="x")
+        section_var = tk.StringVar(value=PHYSICAL_BOOKS_LABEL)
+        ttk.Combobox(fields, textvariable=section_var, values=BOOK_SECTION_LABELS, state="readonly").grid(row=0, column=0)
+        title, start, end = (tk.StringVar() for _ in range(3))
+        for i, (label, variable) in enumerate((("Title", title), ("Start page/time", start), ("End page/time", end))):
+            ttk.Label(fields, text=label).grid(row=1, column=i)
+            ttk.Entry(fields, textvariable=variable).grid(row=2, column=i, padx=4)
+        items = []
+
+        def refresh():
+            items.clear()
+            listing.delete(0, "end")
+            for section in draft.sections:
+                for book in section.books:
+                    items.append((section, book))
+                    listing.insert("end", f"{section.label} — {book.title} ({display_value(section.label, book.start_page)}–{display_value(section.label, book.end_page)})")
+
+        def select(_event):
+            if listing.curselection():
+                section, book = items[listing.curselection()[0]]
+                section_var.set(section.label)
+                title.set(book.title)
+                start.set(display_value(section.label, book.start_page))
+                end.set(display_value(section.label, book.end_page))
+
+        def add(replace=False):
+            try:
+                label = section_var.get()
+                parse = parse_duration if is_audiobook_section(label) else int
+                first = parse(start.get() or ("0:00" if is_audiobook_section(label) else "1"))
+                last = parse(end.get())
+                validate_book_range(label, first, last)
+                if not title.get().strip():
+                    raise ValueError("Book title is required")
+                if replace and not listing.curselection():
+                    raise ValueError("Select a planned book first")
+                section = next(s for s in draft.sections if s.label == label)
+                book = Book(len(section.books) + 1, title.get().strip(), first, last)
+                if replace:
+                    old_section, old = items[listing.curselection()[0]]
+                    if old_section is section:
+                        section.books[section.books.index(old)] = book
+                    else:
+                        number = old.number
+                        old_section.books.remove(old)
+                        renumber_books(old_section.books)
+                        old_section.simultaneous_groups = remap_simultaneous_groups_after_deletion(old_section.simultaneous_groups, number, old_section.books)
+                        section.books.append(book)
+                else:
+                    section.books.append(book)
+                for s in draft.sections:
+                    renumber_books(s.books)
+                refresh()
+            except ValueError as error:
+                messagebox.showerror("Next quarter", str(error), parent=dialog)
+
+        def remove():
+            if listing.curselection():
+                section, book = items[listing.curselection()[0]]
+                number = book.number
+                section.books.remove(book)
+                renumber_books(section.books)
+                section.simultaneous_groups = remap_simultaneous_groups_after_deletion(section.simultaneous_groups, number, section.books)
+                refresh()
+
+        def save():
+            if self.planned_quarter is not original:
+                messagebox.showerror("Next quarter", "The plan changed while you were editing. Reopen the editor before saving.", parent=dialog)
+                return
+            self.planned_quarter = draft
+            self.autosave_json()
+            dialog.destroy()
+            self.check_quarter_rollover()
+
+        def show_metrics():
+            try:
+                quarter_end = period_end_from_start(draft.start_date)
+                section_plans, total_pages, highest_pace, overall_status = build_section_plans(
+                    draft.sections, draft.start_date, quarter_end, self.rest_days
+                )
+            except ValueError as error:
+                messagebox.showerror("Next quarter", str(error), parent=dialog)
+                return
+            popup = tk.Toplevel(dialog)
+            popup.title(f"Next quarter metrics — {draft.start_date}")
+            popup.transient(dialog)
+            text = tk.Text(popup, width=72, height=24, wrap="word")
+            text.pack(fill="both", expand=True, padx=12, pady=12)
+            physical_plan = section_plan_by_label(section_plans, PHYSICAL_BOOKS_LABEL)
+            digital_plan = section_plan_by_label(section_plans, DIGITAL_BOOKS_LABEL)
+            audiobook_plan = section_plan_by_label(section_plans, AUDIOBOOKS_LABEL)
+            lines = [
+                "Next quarter plan",
+                f"Start date: {draft.start_date.isoformat()}",
+                f"Quarter end: {quarter_end.isoformat()}",
+                f"Total pages: {total_pages}",
+                f"Physical total pages: {physical_plan.total_pages}",
+                f"Digital total pages: {digital_plan.total_pages}",
+                f"Audiobook total time: {format_duration(audiobook_plan.total_pages)}",
+                f"Highest daily pace: {highest_pace:.2f} pages/day",
+                f"Audiobook daily time: {format_duration(audiobook_plan.daily_pace)}/day",
+                f"Status: {overall_status}",
+            ]
+            for label, value in optional_summary_stat_rows(
+                section_plans,
+                draft.start_date,
+                quarter_end,
+                highest_pace,
+                self.current_stats_options(),
+                self.rest_days,
+            ):
+                lines.append(f"{label}: {value}")
+            for section_plan in section_plans:
+                lines.append("")
+                lines.append(section_plan.section.label)
+                if not section_plan.deadlines:
+                    lines.append("No books.")
+                    continue
+                lines.append(f"Daily pace: {section_daily_pace(section_plan)}")
+                lines.append(
+                    final_result_message(
+                        section_plan.deadlines[-1].deadline, quarter_end, "quarter end date"
+                    )
+                )
+            text.insert("1.0", "\n".join(lines) + "\n")
+            text.configure(state="disabled")
+            ttk.Button(popup, text="Close", command=popup.destroy).pack(pady=(0, 12))
+
+        listing.bind("<<ListboxSelect>>", select)
+        buttons = ttk.Frame(dialog, padding=12)
+        buttons.pack()
+        for text, command in (("Add", add), ("Update selected", lambda: add(True)), ("Remove selected", remove), ("Show metrics", show_metrics), ("Save plan", save), ("Cancel", dialog.destroy)):
+            ttk.Button(buttons, text=text, command=command).pack(side="left", padx=4)
+        refresh()
 
     def _pick_date(self, initial: str = "") -> str | None:
         """Show a simple calendar dialog. Returns 'YYYY-MM-DD' or None."""
@@ -394,6 +578,9 @@ class ReadingPlanApp(tk.Tk):
         self._build_plan_tab(plan_tab)
         self._build_books_tab(books_tab)
         self._build_summary_tab(summary_tab)
+        charts_tab = ttk.Frame(self.notebook, padding=12)
+        self.notebook.add(charts_tab, text="Charts")
+        self._build_charts_tab(charts_tab)
 
         self.status_label = ttk.Label(
             self, textvariable=self.status_var, anchor="w", padding=(8, 5)
@@ -485,6 +672,7 @@ class ReadingPlanApp(tk.Tk):
             ("Import CSV", self.import_csv),
             ("Export CSV", self.export_csv),
             ("Recalculate", self.recalculate_plan),
+            ("Next quarter", self.edit_next_quarter),
         ]
         for index, (label, command) in enumerate(actions):
             ttk.Button(toolbar, text=label, command=command).grid(
@@ -750,6 +938,77 @@ class ReadingPlanApp(tk.Tk):
             )
             self.plan_tables[label] = table
 
+    def _build_charts_tab(self, parent: ttk.Frame) -> None:
+        toolbar = ttk.Frame(parent)
+        toolbar.pack(fill="x")
+        self.chart_choice = tk.StringVar()
+        self.chart_combo = ttk.Combobox(toolbar, textvariable=self.chart_choice, state="readonly", width=70)
+        self.chart_combo.pack(side="left", fill="x", expand=True)
+        self.chart_combo.bind("<<ComboboxSelected>>", lambda _: self.draw_chart())
+        self.all_button = tk.Button(toolbar, text="All", bg="#475569", fg="white", width=8,
+                                    command=self.toggle_all_charts)
+        self.all_button.pack(side="left", padx=12)
+        self.chart_state = ttk.Label(toolbar, text="Unfinished books")
+        self.chart_state.pack(side="left")
+        self.chart_canvas = tk.Canvas(parent, background="white", highlightthickness=0)
+        self.chart_canvas.pack(fill="both", expand=True, pady=12)
+        self.chart_canvas.bind("<Configure>", lambda _: self.draw_chart())
+        self.chart_books = []
+
+    def toggle_all_charts(self) -> None:
+        self.show_all_charts = not self.show_all_charts
+        self.all_button.configure(bg="#15803d" if self.show_all_charts else "#475569", relief="sunken")
+        self.chart_state.configure(text="All books" if self.show_all_charts else "Unfinished books")
+        # A brief press/colour pulse also works for keyboard activation.
+        self.all_button.configure(activebackground="#22c55e" if self.show_all_charts else "#64748b", pady=5)
+        self.after(140, lambda: self.all_button.configure(relief="raised", pady=1))
+        self.refresh_charts()
+
+    def refresh_charts(self) -> None:
+        selected = self.chart_books[self.chart_combo.current()][1].id if 0 <= self.chart_combo.current() < len(self.chart_books) else None
+        self.chart_books = [(s.label, b) for s in self.sections for b in s.books
+                            if self.show_all_charts or remaining_units(b, s.label) > 0]
+        self.chart_combo.configure(values=[f"{label} — {book.number}. {book.title}" for label, book in self.chart_books])
+        if self.chart_books:
+            index = next((i for i, (_, b) in enumerate(self.chart_books) if b.id == selected), 0)
+            self.chart_combo.current(index)
+        else:
+            self.chart_choice.set("")
+        self.draw_chart()
+
+    def draw_chart(self) -> None:
+        canvas = self.chart_canvas
+        canvas.delete("all")
+        index = self.chart_combo.current()
+        if not 0 <= index < len(self.chart_books):
+            canvas.create_text(30, 30, anchor="nw", text="No unfinished books. Turn on All to see completed books." if not self.show_all_charts else "Add a book to see its chart.")
+            return
+        label, book = self.chart_books[index]
+        baseline = book.baseline_schedule
+        if baseline is None:
+            canvas.create_text(30, 30, anchor="nw", text="Recalculate the plan to see its chart.")
+            return
+        sessions = sorted((s for s in book.reading_sessions if not s.deleted), key=lambda s: s.date)
+        first = min([baseline.start_date] + [s.date for s in sessions])
+        last = max([baseline.deadline, date.today()] + [s.date for s in sessions])
+        width, height = max(canvas.winfo_width(), 300), max(canvas.winfo_height(), 200)
+        total = max(1, total_units(book, label))
+        def point(day, amount):
+            return (75 + (width - 115) * (day - first).days / max(1, (last - first).days),
+                    height - 65 - (height - 120) * min(total, amount) / total)
+        canvas.create_line(75, 55, 75, height - 65, width - 40, height - 65, fill="#64748b")
+        canvas.create_text(70, 45, anchor="e", text=display_value(label, total))
+        canvas.create_text(75, height - 40, anchor="w", text=str(first))
+        canvas.create_text(width - 40, height - 40, anchor="e", text=str(last))
+        canvas.create_line(*point(baseline.start_date, 0), *point(baseline.deadline, total), fill="#7c3aed", width=2, dash=(6, 3))
+        points = [point(first, 0)]
+        for session in sessions:
+            amount = session.current_page - book.start_page + (0 if is_audiobook_section(label) else 1)
+            points.append(point(session.date, amount))
+        points.append(point(max(date.today(), sessions[-1].date if sessions else date.today()), completed_units(book, label)))
+        canvas.create_line(*[v for p in points for v in p], fill="#15803d", width=3)
+        canvas.create_text(75, 20, anchor="w", text="Purple dashed: baseline plan    Green: reading progress")
+
     def _set_plan_available(self, available: bool) -> None:
         self.plan_loaded = available
         for index in range(self.notebook.index("end")):
@@ -854,7 +1113,8 @@ class ReadingPlanApp(tk.Tk):
             _end_name,
             stats_options,
             rest_days,
-        ) = load_json_bundle(path)
+            planned_quarter,
+        ) = load_json_bundle(path, include_planned=True)
         if read_json_bundle_metadata(path) != metadata:
             raise ExternalPlanChangeError(
                 "reading-plan data changed while it was loading; reload it again"
@@ -862,6 +1122,7 @@ class ReadingPlanApp(tk.Tk):
         self.suspend_autosave = True
         try:
             self.sections = sections
+            self.planned_quarter = planned_quarter
             self.rest_days = rest_days
             self.data_directory = path
             self.file_var.set(str(self.data_directory))
@@ -878,6 +1139,7 @@ class ReadingPlanApp(tk.Tk):
         self.has_unsaved_changes = False
         self.save_blocked = False
         self.plan_loaded = True
+        self.check_quarter_rollover()
 
     def _check_for_external_change(self, _event: object | None = None) -> None:
         if not self.plan_loaded or self.loaded_metadata is None or self.has_unsaved_changes:
@@ -897,6 +1159,7 @@ class ReadingPlanApp(tk.Tk):
                 self._show_load_error(str(error), clear_state=False)
                 return
             self.set_status(f"Reloaded externally changed {self.data_directory}")
+        self.check_quarter_rollover()
 
     def _on_close(self) -> None:
         if self.has_unsaved_changes and not messagebox.askyesno(
@@ -1119,6 +1382,7 @@ class ReadingPlanApp(tk.Tk):
         self.refresh_session_books()
         self.refresh_session_table()
         self.refresh_plan(autosave=autosave)
+        self.refresh_charts()
 
     def refresh_book_tables(self) -> None:
         for section in self.sections:
@@ -1517,6 +1781,7 @@ class ReadingPlanApp(tk.Tk):
                 self.current_stats_options(),
                 self.rest_days,
                 self.loaded_metadata,
+                planned_quarter=self.planned_quarter,
             )
         except (OSError, ValueError) as error:
             self._show_load_error(f"Autosave failed: {error}", clear_state=False)
