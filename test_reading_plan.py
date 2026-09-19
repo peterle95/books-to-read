@@ -12,8 +12,12 @@ from reading_plan import (
     BookSection,
     ExternalPlanChangeError,
     JsonBundleError,
+    ReadingSession,
     RestDayRange,
     SummaryStatsOptions,
+    book_from_json,
+    book_to_json,
+    merge_reading_sessions,
     available_reading_days,
     available_reading_days_count,
     add_reading_session,
@@ -1199,3 +1203,82 @@ class SyncPersistenceTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SessionChainTests(unittest.TestCase):
+    """Canonical session order (date, current_page, id) never bricks a load."""
+
+    def test_same_day_inversion_loads_in_canonical_order(self):
+        payload = {
+            "id": "book-id",
+            "title": "React",
+            "start_page": 1,
+            "end_page": 400,
+            "current_page": 306,
+            "pages_read": 306,
+            "reading_sessions": [
+                {"id": "5ff62f96", "date": "2026-09-17", "current_page": 300, "pages_read": 11},
+                {"id": "88ff6391", "date": "2026-09-17", "current_page": 289, "pages_read": 5},
+                {"id": "f237da1d", "date": "2026-09-18", "current_page": 306, "pages_read": 6},
+            ],
+        }
+        book = book_from_json(payload, 1, "Digital books", derive_progress_from_sessions=True)
+        self.assertEqual(
+            [(s.current_page, s.pages_read) for s in book.reading_sessions],
+            [(289, 5), (300, 11), (306, 6)],
+        )
+        self.assertEqual(book.current_page, 306)
+
+    def test_deleted_sessions_do_not_shift_the_chain(self):
+        payload = {
+            "id": "book-id",
+            "title": "One",
+            "start_page": 1,
+            "end_page": 600,
+            "current_page": 120,
+            "pages_read": 120,
+            "reading_sessions": [
+                {"id": "a", "date": "2026-09-16", "current_page": 100, "pages_read": 100},
+                {"id": "b", "date": "2026-09-17", "current_page": 500, "pages_read": 400, "deleted": True},
+                {"id": "c", "date": "2026-09-18", "current_page": 120},
+            ],
+        }
+        book = book_from_json(payload, 1, "Physical books", derive_progress_from_sessions=True)
+        self.assertEqual(book.current_page, 120)
+        derived = [s for s in book.reading_sessions if s.id == "c"][0]
+        self.assertEqual(derived.pages_read, 20)
+
+    def test_backfill_inserts_in_canonical_order_without_moving_progress(self):
+        book = Book(1, "React", 1, 400)
+        add_reading_session(book, date(2026, 9, 17), 300, "Digital books")
+        add_reading_session(book, date(2026, 9, 17), 289, "Digital books")
+        self.assertEqual(
+            [(s.current_page, s.pages_read) for s in book.reading_sessions],
+            [(289, 289), (300, 11)],
+        )
+        self.assertEqual(book.current_page, 300)
+
+    def test_duplicate_page_still_rejected(self):
+        book = Book(1, "One", 1, 400)
+        add_reading_session(book, date(2026, 9, 17), 300, "Digital books")
+        with self.assertRaises(ValueError):
+            add_reading_session(book, date(2026, 9, 17), 300, "Digital books")
+
+    def test_writer_persists_canonical_session_order(self):
+        book = Book(1, "React", 1, 400)
+        add_reading_session(book, date(2026, 9, 17), 300, "Digital books")
+        book.reading_sessions.append(
+            ReadingSession(date(2026, 9, 17), 289, 5, id="88ff6391")
+        )
+        payload = book_to_json(book, "Digital books")
+        pages = [s["current_page"] for s in payload["reading_sessions"]]
+        self.assertEqual(pages, sorted(pages))
+
+    def test_merge_sorts_by_date_page_then_id(self):
+        sessions = merge_reading_sessions(
+            [
+                ReadingSession(date(2026, 9, 17), 300, 11, id="5ff62f96"),
+                ReadingSession(date(2026, 9, 17), 289, 5, id="88ff6391"),
+            ]
+        )
+        self.assertEqual([s.current_page for s in sessions], [289, 300])

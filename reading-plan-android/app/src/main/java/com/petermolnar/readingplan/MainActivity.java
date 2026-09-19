@@ -157,6 +157,8 @@ public class MainActivity extends Activity {
     private ReadingPlanBundleCodec.Metadata loadedBundleMetadata;
     private boolean localDirty;
     private boolean discardLocalChangesForDirectory;
+    // Set while parsing a bundle whose session chain needed recomputing; triggers a self-heal save.
+    boolean bundleRepairedThisLoad;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -627,6 +629,7 @@ public class MainActivity extends Activity {
                 store.write(encoded, null);
             }
             ReadingPlanBundleCodec.ReadResult bundle = store.read();
+            bundleRepairedThisLoad = false;
             String raw = ReadingPlanBundleCodec.toLegacyJson(bundle);
             CsvPlan plan = loadJson(raw, true);
             PlannedQuarter loadedQuarter = PlannedQuarter.fromJson(this, new JSONObject(raw).opt("planned_quarter"), plan.sections);
@@ -637,6 +640,9 @@ public class MainActivity extends Activity {
             setJsonLoaded(true);
             checkQuarterRollover();
             showCurrentTab();
+            if (bundleRepairedThisLoad) {
+                autosaveJson("Reading sessions recalculated and saved");
+            }
         } catch (SecurityException ex) {
             showLoadError("Could not load reading-plan data: " + ex.getMessage(), true);
         } catch (IOException | JSONException | IllegalArgumentException ex) {
@@ -1092,6 +1098,16 @@ public class MainActivity extends Activity {
 
     private JSONObject bookToJson(Book book, String sectionLabel) throws JSONException {
         JSONObject object = new JSONObject();
+        // Writers persist canonical session order so a save can never store a chain break.
+        List<ReadingSession> orderedSessions = new ArrayList<>(book.readingSessions);
+        Collections.sort(orderedSessions, (left, right) -> {
+            int byDate = left.date.compareTo(right.date);
+            if (byDate != 0) {
+                return byDate;
+            }
+            int byPage = Integer.compare(left.currentPage, right.currentPage);
+            return byPage != 0 ? byPage : left.id.compareTo(right.id);
+        });
         object.put("id", book.id);
         object.put("number", book.number);
         object.put("title", book.title);
@@ -1110,7 +1126,7 @@ public class MainActivity extends Activity {
                     book.currentPage == null ? JSONObject.NULL : unitsRemaining(book, sectionLabel)
             );
             JSONArray sessions = new JSONArray();
-            for (ReadingSession session : book.readingSessions) {
+            for (ReadingSession session : orderedSessions) {
                 JSONObject item = new JSONObject();
                 item.put("id", session.id);
                 item.put("date", session.date.toString());
@@ -1131,7 +1147,7 @@ public class MainActivity extends Activity {
         object.put("pages", book.pages());
         object.put("pages_read", book.pagesRead());
         JSONArray sessions = new JSONArray();
-        for (ReadingSession session : book.readingSessions) {
+        for (ReadingSession session : orderedSessions) {
             JSONObject item = new JSONObject();
             item.put("id", session.id);
             item.put("date", session.date.toString());
@@ -1284,8 +1300,31 @@ public class MainActivity extends Activity {
         JSONArray rawSessions = object.optJSONArray("reading_sessions");
         Integer previousCurrentPage = null;
         if (rawSessions != null) {
+            // Canonical session order is (date, current_page, id): validate the chain in
+            // the order it means, not raw file order, so a same-day inversion (rev 50)
+            // can never brick the load. Stable sort keeps file order for legacy ties.
+            List<JSONObject> orderedRaw = new ArrayList<>();
             for (int i = 0; i < rawSessions.length(); i++) {
-                JSONObject rawSession = rawSessions.getJSONObject(i);
+                orderedRaw.add(rawSessions.getJSONObject(i));
+            }
+            final boolean audioOrder = isAudiobookSection(sectionLabel);
+            Collections.sort(orderedRaw, (left, right) -> {
+                int byDate = left.optString("date", "").compareTo(right.optString("date", ""));
+                if (byDate != 0) {
+                    return byDate;
+                }
+                int leftPage = audioOrder
+                        ? left.optInt("current_time_seconds", Integer.MIN_VALUE)
+                        : left.optInt("current_page", Integer.MIN_VALUE);
+                int rightPage = audioOrder
+                        ? right.optInt("current_time_seconds", Integer.MIN_VALUE)
+                        : right.optInt("current_page", Integer.MIN_VALUE);
+                if (leftPage != rightPage) {
+                    return Integer.compare(leftPage, rightPage);
+                }
+                return left.optString("id", "").compareTo(right.optString("id", ""));
+            });
+            for (JSONObject rawSession : orderedRaw) {
                 String sessionId = rawSession.optString("id", "").trim();
                 if (sessionId.isEmpty()) {
                     sessionId = UUID.randomUUID().toString();
@@ -1337,9 +1376,13 @@ public class MainActivity extends Activity {
                                 - previousTotal
                                 + (isAudiobookSection(sectionLabel) ? 0 : 1);
                         if (sessionPagesRead != expected) {
-                            throw new IllegalArgumentException(isAudiobookSection(sectionLabel)
-                                    ? "time listened conflicts with session progress"
-                                    : "pages read conflicts with session progress");
+                            // Tolerant chain: recompute instead of bricking the load.
+                            // A same-day inversion previously threw here and left the
+                            // app stuck on "Reading plan data unavailable".
+                            if (expected > 0) {
+                                sessionPagesRead = expected;
+                                bundleRepairedThisLoad = true;
+                            }
                         }
                     }
                 }
@@ -1381,7 +1424,11 @@ public class MainActivity extends Activity {
         sessions = new ArrayList<>(sessionsById.values());
         Collections.sort(sessions, (left, right) -> {
             int byDate = left.date.compareTo(right.date);
-            return byDate != 0 ? byDate : left.id.compareTo(right.id);
+            if (byDate != 0) {
+                return byDate;
+            }
+            int byPage = Integer.compare(left.currentPage, right.currentPage);
+            return byPage != 0 ? byPage : left.id.compareTo(right.id);
         });
         if (!sessions.isEmpty() && (deriveProgressFromSessions || currentPage == null)) {
             int max = Integer.MIN_VALUE;
