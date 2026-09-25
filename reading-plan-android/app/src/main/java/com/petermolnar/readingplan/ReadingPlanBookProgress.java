@@ -2,6 +2,7 @@ package com.petermolnar.readingplan;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import static com.petermolnar.readingplan.BookCollections.remapGroupsByBookIdentity;
@@ -16,15 +17,73 @@ final class ReadingPlanBookProgress {
     }
 
     void addReadingSession(Book book, LocalDate sessionDate, int currentPage, String sectionLabel) {
-        int previousPagesRead = completedUnits(book, sectionLabel);
+        // Backfills are allowed: the session is inserted in canonical order and the
+        // chain is recomputed, so logging a page behind the max no longer corrupts
+        // the persisted order that strict readers validate.
+        Integer previousPage = book.currentPage;
+        List<ReadingSession> previousSessions = new ArrayList<>(book.readingSessions);
         setBookProgress(book, currentPage, sectionLabel);
-        int pagesRead = completedUnits(book, sectionLabel) - previousPagesRead;
-        if (pagesRead <= 0) {
-            throw new IllegalArgumentException(isAudiobookSection(sectionLabel)
-                    ? "time left must be less than the previously recorded time left"
-                    : "current page must be after the previously recorded page");
+        book.readingSessions.add(new ReadingSession(sessionDate, currentPage, 1));
+        recalculateChain(book, sectionLabel);
+        for (ReadingSession session : book.readingSessions) {
+            if (!session.deleted && session.pagesRead <= 0) {
+                book.readingSessions.clear();
+                book.readingSessions.addAll(previousSessions);
+                book.currentPage = previousPage;
+                throw new IllegalArgumentException(isAudiobookSection(sectionLabel)
+                        ? "time left must be less than the previously recorded time left"
+                        : "current page must be after the previously recorded page");
+            }
         }
-        book.readingSessions.add(new ReadingSession(sessionDate, currentPage, pagesRead));
+    }
+
+    static void recalculateChain(Book book, String sectionLabel) {
+        List<ReadingSession> ordered = new ArrayList<>();
+        for (ReadingSession session : book.readingSessions) {
+            if (!session.deleted) {
+                ordered.add(session);
+            }
+        }
+        Collections.sort(ordered, (left, right) -> {
+            int byDate = left.date.compareTo(right.date);
+            if (byDate != 0) {
+                return byDate;
+            }
+            int byPage = Integer.compare(left.currentPage, right.currentPage);
+            return byPage != 0 ? byPage : left.id.compareTo(right.id);
+        });
+        boolean audio = isAudiobookSection(sectionLabel);
+        int previous = 0;
+        for (ReadingSession session : ordered) {
+            int completed = audio
+                    ? Math.max(session.currentPage - book.startPage, 0)
+                    : Math.max(session.currentPage - book.startPage + 1, 0);
+            int contribution = Math.max(0, completed - previous);
+            for (int i = 0; i < book.readingSessions.size(); i++) {
+                if (book.readingSessions.get(i) == session) {
+                    ReadingSession current = book.readingSessions.get(i);
+                    book.readingSessions.set(i, new ReadingSession(
+                            current.id, current.date, current.currentPage, contribution, current.deleted));
+                    break;
+                }
+            }
+            previous = completed;
+        }
+        int max = Integer.MIN_VALUE;
+        for (ReadingSession session : book.readingSessions) {
+            if (!session.deleted) {
+                max = Math.max(max, session.currentPage);
+            }
+        }
+        book.currentPage = max == Integer.MIN_VALUE ? null : max;
+        Collections.sort(book.readingSessions, (left, right) -> {
+            int byDate = left.date.compareTo(right.date);
+            if (byDate != 0) {
+                return byDate;
+            }
+            int byPage = Integer.compare(left.currentPage, right.currentPage);
+            return byPage != 0 ? byPage : left.id.compareTo(right.id);
+        });
     }
 
     void removeReadingSession(Book book, int index) {
