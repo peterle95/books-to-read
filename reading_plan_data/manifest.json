@@ -1,11 +1,11 @@
 {
   "schema_version": 2,
-  "revision": 90,
-  "last_modified": "2026-09-25T14:07:09+02:00",
+  "revision": 100,
+  "last_modified": "2026-09-28T22:24:05+02:00",
   "modified_by": "android-4b47ec3e-0d89-4734-be46-745036335dab",
   "files": {
     "plan.json": "e8f5bc3dae301ab75436622db1869e36feb5bdfe923a59fcd16103b81f6b3874",
-    "books.json": "1b4df936a8f4c3f9835ba59d3c303157b21a01b13b0c28001f663df85570343d",
-    "sessions.json": "7b1808e8da6e32bad4e0bdd64e8009a28efc689441c1a5af90c744c0ee88f2e7"
+    "books.json": "5c895ab42682b8a8bb3dc3d29b9b1dd8b02b6f5a9f8190bf1edfcaebfa6d762b",
+    "sessions.json": "8a20c33f2d255f8d406631a8ea2df456e0ca506f61b5cb1fa9caac8d061a6e71"
   }
 }
