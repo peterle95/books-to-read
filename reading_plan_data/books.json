@@ -114,12 +114,12 @@
           },
           "deadline_override": null,
           "start_date_override": "2026-09-25",
-          "target_completed_date": "2026-09-28",
+          "target_completed_date": "2026-09-29",
           "start_page": 1,
           "end_page": 100,
-          "current_page": 31,
+          "current_page": 38,
           "pages": 100,
-          "pages_read": 31
+          "pages_read": 38
         },
         {
           "id": "5586a600-9615-45b1-8936-14bb5564de05",
