@@ -407,6 +407,26 @@ class ReadingPlanApp(tk.Tk):
             dialog.destroy()
             self.check_quarter_rollover()
 
+        def implement():
+            if self.planned_quarter is not original:
+                messagebox.showerror("Next quarter", "The plan changed while you were editing. Reopen the editor before saving.", parent=dialog)
+                return
+            if not messagebox.askyesno("Next quarter", "Replace the current plan with this plan now?", parent=dialog):
+                return
+            result = activate_planned_quarter(self.sections, draft, max(date.today(), draft.start_date), self.rest_days)
+            if result is None:
+                messagebox.showerror("Next quarter", "Could not implement this plan.", parent=dialog)
+                return
+            self.sections, start, end = result
+            self.planned_quarter = None
+            self.rest_days = [r for r in self.rest_days if r.end_date >= start]
+            self.start_var.set(start.isoformat())
+            self.end_var.set(end.isoformat())
+            self.custom_target_var.set(False)
+            self.toggle_custom_target(refresh=False)
+            self.refresh_all(autosave=True)
+            dialog.destroy()
+
         def show_metrics():
             try:
                 quarter_end = period_end_from_start(draft.start_date)
@@ -466,6 +486,7 @@ class ReadingPlanApp(tk.Tk):
         buttons.pack()
         for text, command in (("Add", add), ("Update selected", lambda: add(True)), ("Remove selected", remove), ("Show metrics", show_metrics), ("Save plan", save), ("Cancel", dialog.destroy)):
             ttk.Button(buttons, text=text, command=command).pack(side="left", padx=4)
+        tk.Button(buttons, text="Implement", command=implement, bg="#dc2626", fg="white", activebackground="#991b1b", activeforeground="white").pack(side="left", padx=4)
         refresh()
 
     def _pick_date(self, initial: str = "") -> str | None:

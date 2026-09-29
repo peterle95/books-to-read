@@ -402,22 +402,55 @@ def set_book_progress(
     book.current_page = current_page
 
 
+def _recalculate_session_chain(book: Book, section_label: str) -> None:
+    """Recompute per-session contributions from canonical order; progress stays at max."""
+    ordered = sorted(
+        (session for session in book.reading_sessions if not session.deleted),
+        key=lambda session: (session.date, session.current_page, session.id),
+    )
+    previous = 0
+    for session in ordered:
+        if is_audiobook_section(section_label):
+            completed = max(session.current_page - book.start_page, 0)
+        else:
+            completed = max(session.current_page - book.start_page + 1, 0)
+        session.pages_read = max(0, completed - previous)
+        previous = completed
+    active = [session for session in book.reading_sessions if not session.deleted]
+    book.current_page = max((session.current_page for session in active), default=None)
+    book.reading_sessions.sort(key=lambda session: (session.date, session.current_page, session.id))
+
+
 def add_reading_session(
     book: Book,
     session_date: date,
     current_page: int,
     section_label: str = PHYSICAL_BOOKS_LABEL,
 ) -> None:
-    previous_completed = completed_units(book, section_label)
+    # Backfills are allowed: the session is inserted in canonical order and the
+    # chain is recomputed, so logging a page behind the max no longer corrupts
+    # the file order that strict readers validate.
+    previous_page = book.current_page
     set_book_progress(book, current_page, section_label)
-    units_read = completed_units(book, section_label) - previous_completed
-    if units_read <= 0:
+    new_session = ReadingSession(session_date, current_page, 1)
+    book.reading_sessions.append(new_session)
+    previous_reads = {
+        id(session): session.pages_read for session in book.reading_sessions
+    }
+    _recalculate_session_chain(book, section_label)
+    if any(
+        session.pages_read <= 0 and not session.deleted
+        for session in book.reading_sessions
+    ):
+        for session in book.reading_sessions:
+            session.pages_read = previous_reads[id(session)]
+        book.current_page = previous_page
+        book.reading_sessions.remove(new_session)
         if is_audiobook_section(section_label):
             raise ValueError(
                 "time left must be less than the previously recorded time left"
             )
         raise ValueError("current page must be after the previously recorded page")
-    book.reading_sessions.append(ReadingSession(session_date, current_page, units_read))
 
 
 def remove_reading_session(book: Book, session_index: int) -> None:
@@ -449,7 +482,12 @@ def merge_reading_sessions(
             raise ValueError("conflicting reading session UUID")
         elif session.deleted:
             existing.deleted = True
-    return sorted(by_id.values(), key=lambda session: (session.date, session.id))
+    return sorted(
+        by_id.values(),
+        # ponytail: canonical session order is (date, current_page, id);
+        # date+id alone keeps same-day inversions that bricked Android rev 50.
+        key=lambda session: (session.date, session.current_page, session.id),
+    )
 
 
 def renumber_books(books: list[Book]) -> None:
@@ -1920,6 +1958,10 @@ def book_to_json(book: Book, section_label: str) -> dict[str, object]:
     deadline_override = (
         None if book.deadline_override is None else book.deadline_override.isoformat()
     )
+    # Writers persist canonical session order so a save can never store a chain break.
+    ordered_sessions = sorted(
+        book.reading_sessions, key=lambda s: (s.date, s.current_page, s.id)
+    )
     start_date_override = (
         None
         if book.start_date_override is None
@@ -1950,7 +1992,7 @@ def book_to_json(book: Book, section_label: str) -> dict[str, object]:
             ),
             "reading_sessions": [
                 reading_session_to_json(session, section_label, book)
-                for session in book.reading_sessions
+                for session in ordered_sessions
             ],
         }
     return {
@@ -1972,7 +2014,7 @@ def book_to_json(book: Book, section_label: str) -> dict[str, object]:
         ),
         "reading_sessions": [
             reading_session_to_json(session, section_label)
-            for session in book.reading_sessions
+            for session in ordered_sessions
         ],
     }
 
@@ -2119,9 +2161,11 @@ def book_from_json(
                 deleted,
             )
         )
-        previous_current_page = max(
-            previous_current_page or session_current_page, session_current_page
-        )
+        # Deleted sessions are skipped by the chain on both platforms.
+        if not deleted:
+            previous_current_page = max(
+                previous_current_page or session_current_page, session_current_page
+            )
 
     reading_sessions = merge_reading_sessions(reading_sessions)
     active_sessions = [session for session in reading_sessions if not session.deleted]

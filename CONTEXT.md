@@ -59,3 +59,11 @@ _Avoid_: Entries list, activity feed
 **Day group**:
 A reading-history summary for one calendar date, combining that day's total reading and, when applicable, its individual reading sessions.
 _Avoid_: Daily entry, date card
+
+**Session chain**:
+The progression of a book's reading sessions in canonical session order, where each session's reading amount is the progress difference from the previous session.
+_Avoid_: File order, entry list
+
+**Canonical session order**:
+The ordering of reading sessions by calendar date, then page position, then stable session ID; the order readers validate and writers persist.
+_Avoid_: File order, creation order
