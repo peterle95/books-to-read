@@ -6,10 +6,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 final class ReadingPlanCalendar {
-    private final MainActivity activity;
+    private final List<RestDayRange> restDays;
 
     ReadingPlanCalendar(MainActivity activity) {
-        this.activity = activity;
+        this(activity.restDays);
+    }
+
+    ReadingPlanCalendar(List<RestDayRange> restDays) {
+        this.restDays = restDays;
     }
 
     static LocalDate nextQuarterStart(LocalDate today) {
@@ -27,7 +31,7 @@ final class ReadingPlanCalendar {
     }
 
     boolean isRestDay(LocalDate value) {
-        for (RestDayRange range : activity.restDays) {
+        for (RestDayRange range : restDays) {
             if (!value.isBefore(range.startDate) && !value.isAfter(range.endDate)) {
                 return true;
             }
@@ -50,9 +54,9 @@ final class ReadingPlanCalendar {
     }
 
     void normalizeRestDayRanges() {
-        activity.restDays.sort((left, right) -> left.startDate.compareTo(right.startDate));
+        restDays.sort((left, right) -> left.startDate.compareTo(right.startDate));
         List<RestDayRange> merged = new ArrayList<>();
-        for (RestDayRange range : activity.restDays) {
+        for (RestDayRange range : restDays) {
             if (merged.isEmpty()
                     || range.startDate.isAfter(merged.get(merged.size() - 1).endDate.plusDays(1))) {
                 merged.add(range);
@@ -64,8 +68,8 @@ final class ReadingPlanCalendar {
                 ));
             }
         }
-        activity.restDays.clear();
-        activity.restDays.addAll(merged);
+        restDays.clear();
+        restDays.addAll(merged);
     }
 
     static int inclusiveDaysBetween(LocalDate start, LocalDate end) {

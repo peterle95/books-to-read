@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 import static com.petermolnar.readingplan.PlanPrimitives.completedUnits;
 import static com.petermolnar.readingplan.PlanPrimitives.isAudiobookSection;
@@ -14,6 +15,7 @@ final class ReadingPlanChartData {
     final Book book;
     final LocalDate startDate;
     final LocalDate plannedDeadline;
+    final LocalDate projectedDeadline;
     final LocalDate deadline;
     final List<LocalDate> dates = new ArrayList<>();
     final List<Integer> plannedPages = new ArrayList<>();
@@ -26,6 +28,12 @@ final class ReadingPlanChartData {
     final int dailyYMax;
 
     ReadingPlanChartData(MainActivity activity, String sectionLabel, Book book, BookDeadline deadline) {
+        this(new ReadingPlanCalendar(activity), sectionLabel, book, deadline, LocalDate.now());
+    }
+
+    ReadingPlanChartData(
+            ReadingPlanCalendar calendar, String sectionLabel, Book book, BookDeadline deadline, LocalDate today
+    ) {
         this.sectionLabel = sectionLabel;
         this.book = book;
         BaselineSchedule baseline = book.baselineSchedule;
@@ -38,19 +46,19 @@ final class ReadingPlanChartData {
         int dailyMaximum = 0;
         int readingDays = 0;
         int sessionActual = 0;
-        LocalDate today = LocalDate.now();
-        this.actualPace = actualReadingPace(activity, book, sectionLabel, today);
-        LocalDate projectedDeadline = projectedCompletionDate(activity, book, sectionLabel, today, actualPace);
-        LocalDate chartDeadline = this.plannedDeadline.isAfter(projectedDeadline)
+        this.actualPace = actualReadingPace(calendar, book, sectionLabel, today);
+        this.projectedDeadline = projectedCompletionDate(calendar, book, sectionLabel, today, actualPace);
+        LocalDate chartDeadline = projectedDeadline == null || this.plannedDeadline.isAfter(projectedDeadline)
                 ? this.plannedDeadline
                 : projectedDeadline;
         if (chartDeadline.isBefore(today)) {
             chartDeadline = today;
         }
         this.deadline = chartDeadline;
-        for (LocalDate date = startDate; !date.isAfter(this.deadline); date = date.plusDays(1)) {
+        LocalDate chartStart = startDate.isAfter(today) && actualPace > 0.0 ? today : startDate;
+        for (LocalDate date = chartStart; !date.isAfter(this.deadline); date = date.plusDays(1)) {
             dates.add(date);
-            if (!activity.isRestDay(date)) {
+            if (!date.isBefore(startDate) && !calendar.isRestDay(date)) {
                 readingDays++;
             }
             int planned = Math.min(
@@ -77,8 +85,8 @@ final class ReadingPlanChartData {
             actual = Math.min(Math.max(actual, 0), totalUnits(book, sectionLabel));
             actualPages.add(actual);
             int dailyTargetForDate = 0;
-            if (!activity.isRestDay(date) && !date.isAfter(this.plannedDeadline)) {
-                int daysRemaining = activity.availableReadingDaysCount(date, this.deadline);
+            if (!date.isBefore(startDate) && !calendar.isRestDay(date) && !date.isAfter(this.plannedDeadline)) {
+                int daysRemaining = calendar.availableReadingDaysCount(date, this.deadline);
                 int progress = !date.isBefore(today) && book.currentPage != null
                         ? completedUnits(book, sectionLabel)
                         : sessionActual;
@@ -90,25 +98,23 @@ final class ReadingPlanChartData {
             dailyTargetPages.add(dailyTargetForDate);
             int projected = -1;
             if (!date.isBefore(today) && actualPace > 0.0) {
-                int projectedReadingDays = activity.availableReadingDaysCount(today, date);
-                projected = Math.min(
-                        totalUnits(book, sectionLabel),
-                        completedUnits(book, sectionLabel)
-                                + (int) Math.ceil(actualPace * projectedReadingDays - 1e-9)
-                );
+                // Today's point is recorded progress; forecast only subsequent reading days.
+                int projectedReadingDays = calendar.availableReadingDaysCount(today.plusDays(1), date);
+                projected = projectedUnits(completedUnits(book, sectionLabel), totalUnits(book, sectionLabel),
+                        actualPace, projectedReadingDays);
             }
             projectionPages.add(projected);
             plannedMaximum = Math.max(plannedMaximum, planned);
             actualMaximum = Math.max(actualMaximum, actual);
             dailyMaximum = Math.max(dailyMaximum, dailyTargetForDate);
         }
-        int dayOffset = (int) ChronoUnit.DAYS.between(startDate, today);
-        todayIndex = MainActivity.clamp(dayOffset, 0, Math.max(dates.size() - 1, 0));
+        int dayOffset = (int) ChronoUnit.DAYS.between(chartStart, today);
+        todayIndex = ReadingPlanCalendar.clamp(dayOffset, 0, Math.max(dates.size() - 1, 0));
         yMax = Math.max(1, Math.max(totalUnits(book, sectionLabel), Math.max(plannedMaximum, actualMaximum)));
         dailyYMax = Math.max(1, dailyMaximum);
     }
 
-    private static double actualReadingPace(MainActivity activity, Book book, String sectionLabel, LocalDate today) {
+    private static double actualReadingPace(ReadingPlanCalendar calendar, Book book, String sectionLabel, LocalDate today) {
         if (completedUnits(book, sectionLabel) <= 0) {
             return 0.0;
         }
@@ -121,26 +127,39 @@ final class ReadingPlanChartData {
         if (firstSession == null) {
             return 0.0;
         }
-        int elapsedReadingDays = activity.availableReadingDaysCount(firstSession, today);
+        int elapsedReadingDays = calendar.availableReadingDaysCount(firstSession, today);
         return elapsedReadingDays <= 0 ? 0.0 : (double) completedUnits(book, sectionLabel) / elapsedReadingDays;
     }
 
     private static LocalDate projectedCompletionDate(
-            MainActivity activity, Book book, String sectionLabel, LocalDate today, double pace
+            ReadingPlanCalendar calendar, Book book, String sectionLabel, LocalDate today, double pace
     ) {
         int total = totalUnits(book, sectionLabel);
         int completed = completedUnits(book, sectionLabel);
-        if (pace <= 0.0 || completed >= total) {
+        if (pace <= 0.0) {
+            return null;
+        }
+        if (completed >= total) {
             return today;
         }
         int readingDays = 0;
         LocalDate date = today;
-        while (completed + (int) Math.ceil(pace * readingDays - 1e-9) < total) {
-            if (!activity.isRestDay(date)) {
+        while (projectedUnits(completed, total, pace, readingDays) < total) {
+            date = date.plusDays(1);
+            if (!calendar.isRestDay(date)) {
                 readingDays++;
             }
-            date = date.plusDays(1);
         }
-        return date.minusDays(1);
+        return date;
+    }
+
+    private static int projectedUnits(int completed, int total, double pace, int readingDays) {
+        return Math.min(total, completed + (int) Math.ceil(pace * readingDays - 1e-9));
+    }
+
+    String projectionLabel() {
+        String endDate = projectedDeadline == null ? "—" : String.format(Locale.US, "%02d/%02d",
+                projectedDeadline.getDayOfMonth(), projectedDeadline.getMonthValue());
+        return "Projection · est. end date: " + endDate;
     }
 }
