@@ -111,6 +111,7 @@ public class MainActivity extends Activity {
     private boolean jsonLoaded;
 
     final List<BookSection> sections = blankSections();
+    final List<RestDayRange> restDays = new ArrayList<>();
     private final ReadingPlanUi ui = new ReadingPlanUi(this);
     private final ReadingPlanTables tables = new ReadingPlanTables(this);
     private final ReadingPlanCalendar calendar = new ReadingPlanCalendar(this);
@@ -129,7 +130,6 @@ public class MainActivity extends Activity {
     LocalDate startDate;
     LocalDate endDate;
     String endLabel = "Quarter end";
-    final List<RestDayRange> restDays = new ArrayList<>();
     private Uri dataDirectoryUri;
     private String currentTab = "Session";
     boolean metricsSubview = false;

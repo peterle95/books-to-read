@@ -31,6 +31,36 @@
         "date": "2026-09-28",
         "current_page": 51,
         "pages_read": 16
+      },
+      {
+        "id": "cf61f233-72a7-4226-aec3-3759874d6b7a",
+        "date": "2026-09-29",
+        "current_page": 62,
+        "pages_read": 11
+      },
+      {
+        "id": "b58bd2bf-baac-4b2f-a200-dbd6f7b28155",
+        "date": "2026-09-30",
+        "current_page": 70,
+        "pages_read": 8
+      },
+      {
+        "id": "497b3e89-a156-4d46-8539-43ca56c3634e",
+        "date": "2026-10-01",
+        "current_page": 80,
+        "pages_read": 10
+      },
+      {
+        "id": "27ead0f8-4ed8-44f9-b4fb-add7e3ac6219",
+        "date": "2026-10-02",
+        "current_page": 92,
+        "pages_read": 12
+      },
+      {
+        "id": "e46aba38-7fe1-444e-9704-d3d64db925a2",
+        "date": "2026-10-03",
+        "current_page": 103,
+        "pages_read": 11
       }
     ],
     "9edb544e-48ab-4f86-9ee6-6739ec7afb79": [],
@@ -61,9 +91,40 @@
         "date": "2026-09-29",
         "current_page": 38,
         "pages_read": 7
+      },
+      {
+        "id": "de8609a0-e006-4162-afe5-cb9d54e0fba9",
+        "date": "2026-09-30",
+        "current_page": 44,
+        "pages_read": 6
+      },
+      {
+        "id": "dbaa2601-8aea-4b7b-8453-233d32bc8164",
+        "date": "2026-10-01",
+        "current_page": 53,
+        "pages_read": 9
+      },
+      {
+        "id": "5c989288-c3fc-49ee-97f5-650fc7999b5d",
+        "date": "2026-10-02",
+        "current_page": 60,
+        "pages_read": 7
+      },
+      {
+        "id": "32e65683-ba4f-497e-8f31-0a1c531ff1a2",
+        "date": "2026-10-03",
+        "current_page": 67,
+        "pages_read": 7
       }
     ],
-    "5586a600-9615-45b1-8936-14bb5564de05": [],
+    "5586a600-9615-45b1-8936-14bb5564de05": [
+      {
+        "id": "3be87c07-6a27-4292-b807-954683f302b4",
+        "date": "2026-10-03",
+        "current_page": 42,
+        "pages_read": 40
+      }
+    ],
     "8977a3b8-df81-4114-866a-cd043c13772d": []
   }
 }
