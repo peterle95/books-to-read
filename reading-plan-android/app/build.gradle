@@ -12,6 +12,16 @@ tasks.register("checkQuarterPlanning", JavaExec) {
             androidComponents.sdkComponents.bootClasspath)
 }
 
+tasks.register("checkChartProjection", JavaExec) {
+    dependsOn "compileDebugUnitTestJavaWithJavac"
+    mainClass = "com.petermolnar.readingplan.ReadingPlanChartCheck"
+    enableAssertions = true
+    classpath = files(
+            tasks.named("compileDebugJavaWithJavac").map { it.destinationDirectory },
+            tasks.named("compileDebugUnitTestJavaWithJavac").map { it.destinationDirectory },
+            androidComponents.sdkComponents.bootClasspath)
+}
+
 android {
     namespace "com.petermolnar.readingplan"
     compileSdk 35
@@ -22,6 +32,7 @@ android {
         targetSdk 35
         versionCode 3
         versionName "2.1"
+        testInstrumentationRunner "com.petermolnar.readingplan.ReadingPlanChartDeviceCheck"
     }
 
     compileOptions {

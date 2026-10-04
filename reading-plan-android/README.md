@@ -42,8 +42,21 @@ gradle :app:assembleDebug
 
 The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
 
-Run the standalone quarter-rollover regression check with the Gradle wrapper:
+Run the standalone chart-projection and quarter-rollover regression checks with the Gradle wrapper:
 
 ```powershell
-.\gradlew.bat :app:checkQuarterPlanning
+.\gradlew.bat :app:checkChartProjection :app:checkQuarterPlanning
+```
+
+Run the native chart check on a disposable emulator. It uses an in-memory example plan and saves a chart screenshot in the app's external files directory:
+
+```powershell
+.\gradlew.bat :app:assembleDebug :app:assembleDebugAndroidTest
+$adb = "$env:ANDROID_HOME\platform-tools\adb.exe"
+$serial = "emulator-5560" # Use the emulator serial shown by adb devices.
+& $adb -s $serial install -r app\build\outputs\apk\debug\app-debug.apk
+& $adb -s $serial install -r app\build\outputs\apk\androidTest\debug\app-debug-androidTest.apk
+$result = & $adb -s $serial shell am instrument -w com.petermolnar.readingplan.test/com.petermolnar.readingplan.ReadingPlanChartDeviceCheck
+$result
+if ($LASTEXITCODE -ne 0 -or ($result -join "`n") -notmatch "Native chart checks passed") { throw "Native chart check failed" }
 ```

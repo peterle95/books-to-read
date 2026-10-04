@@ -25,16 +25,24 @@ final class ReadingPlanChartView extends View {
         this.chart = chart;
         setBackgroundColor(MainActivity.CREAM);
         setMinimumHeight(activity.dp(300));
+        updateContentDescription();
     }
 
     void setChartData(ReadingPlanChartData chart) {
         this.chart = chart;
+        updateContentDescription();
         invalidate();
     }
 
     void setProjectionVisible(boolean visible) {
         projectionVisible = visible;
+        updateContentDescription();
         invalidate();
+    }
+
+    private void updateContentDescription() {
+        setContentDescription(projectionVisible && chart != null
+                ? chart.projectionLabel() : "Reading progress chart");
     }
 
     @Override
@@ -45,7 +53,7 @@ final class ReadingPlanChartView extends View {
         }
 
         float left = activity.dp(54);
-        float top = activity.dp(42);
+        float top = activity.dp(projectionVisible ? 62 : 42);
         float right = getWidth() - activity.dp(48);
         float bottom = getHeight() - activity.dp(52);
         if (right <= left || bottom <= top) {
@@ -120,7 +128,8 @@ final class ReadingPlanChartView extends View {
         canvas.drawText("Daily target", left + activity.dp(120), activity.dp(18), paint);
         if (projectionVisible) {
             paint.setColor(MainActivity.VIOLET);
-            canvas.drawText("Projection", left + activity.dp(210), activity.dp(18), paint);
+            // Keep the complete estimate readable on phone-width charts.
+            canvas.drawText(chart.projectionLabel(), left, activity.dp(36), paint);
         }
         canvas.save();
         canvas.rotate(-90, activity.dp(15), (top + bottom) / 2);

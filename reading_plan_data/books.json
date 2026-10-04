@@ -17,12 +17,12 @@
           },
           "deadline_override": null,
           "start_date_override": "2026-09-24",
-          "target_completed_date": "2026-09-28",
+          "target_completed_date": "2026-10-03",
           "start_page": 3,
           "end_page": 286,
-          "current_page": 51,
+          "current_page": 103,
           "pages": 284,
-          "pages_read": 49
+          "pages_read": 101
         },
         {
           "id": "9edb544e-48ab-4f86-9ee6-6739ec7afb79",
@@ -101,7 +101,12 @@
     {
       "label": "Digital books",
       "baseline_needs_recalculation": false,
-      "simultaneous_groups": [],
+      "simultaneous_groups": [
+        [
+          "612d440c-4d69-4ca1-9266-47f8ff658dac",
+          "5586a600-9615-45b1-8936-14bb5564de05"
+        ]
+      ],
       "books": [
         {
           "id": "612d440c-4d69-4ca1-9266-47f8ff658dac",
@@ -114,30 +119,30 @@
           },
           "deadline_override": null,
           "start_date_override": "2026-09-25",
-          "target_completed_date": "2026-09-29",
+          "target_completed_date": "2026-10-03",
           "start_page": 1,
           "end_page": 100,
-          "current_page": 38,
+          "current_page": 67,
           "pages": 100,
-          "pages_read": 38
+          "pages_read": 67
         },
         {
           "id": "5586a600-9615-45b1-8936-14bb5564de05",
           "number": 2,
           "title": "designing apps",
           "baseline_schedule": {
-            "start_date": "2026-10-10",
+            "start_date": "2026-10-01",
             "deadline": "2026-12-31",
-            "daily_target": 9.120481927710843
+            "daily_target": 9.231707317073171
           },
           "deadline_override": null,
-          "start_date_override": null,
-          "target_completed_date": null,
+          "start_date_override": "2026-10-01",
+          "target_completed_date": "2026-10-03",
           "start_page": 3,
           "end_page": 759,
-          "current_page": null,
+          "current_page": 42,
           "pages": 757,
-          "pages_read": 0
+          "pages_read": 40
         }
       ]
     },
