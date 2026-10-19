@@ -11,11 +11,17 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.CheckBox;
 import android.widget.Spinner;
+import android.widget.TableLayout;
+import android.widget.TableRow;
+import android.widget.TextView;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.lang.reflect.Field;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 /** Native regression check, using only the platform runner; run on a disposable emulator. */
 public final class ReadingPlanChartDeviceCheck extends Instrumentation {
@@ -38,6 +44,7 @@ public final class ReadingPlanChartDeviceCheck extends Instrumentation {
                 activity.normalizeRestDayRanges();
                 require(activity.restDays.size() == 1 && activity.isRestDay(today.plusDays(2)),
                         "Activity calendar must see and normalize later rest-day edits");
+                checkScheduleTable(activity, today);
                 activity.startDate = today.minusDays(6);
                 activity.endDate = today.plusDays(8);
                 activity.plannedQuarter = null;
@@ -89,7 +96,7 @@ public final class ReadingPlanChartDeviceCheck extends Instrumentation {
                 screenshot.recycle();
             }
             result.putString("stream", "Native chart checks passed: activity wiring, rest-day edits, anchor, matching finish/date, "
-                    + "phone-width legend, native canvas, projection toggle, book selection. Screenshot: " + output);
+                    + "phone-width legend, native canvas, projection toggle, book selection, metrics schedule columns. Screenshot: " + output);
             finish(Activity.RESULT_OK, result);
         } catch (Throwable failure) {
             result.putString("stream", android.util.Log.getStackTraceString(failure));
@@ -106,6 +113,38 @@ public final class ReadingPlanChartDeviceCheck extends Instrumentation {
         book.readingSessions.add(new ReadingSession(today, current, current - first));
         book.baselineSchedule = new BaselineSchedule(activity.startDate, activity.endDate, 6);
         activity.sectionByLabel(section).books.add(book);
+    }
+
+    private static void checkScheduleTable(MainActivity activity, LocalDate today) {
+        String[] headers = {"Book", "Daily", "Remaining", "Remaining days", "Start date", "Deadline", "Status"};
+        int[] startOffsets = {-6, 4, -6, 0, 2};
+        int[] endOffsets = {8, 8, -1, 0, 3};
+        String[] remainingDays = {"7", "5", "0", "1", "0"};
+        for (String label : MainActivity.BOOK_SECTION_LABELS) {
+            List<BookDeadline> deadlines = new ArrayList<>();
+            for (int index = 0; index < startOffsets.length; index++) {
+                deadlines.add(new BookDeadline(new Book(index + 1, "Schedule example", 1, 100), 100,
+                        today.plusDays(startOffsets[index]), today.plusDays(endOffsets[index]), 15, 6, "before end"));
+            }
+            SectionPlan plan = new SectionPlan(new BookSection(label), deadlines, 6, 500, 6, "achievable");
+            TableLayout table = (TableLayout) activity.bookScheduleTable(plan).getChildAt(0);
+            TableRow header = (TableRow) table.getChildAt(0);
+            require(header.getChildCount() == headers.length, "Schedule header must include both new columns");
+            for (int column = 0; column < headers.length; column++) {
+                require(((TextView) header.getChildAt(column)).getText().toString().equals(headers[column]),
+                        "Unexpected schedule column order");
+            }
+            for (int index = 0; index < deadlines.size(); index++) {
+                TableRow row = (TableRow) table.getChildAt(index + 1);
+                require(row.getChildCount() == headers.length, "Schedule rows must align with the header");
+                List<String> expected = Arrays.asList(remainingDays[index], deadlines.get(index).startDate.toString(),
+                        deadlines.get(index).deadline.toString(), "before end");
+                for (int column = 0; column < expected.size(); column++) {
+                    require(((TextView) row.getChildAt(column + 3)).getText().toString().equals(expected.get(column)),
+                            "Schedule must show remaining reading days, scheduled start, deadline, and status");
+                }
+            }
+        }
     }
 
     private static void checkForecast(ReadingPlanChartData chart, LocalDate expected) {

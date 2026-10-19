@@ -6,6 +6,7 @@ import android.widget.TableLayout;
 import android.widget.TableRow;
 import android.widget.TextView;
 
+import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
 
@@ -32,9 +33,13 @@ final class ReadingPlanTables {
         TableLayout table = new TableLayout(activity);
         scroll.addView(table);
         boolean audiobookSection = isAudiobookSection(sectionPlan.section.label);
-        addTableRow(table, true, Arrays.asList("Book", "Daily", "Remaining", "Deadline", "Status"), -1);
+        LocalDate today = LocalDate.now();
+        addTableRow(table, true, Arrays.asList(
+                "Book", "Daily", "Remaining", "Remaining days", "Start date", "Deadline", "Status"
+        ), -1);
         for (BookDeadline deadline : sectionPlan.deadlines) {
             Book book = deadline.book;
+            LocalDate remainingStart = deadline.startDate.isAfter(today) ? deadline.startDate : today;
             String daily = audiobookSection
                     ? formatDuration(deadline.dailyPages)
                     : format2(deadline.dailyPages) + " pages";
@@ -45,6 +50,8 @@ final class ReadingPlanTables {
                     book.number + ". " + book.title,
                     daily,
                     remaining,
+                    String.valueOf(activity.availableReadingDaysCount(remainingStart, deadline.deadline)),
+                    deadline.startDate.toString(),
                     deadline.deadline.toString(),
                     deadline.status
             ), -1);

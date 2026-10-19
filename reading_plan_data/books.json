@@ -17,12 +17,12 @@
           },
           "deadline_override": null,
           "start_date_override": "2026-09-24",
-          "target_completed_date": "2026-10-03",
+          "target_completed_date": "2026-10-18",
           "start_page": 3,
           "end_page": 286,
-          "current_page": 103,
+          "current_page": 192,
           "pages": 284,
-          "pages_read": 101
+          "pages_read": 190
         },
         {
           "id": "9edb544e-48ab-4f86-9ee6-6739ec7afb79",
@@ -119,12 +119,12 @@
           },
           "deadline_override": null,
           "start_date_override": "2026-09-25",
-          "target_completed_date": "2026-10-03",
+          "target_completed_date": "2026-10-06",
           "start_page": 1,
           "end_page": 100,
-          "current_page": 67,
+          "current_page": 100,
           "pages": 100,
-          "pages_read": 67
+          "pages_read": 100
         },
         {
           "id": "5586a600-9615-45b1-8936-14bb5564de05",
@@ -137,12 +137,12 @@
           },
           "deadline_override": null,
           "start_date_override": "2026-10-01",
-          "target_completed_date": "2026-10-03",
+          "target_completed_date": "2026-10-17",
           "start_page": 3,
           "end_page": 759,
-          "current_page": 42,
+          "current_page": 211,
           "pages": 757,
-          "pages_read": 40
+          "pages_read": 209
         }
       ]
     },
