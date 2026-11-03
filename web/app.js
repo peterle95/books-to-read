@@ -34,6 +34,7 @@ plan.addEventListener('input', () => {
 
 document.querySelector('#bundle-form').addEventListener('submit', async (event) => {
   event.preventDefault();
+  bundleMessage.textContent = '';
   try {
     const files = Array.from(document.querySelector('#bundle-files').files);
     const names = bundleNames;
