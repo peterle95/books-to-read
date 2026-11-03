@@ -120,6 +120,66 @@ m['files']['sessions.json'] = hashlib.sha256((p/'sessions.json').read_bytes()).h
   });
 });
 
+test('import canonicalizes reversed history even when its contributions already match', async ({ page }) => {
+  await withPlan(page, async (directory) => {
+    const files = names.map((name) => path.join(directory, name));
+    execFileSync('python', ['-c', `
+from datetime import date
+from pathlib import Path
+import sys, json, hashlib
+from reading_plan import Book, BookSection, SummaryStatsOptions, add_reading_session, write_json_bundle, read_json_bundle_metadata
+p = Path(sys.argv[1]); b = Book(1, 'Ordered', 1, 100, id='ordered')
+add_reading_session(b, date(2026,11,1), 10); add_reading_session(b, date(2026,11,2), 30)
+write_json_bundle(p, [BookSection('Physical books', [b], []), BookSection('Digital books', [], []), BookSection('Audiobooks', [], [])], date(2026,10,1), date(2026,12,31), 'Quarter end', SummaryStatsOptions(True,True,True,True,True), metadata=read_json_bundle_metadata(p))
+s = json.loads((p/'sessions.json').read_text()); s['sessions']['ordered'].reverse()
+(p/'sessions.json').write_text(json.dumps(s)); m = json.loads((p/'manifest.json').read_text())
+m['files']['sessions.json'] = hashlib.sha256((p/'sessions.json').read_bytes()).hexdigest()
+(p/'manifest.json').write_text(json.dumps(m))
+`, directory]);
+    await page.getByLabel('Bundle files').setInputFiles(files);
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.getByRole('button', { name: 'Import bundle' }).click();
+    await expect(page.getByTestId('bundle-status')).toContainText('repaired');
+    const download = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Export bundle ZIP' }).click();
+    const zip = path.join(directory, 'ordered.zip'); await (await download).saveAs(zip);
+    execFileSync('python', ['-c', `
+import sys, zipfile, json
+with zipfile.ZipFile(sys.argv[1]) as archive: events = json.loads(archive.read('sessions.json'))['sessions']['ordered']
+assert [s['current_page'] for s in events] == [10,30]
+assert [s['pages_read'] for s in events] == [10,20]
+`, zip]);
+  });
+});
+
+test('renaming imported books retains progress represented without a current-position field', async ({ page }) => {
+  await withPlan(page, async (directory) => {
+    execFileSync('python', ['-c', `
+from datetime import date
+from pathlib import Path
+import sys, json, hashlib
+from reading_plan import Book, BookSection, SummaryStatsOptions, write_json_bundle, read_json_bundle_metadata
+p=Path(sys.argv[1])
+write_json_bundle(p,[BookSection('Physical books',[Book(1,'Implicit paper',1,100,current_page=40,id='paper')],[]),BookSection('Digital books',[],[]),BookSection('Audiobooks',[Book(1,'Implicit audio',0,3600,current_page=600,id='audio')],[])],date(2026,10,1),date(2026,12,31),'Quarter end',SummaryStatsOptions(True,True,True,True,True),metadata=read_json_bundle_metadata(p))
+b=json.loads((p/'books.json').read_text()); del b['sections'][0]['books'][0]['current_page']; del b['sections'][2]['books'][0]['current_time_seconds']
+(p/'books.json').write_text(json.dumps(b)); m=json.loads((p/'manifest.json').read_text()); m['files']['books.json']=hashlib.sha256((p/'books.json').read_bytes()).hexdigest(); (p/'manifest.json').write_text(json.dumps(m))
+`, directory]);
+    await page.getByLabel('Bundle files').setInputFiles(names.map((name) => path.join(directory, name)));
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.getByRole('button', { name: 'Import bundle' }).click();
+    await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+    for (const title of ['Implicit paper', 'Implicit audio']) {
+      await page.getByRole('button', { name: `Edit book ${title}`, exact: true }).click();
+      await page.getByLabel('Current book title').fill(`${title} revised`);
+      await page.getByRole('button', { name: 'Save book', exact: true }).click();
+      await expect(page.getByTestId('editor-status')).toHaveText('Book saved.');
+    }
+    await page.reload();
+    await checkExport(page, directory, `assert sections[0].books[0].current_page == 40
+assert sections[2].books[0].current_page == 600`);
+  });
+});
+
 test('backdated history can be recorded, corrected and deleted without changing the baseline', async ({ page, context }) => {
   await withPlan(page, async (directory) => {
     await page.getByLabel('Current book title').fill('History');

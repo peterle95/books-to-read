@@ -298,8 +298,8 @@ test('the next quarter can be planned, inspected, changed and removed before it 
     await page.getByRole('button', { name: 'Save quarter start' }).click();
     await expect(page.getByTestId('quarter-status')).toHaveText('A next-quarter plan must start on 1 January, 1 April, 1 July or 1 October.');
 
-    await page.getByLabel('Format').selectOption('Digital books');
-    await page.getByLabel('Book title').fill('Future read');
+    await page.getByLabel('Format', { exact: true }).selectOption('Digital books');
+    await page.getByLabel('Book title', { exact: true }).fill('Future read');
     await page.getByLabel('Start page or time in seconds').fill('1');
     await page.getByLabel('End page or time in seconds').fill('30');
     await page.getByRole('button', { name: 'Add planned book' }).click();

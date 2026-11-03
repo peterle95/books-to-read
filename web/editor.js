@@ -58,17 +58,24 @@ bookForm.addEventListener('submit', async (event) => {
     const existing = section.books.find((book) => book.id === editingBook);
     if (editingBook && !existing) throw new Error('This book changed. Cancel and choose it again.');
     const book = existing || window.ReadingQuarter.newBook(section.label, bookTitle.value.trim(), from, to);
+    const originalFrom = Number(audio ? book.start_time_seconds ?? 0 : book.start_page ?? 1);
+    const completed = window.ReadingSchedule.units(book, audio).completed;
+    const currentPosition = completed > 0 ? originalFrom + completed - (audio ? 0 : 1)
+      : (audio ? book.current_time_seconds : book.current_page) ?? null;
     const position = bookPosition.value ? Number(bookPosition.value) : existing ? section.books.indexOf(existing) + 1 : section.books.length + 1;
     if (!Number.isSafeInteger(position) || position < 1 || position > section.books.length + (existing ? 0 : 1)) throw new Error('Choose a position within this format.');
     Object.assign(book, { title: bookTitle.value.trim() }, audio
       ? { start_time_seconds: from, end_time_seconds: to, duration_seconds: to - from }
       : { start_page: from, end_page: to, pages: to - from + 1 });
-    const currentPosition = audio ? book.current_time_seconds : book.current_page;
     if (currentPosition != null && (currentPosition < from || currentPosition > to)) throw new Error('The range must include recorded progress.');
     if (audio) {
+      book.current_time_seconds = currentPosition;
       book.time_listened_seconds = currentPosition == null ? 0 : currentPosition - from;
       book.remaining_time_seconds = currentPosition == null ? null : to - currentPosition;
-    } else book.pages_read = currentPosition == null ? 0 : currentPosition - from + 1;
+    } else {
+      book.current_page = currentPosition;
+      book.pages_read = currentPosition == null ? 0 : currentPosition - from + 1;
+    }
     section.books = section.books.filter((item) => item.id !== book.id);
     section.books.splice(position - 1, 0, book);
     current.sessions.sessions[book.id] ||= [];
@@ -107,8 +114,9 @@ window.renderEditor = () => {
         bookFormat.disabled = true;
         bookTitle.value = book.title;
         const audio = section.label.trim() === 'Audiobooks';
-        bookFrom.value = audio ? book.start_time_seconds : book.start_page;
-        bookTo.value = audio ? book.end_time_seconds : book.end_page;
+        const from = Number(audio ? book.start_time_seconds ?? 0 : book.start_page ?? 1);
+        bookFrom.value = from;
+        bookTo.value = from + window.ReadingSchedule.units(book, audio).total - (audio ? 0 : 1);
         bookPosition.value = index + 1;
         bookTitle.focus();
       }));
@@ -154,6 +162,7 @@ sessionForm.addEventListener('submit', async (event) => {
     if (!section) throw new Error('Choose a book.');
     const book = section.books.find((item) => item.id === sessionBook.value);
     const audio = section.label.trim() === 'Audiobooks';
+    const end = audio ? Number(book.end_time_seconds ?? book.duration_seconds ?? book.pages) : Number(book.end_page ?? book.pages);
     const date = window.ReadingSchedule.iso(window.ReadingSchedule.parseDate(sessionDate.value));
     const position = window.parseReadingUnits(sessionPosition.value, audio);
     if (!sessionPosition.value || !Number.isSafeInteger(position) || position < 0) throw new Error('Enter a whole page number or seconds left.');
@@ -162,7 +171,7 @@ sessionForm.addEventListener('submit', async (event) => {
     if (editingSession && !existing) throw new Error('This session changed. Cancel and choose it again.');
     const session = existing || { id: crypto.randomUUID() };
     Object.assign(session, { date }, audio
-      ? { current_time_seconds: book.end_time_seconds - position, remaining_time_seconds: position }
+      ? { current_time_seconds: end - position, remaining_time_seconds: position }
       : { current_page: position });
     if (!existing) sessions.push(session);
     window.recalculateReadingHistory(book, sessions, section.label);
@@ -185,9 +194,8 @@ const renderHistory = (current) => {
   if (!sessionDate.value) sessionDate.value = window.ReadingSchedule.today();
   const events = books.flatMap(({ section, book }) => (current.sessions.sessions[book.id] || [])
     .filter((session) => !session.deleted).map((session) => ({ section, book, session })));
-  events.sort((a, b) => window.ReadingSchedule.parseDate(a.session.date) - window.ReadingSchedule.parseDate(b.session.date)
-    || (a.session.current_page ?? a.session.current_time_seconds) - (b.session.current_page ?? b.session.current_time_seconds)
-    || a.session.id.localeCompare(b.session.id));
+  events.sort((a, b) => window.compareReadingSessions(a.session, b.session,
+    a.session.current_page ?? a.session.current_time_seconds, b.session.current_page ?? b.session.current_time_seconds));
   const items = events.map(({ section, book, session }) => {
     const item = document.createElement('li');
     const audio = section.label.trim() === 'Audiobooks';

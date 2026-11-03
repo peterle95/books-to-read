@@ -94,11 +94,12 @@ they do not edit the reader's authoritative `reading_plan_data/` directory.
 Record final results and remaining blockers in #44. Do not close it until the
 reader-used feature differences and actual-device outcomes are resolved.
 
-Session evidence (2026-11-03): the eight focused release workflows passed in
+Session evidence (2026-11-03): the eleven focused release workflows passed in
 desktop Chromium, including offline edits in all formats, backdated history
 correction/deletion, chain repair, copied real-data transfers in both directions,
 clock input and planning controls, desktop CSV compatibility, and chart/metrics
-navigation. The real-data workflow uses a copy of revision 282 (six books,
+navigation, book reorder/deletion, implicit-progress preservation and canonical
+ordering when imported contributions already match. The real-data workflow uses a copy of revision 282 (six books,
 four recorded sessions) and asserts the source files are unchanged. This is
 automated transfer evidence, not desktop GUI or actual Android verification.
 

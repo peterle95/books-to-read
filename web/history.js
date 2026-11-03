@@ -15,6 +15,11 @@ window.formatReadingTime = (value) => {
   const seconds = Math.max(0, Math.round(value));
   return `${Math.floor(seconds / 3600)}:${String(Math.floor(seconds / 60) % 60).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
 };
+window.compareReadingSessions = (a, b, aPosition, bPosition) => {
+  const left = a.id.trim(), right = b.id.trim();
+  return window.ReadingSchedule.parseDate(a.date) - window.ReadingSchedule.parseDate(b.date)
+    || aPosition - bPosition || (left < right ? -1 : left > right ? 1 : 0);
+};
 window.recalculateReadingHistory = (book, sessions, label, sort = true) => {
   const audio = label.trim() === 'Audiobooks';
   const start = Number(audio ? book.start_time_seconds ?? 0 : book.start_page ?? 1);
@@ -29,9 +34,8 @@ window.recalculateReadingHistory = (book, sessions, label, sort = true) => {
     positions.set(session, Number(current));
     if (!session.deleted) previousPosition = Math.max(previousPosition, Number(current));
   }
-  const ordered = [...sessions].sort((a, b) => window.ReadingSchedule.parseDate(a.date) - window.ReadingSchedule.parseDate(b.date)
-    || positions.get(a) - positions.get(b) || String(a.id).localeCompare(String(b.id)));
-  let previous = start - (audio ? 0 : 1), changed = false;
+  const ordered = [...sessions].sort((a, b) => window.compareReadingSessions(a, b, positions.get(a), positions.get(b)));
+  let previous = start - (audio ? 0 : 1), changed = ordered.some((session, index) => session !== sessions[index]);
   const seen = new Map();
   const deleted = new Set(sessions.filter((session) => session.deleted === true).map((session) => session.id.trim()));
   for (const session of ordered) {
