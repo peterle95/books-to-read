@@ -24,6 +24,28 @@
       <button type="submit">Save plan</button>
     </form>
     <p id="status" role="status" aria-live="polite"></p>
+    <section aria-labelledby="books-heading">
+      <h2 id="books-heading">Books and reading history</h2>
+      <p>Import a bundle below to edit its books. Pages are inclusive; audiobook fields accept seconds, HH:MM or HH:MM:SS. Save changes before switching apps. Keep only one active editor, including browser tabs.</p>
+      <form id="book-form" hidden>
+        <label for="book-format">Book format</label>
+        <select id="book-format"><option>Physical books</option><option>Digital books</option><option>Audiobooks</option></select>
+        <label for="book-title">Current book title</label><input id="book-title" required>
+        <label for="book-from">Book start page or seconds</label><input id="book-from" required>
+        <label for="book-to">Book end page or seconds</label><input id="book-to" required>
+        <label for="book-position">Book position (blank to append)</label><input id="book-position" type="number" min="1" step="1">
+        <button type="submit">Save book</button><button id="cancel-book" type="button">Cancel book edit</button>
+      </form>
+      <ul id="book-list" aria-label="Current books"></ul>
+      <form id="session-form" hidden>
+        <label for="session-book">Reading session book</label><select id="session-book"></select>
+        <label for="session-date">Reading date</label><input id="session-date" type="date" required>
+        <label for="session-position">Page reached or audiobook seconds left</label><input id="session-position" required>
+        <button type="submit">Save reading session</button><button id="cancel-session" type="button">Cancel session edit</button>
+      </form>
+      <ul id="history-list" aria-label="Reading history"></ul>
+      <p id="editor-status" data-testid="editor-status" role="status" aria-live="polite"></p>
+    </section>
     <section aria-labelledby="schedule-heading">
       <h2 id="schedule-heading">Reading schedule</h2>
       <p>Set the plan dates and rest days, then calculate the baseline schedule. Rest days reduce the days available for reading, but they do not move the baseline dates. Books in a simultaneous group share a start and finish while their daily targets are split by remaining work. A deadline override gives one book an independent schedule until you clear it. The baseline schedule stays saved until you calculate it again.</p>
@@ -75,6 +97,17 @@
         <tbody id="projection-rows"></tbody>
       </table>
     </section>
+    <section aria-labelledby="charts-heading">
+      <h2 id="charts-heading">Charts</h2>
+      <button id="charts-all" type="button" aria-pressed="false">All</button>
+      <button id="metrics-open" type="button">Metrics</button>
+      <p>All is off by default: charts show books with progress that are not finished. Plan and actual use the left axis; read/required per day uses the right axis. Projection ranges are estimates, not guarantees.</p>
+      <div id="charts"></div>
+    </section>
+    <dialog id="metrics-dialog" aria-label="Reading metrics">
+      <button id="metrics-close" type="button">Back to charts</button>
+      <div id="metrics-content"></div>
+    </dialog>
     <section aria-labelledby="quarter-heading">
       <h2 id="quarter-heading">Next quarter</h2>
       <p>Plan the books for the next quarter here. When the quarter starts, unfinished current books carry forward first with their history and stable IDs, completed books leave the plan, and the baseline schedule is recalculated. The plan activates automatically when you open or use the app on or after its start date.</p>
@@ -90,13 +123,26 @@
         <label for="quarter-title">Book title</label>
         <input id="quarter-title" type="text" required>
         <label for="quarter-from">Start page or time in seconds</label>
-        <input id="quarter-from" type="number" min="0" step="1" required>
+        <input id="quarter-from" required>
         <label for="quarter-to">End page or time in seconds</label>
-        <input id="quarter-to" type="number" min="0" step="1" required>
+        <input id="quarter-to" required>
         <button type="submit">Add planned book</button>
+        <button id="cancel-planned-edit" type="button">Cancel planned edit</button>
       </form>
       <ul id="quarter-list" aria-label="Next-quarter books"></ul>
       <p id="quarter-status" data-testid="quarter-status" role="status" aria-live="polite"></p>
+    </section>
+    <section aria-labelledby="settings-heading">
+      <h2 id="settings-heading">Summary settings</h2>
+      <form id="settings-form" hidden>
+        <label><input type="checkbox" name="book_counts"> Show book counts</label>
+        <label><input type="checkbox" name="page_share"> Show page share</label>
+        <label><input type="checkbox" name="average_pages"> Show average pages</label>
+        <label><input type="checkbox" name="reading_period"> Show reading period</label>
+        <label><input type="checkbox" name="pace_driver"> Show pace driver</label>
+        <button type="submit">Save summary settings</button>
+      </form>
+      <p id="settings-status" data-testid="settings-status" role="status"></p>
     </section>
     <section aria-labelledby="bundle-heading">
       <h2 id="bundle-heading">Transfer desktop bundle</h2>
@@ -112,6 +158,16 @@
       <p id="backup-reminder" class="note" data-testid="backup-reminder" hidden></p>
       <p id="bundle-status" data-testid="bundle-status" role="status"></p>
     </section>
+    <section aria-labelledby="csv-heading">
+      <h2 id="csv-heading">CSV compatibility</h2>
+      <p>CSV replaces the current plan's books and progress, but contains no reading history, stable IDs, overrides or next-quarter plan. Keep a bundle ZIP backup first. Existing next-quarter books are retained. Use CSV only with trusted reading apps; spreadsheet software can interpret titles as formulas.</p>
+      <form id="csv-form">
+        <label for="csv-file">CSV plan file</label><input id="csv-file" type="file" accept=".csv,text/csv" required>
+        <button type="submit">Import CSV plan</button>
+      </form>
+      <button id="csv-export" type="button" hidden>Export CSV plan</button>
+      <p id="csv-status" data-testid="csv-status" role="status"></p>
+    </section>
     <p class="note">Your plan stays in this browser. It does not sync with the desktop or Android app. Clearing browser data can delete it.</p>
   </main>
   <script src="./schedule.js" defer></script>
@@ -119,6 +175,10 @@
   <script src="./quarter.js" defer></script>
   <script src="./bundle-validator.js" defer></script>
   <script src="./bundle-export.js" defer></script>
+  <script src="./history.js" defer></script>
   <script src="./app.js" defer></script>
+  <script src="./editor.js" defer></script>
+  <script src="./csv.js" defer></script>
+  <script src="./charts.js" defer></script>
 </body>
 </html>

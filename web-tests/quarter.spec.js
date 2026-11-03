@@ -289,8 +289,8 @@ test('the next quarter can be planned, inspected, changed and removed before it 
       `Next-quarter plan saved: 2 books. Unfinished current books carry forward first, and the plan activates on ${dates.future}.`,
     );
     await expect(page.getByLabel('Next-quarter books').locator('li')).toHaveText([
-      'Physical books: Next story (1 to 80 pages) Remove',
-      'Audiobooks: Next audio (0 to 600 seconds) Remove',
+      'Physical books: Next story (1 to 80 pages) Edit Remove',
+      'Audiobooks: Next audio (0 to 600 seconds) Edit Remove',
     ]);
 
     // The next quarter must start on a calendar quarter boundary.
@@ -315,8 +315,8 @@ test('the next quarter can be planned, inspected, changed and removed before it 
     await page.reload();
     await expect(page.getByLabel('Next quarter starts')).toHaveValue(dates.beyond);
     await expect(page.getByLabel('Next-quarter books').locator('li')).toHaveText([
-      'Physical books: Next story (1 to 80 pages) Remove',
-      'Digital books: Future read (1 to 30 pages) Remove',
+      'Physical books: Next story (1 to 80 pages) Edit Remove',
+      'Digital books: Future read (1 to 30 pages) Edit Remove',
     ]);
     await expect(page.getByLabel('Plan start')).not.toHaveValue(dates.beyond);
 

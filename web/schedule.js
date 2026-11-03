@@ -223,10 +223,22 @@
   };
 
   // Persisted overrides are reapplied after a calculation, in book order.
+  const applyStartOverride = (book, baselines, override, planStart, today, restDays) => {
+    const baseline = baselines[book.id];
+    if (!baseline) throw new Error('Calculate the schedule before setting a start date override.');
+    const start = override || planStart;
+    if (parse(start) > parse(baseline.deadline)) throw new Error('Start date override cannot be after the deadline.');
+    const effective = effectiveRemainingStart(parse(start), parse(baseline.deadline), parse(today), normalizeRestDays(restDays));
+    const days = availableDays(effective, parse(baseline.deadline), normalizeRestDays(restDays)).length;
+    baselines[book.id] = { ...baseline, startDate: start, dailyTarget: days ? book.remaining / days : 0 };
+  };
   const applyPersistedOverrides = (sections, baselines, planEndIso, todayIso, restDays) => {
     for (const section of sections) {
       for (const book of section.books) {
         if (book.deadlineOverride) applyDeadlineOverride(section, baselines, book, book.deadlineOverride, planEndIso, todayIso, restDays);
+      }
+      for (const book of section.books) {
+        if (book.startDateOverride) applyStartOverride(book, baselines, book.startDateOverride, baselines[book.id].startDate, todayIso, restDays);
       }
     }
     return baselines;
@@ -247,12 +259,13 @@
   };
 
   // Local group and override edits are layered over what the imported bundle stores.
-  const withLocalSettings = (sections, groups, overrides) => sections.map((section) => ({
+  const withLocalSettings = (sections, groups, overrides, startOverrides) => sections.map((section) => ({
     ...section,
     groups: groups && groups[section.label] ? groups[section.label].map((group) => group.map(Number).sort((a, b) => a - b)) : section.groups,
     books: section.books.map((book) => ({
       ...book,
       deadlineOverride: overrides && overrides[book.id] !== undefined ? overrides[book.id] : book.deadlineOverride,
+      startDateOverride: startOverrides && startOverrides[book.id] !== undefined ? startOverrides[book.id] : book.startDateOverride,
     })),
   }));
 
@@ -302,12 +315,14 @@
       restDays,
       groups: Object.fromEntries(sections.map((section) => [section.label, section.groups.map((group) => [...group])])),
       overrides: Object.fromEntries(sections.flatMap((section) => section.books.map((book) => [book.id, book.deadlineOverride || null]))),
+      startOverrides: Object.fromEntries(sections.flatMap((section) => section.books.map((book) => [book.id, book.startDateOverride || null]))),
       baselines,
-      needsRecalculation: !complete,
+      needsRecalculation: !complete || (booksFile.sections || []).some((section) => section.baseline_needs_recalculation),
     };
   };
 
   window.ReadingSchedule = {
+    applyStartOverride,
     sectionsFromBooksFile,
     units,
     normalizeRestDays,

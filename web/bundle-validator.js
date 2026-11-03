@@ -145,6 +145,11 @@ window.validateBundleContents = (values, nonIntegers) => {
       if (session.deleted !== true) previous = Math.max(previous ?? current, current);
     }
     const active = [...events.values()].filter((event) => !event.deleted);
+    let completed = book.start - (book.audio ? 0 : 1);
+    for (const event of active.sort((a, b) => a.date - b.date || a.current - b.current)) {
+      if (event.current <= completed) fail(path, 'reading session progress must advance in date order');
+      completed = event.current;
+    }
     const derived = active.length ? active.reduce((maximum, event) => Math.max(maximum, event.current), -Infinity) : sessions.length ? null : book.current;
     if (derived !== book.current) fail(path, 'book progress conflicts with reading sessions');
   }

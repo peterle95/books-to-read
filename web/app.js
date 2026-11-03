@@ -95,6 +95,21 @@ document.querySelector('#bundle-form').addEventListener('submit', async (event) 
       if (actual !== expected.toLowerCase()) throw new Error(`Checksum mismatch for ${name}.`);
     }
     window.validateBundleContents(Object.fromEntries(names.map((name) => [name, parse(name)])), nonIntegers);
+    let repaired = false;
+    for (const section of parsed['books.json'].sections) {
+      for (const book of section.books) {
+        repaired = window.recalculateReadingHistory(book, parsed['sessions.json'].sessions[book.id.trim()], section.label, false) || repaired;
+      }
+    }
+    if (repaired) {
+      const encoder = new TextEncoder();
+      buffers['sessions.json'] = encoder.encode(JSON.stringify(parsed['sessions.json']));
+      manifest.revision += 1;
+      manifest.last_modified = new Date().toISOString();
+      manifest.modified_by = 'web app';
+      manifest.files['sessions.json'] = await digest(buffers['sessions.json']);
+      buffers['manifest.json'] = encoder.encode(JSON.stringify(manifest));
+    }
     if (!window.confirm('Replace the stored reading-plan bundle with these files? The text draft will not change.')) {
       bundleMessage.textContent = 'Import cancelled. Stored bundle unchanged.';
       return;
@@ -109,7 +124,7 @@ document.querySelector('#bundle-form').addEventListener('submit', async (event) 
     localStorage.removeItem(scheduleKey);
     scheduleState = null;
     showExports();
-    bundleMessage.textContent = 'Bundle imported on this device.';
+    bundleMessage.textContent = repaired ? 'Bundle imported on this device; reading session chain repaired.' : 'Bundle imported on this device.';
     imported = true;
   } catch (error) {
     bundleMessage.textContent = `Bundle could not be imported: ${error.message}`;
@@ -120,8 +135,10 @@ document.querySelector('#bundle-form').addEventListener('submit', async (event) 
   }
 });
 
-exports.addEventListener('click', () => {
+exports.addEventListener('click', async () => {
   try {
+    // Include legacy locally saved schedules in the transferable backup too.
+    if (localStorage.getItem(scheduleKey)) await saveSchedule();
     const encoded = JSON.parse(localStorage.getItem(bundleKey));
     const url = URL.createObjectURL(window.createBundleZip(encoded));
     const link = document.createElement('a');
@@ -182,7 +199,7 @@ const loadSchedule = (bundle) => {
   try {
     const saved = JSON.parse(localStorage.getItem(scheduleKey) || 'null');
     if (saved && saved.version === 1 && saved.startDate && saved.endDate) {
-      return { ...saved, groups: saved.groups ?? defaults.groups, overrides: saved.overrides ?? defaults.overrides };
+      return { ...saved, groups: saved.groups ?? defaults.groups, overrides: saved.overrides ?? defaults.overrides, startOverrides: saved.startOverrides ?? defaults.startOverrides };
     }
   } catch {
     // Fall back to the imported bundle's own dates and baselines.
@@ -190,17 +207,42 @@ const loadSchedule = (bundle) => {
   return defaults;
 };
 
-const saveSchedule = () => {
+const saveSchedule = async () => {
   try {
-    localStorage.setItem(scheduleKey, JSON.stringify(scheduleState));
-  } catch {
-    scheduleStatus.textContent = 'Unable to save the schedule on this device.';
+    const current = readBundleFiles();
+    const sections = sectionsForState(readBundleData(), scheduleState);
+    await writeBundleFiles({
+      'plan.json': {
+        ...current.plan,
+        start_date: scheduleState.startDate,
+        end_date: scheduleState.endDate,
+        rest_days: scheduleState.restDays.map((range) => ({ start_date: range.start, end_date: range.end })),
+      },
+      'books.json': {
+        ...current.books,
+        sections: current.books.sections.map((section, index) => ({
+          ...section,
+          baseline_needs_recalculation: scheduleState.needsRecalculation,
+          simultaneous_groups: sections[index].groups.map((group) => group.map((number) => section.books[number - 1].id)),
+          books: section.books.map((book) => {
+            const baseline = scheduleState.baselines[String(book.id).trim()];
+            return { ...book, deadline_override: scheduleState.overrides[String(book.id).trim()] || null,
+              start_date_override: scheduleState.startOverrides?.[String(book.id).trim()] || null,
+              baseline_schedule: baseline ? { start_date: baseline.startDate, deadline: baseline.deadline, daily_target: baseline.dailyTarget } : null };
+          }),
+        })),
+      },
+    });
+    localStorage.removeItem(scheduleKey);
+  } catch (error) {
+    scheduleState = loadSchedule(readBundleData());
+    throw new Error(`Unable to save the schedule on this device: ${error.message}`);
   }
 };
 
-const sectionsForState = (bundle, state) => window.ReadingSchedule.withLocalSettings(bundle.sections, state.groups, state.overrides);
+const sectionsForState = (bundle, state) => window.ReadingSchedule.withLocalSettings(bundle.sections, state.groups, state.overrides, state.startOverrides);
 
-const setOverride = (bookId, value) => {
+const setOverride = async (bookId, value) => {
   try {
     const bundle = readBundleData();
     if (!bundle) throw new Error('Import a bundle before scheduling its books.');
@@ -219,20 +261,20 @@ const setOverride = (bookId, value) => {
     window.ReadingSchedule.applyDeadlineOverride(section, baselines, book, value || null, scheduleState.endDate, window.ReadingSchedule.today(), scheduleState.restDays);
     scheduleState.baselines = baselines;
     scheduleState.overrides = { ...scheduleState.overrides, [bookId]: value || null };
-    saveSchedule();
+    await saveSchedule();
     renderSchedule(value ? `Deadline override saved for ${book.title}.` : `Deadline override cleared for ${book.title}.`);
   } catch (error) {
     scheduleStatus.textContent = error.message;
   }
 };
 
-const removeGroup = (label, index) => {
+const removeGroup = async (label, index) => {
   const bundle = readBundleData();
   if (!bundle) return;
   const section = sectionsForState(bundle, scheduleState).find((item) => item.label === label);
   if (!section) return;
   scheduleState.groups = { ...scheduleState.groups, [label]: section.groups.filter((_, position) => position !== index) };
-  scheduleChanged();
+  try { await scheduleChanged(); } catch (error) { scheduleStatus.textContent = error.message; }
 };
 
 const renderGroups = (sections) => {
@@ -289,6 +331,29 @@ const overrideCell = (book) => {
   clear.setAttribute('aria-label', `Clear the deadline for ${book.title}`);
   clear.addEventListener('click', () => setOverride(book.id, ''));
   cell.append(input, set, clear);
+  const start = document.createElement('input');
+  start.type = 'date';
+  start.value = scheduleState.startOverrides?.[book.id] || '';
+  start.setAttribute('aria-label', `Start date override for ${book.title}`);
+  const saveStart = document.createElement('button');
+  saveStart.type = 'button';
+  saveStart.textContent = 'Set start date';
+  saveStart.setAttribute('aria-label', `Save the start date for ${book.title}`);
+  const updateStart = async (value) => {
+    try {
+      window.ReadingSchedule.applyStartOverride(book, scheduleState.baselines, value, scheduleState.startDate, window.ReadingSchedule.today(), scheduleState.restDays);
+      scheduleState.startOverrides = { ...scheduleState.startOverrides, [book.id]: value || null };
+      await saveSchedule();
+      renderSchedule(value ? `Start date override saved for ${book.title}.` : `Start date override cleared for ${book.title}.`);
+    } catch (error) { scheduleStatus.textContent = error.message; }
+  };
+  saveStart.addEventListener('click', () => updateStart(start.value));
+  const clearStart = document.createElement('button');
+  clearStart.type = 'button';
+  clearStart.textContent = 'Clear start date';
+  clearStart.setAttribute('aria-label', `Clear the start date for ${book.title}`);
+  clearStart.addEventListener('click', () => updateStart(''));
+  cell.append(start, saveStart, clearStart);
   return cell;
 };
 
@@ -328,6 +393,9 @@ const renderProjections = (bundle) => {
 };
 
 const renderSchedule = (message = '') => {
+  if (window.renderEditor) window.renderEditor();
+  if (window.renderCharts) window.renderCharts();
+  document.querySelector('#csv-export').hidden = !localStorage.getItem(bundleKey);
   const bundle = readBundleData();
   scheduleEmpty.hidden = !!bundle;
   projectionEmpty.hidden = !!bundle;
@@ -354,9 +422,9 @@ const renderSchedule = (message = '') => {
     remove.type = 'button';
     remove.textContent = 'Remove';
     remove.setAttribute('aria-label', `Remove rest days ${label}`);
-    remove.addEventListener('click', () => {
-      scheduleState.restDays = scheduleState.restDays.filter((_, position) => position !== index);
-      scheduleChanged();
+      remove.addEventListener('click', async () => {
+        scheduleState.restDays = scheduleState.restDays.filter((_, position) => position !== index);
+        try { await scheduleChanged(); } catch (error) { scheduleStatus.textContent = error.message; }
     });
     item.append(remove);
     return item;
@@ -400,32 +468,32 @@ const renderSchedule = (message = '') => {
   }
 };
 
-const scheduleChanged = () => {
+const scheduleChanged = async () => {
   if (Object.keys(scheduleState.baselines).length) scheduleState.needsRecalculation = true;
-  saveSchedule();
+  await saveSchedule();
   renderSchedule();
 };
 
-scheduleForm.addEventListener('submit', (event) => {
+scheduleForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   try {
     if (!startInput.value || !finishInput.value) throw new Error('Set both plan dates.');
     if (!window.ReadingSchedule.availableReadingDays(startInput.value, finishInput.value, []).length) throw new Error('The plan finish date is before its start date.');
     scheduleState.startDate = startInput.value;
     scheduleState.endDate = finishInput.value;
-    scheduleChanged();
+    await scheduleChanged();
   } catch (error) {
     scheduleStatus.textContent = error.message;
   }
 });
 
-restForm.addEventListener('submit', (event) => {
+restForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   try {
     if (!restStart.value || !restEnd.value) throw new Error('Set both rest-day dates.');
     const ranges = window.ReadingSchedule.normalizeRestDays([...scheduleState.restDays, { start: restStart.value, end: restEnd.value }]);
     scheduleState.restDays = ranges.map((range) => ({ start: window.ReadingSchedule.iso(range.start), end: window.ReadingSchedule.iso(range.end) }));
-    scheduleChanged();
+    await scheduleChanged();
   } catch (error) {
     scheduleStatus.textContent = error.message;
   }
@@ -436,7 +504,7 @@ groupSection.addEventListener('change', () => {
   if (bundle) renderGroups(sectionsForState(bundle, scheduleState));
 });
 
-groupForm.addEventListener('submit', (event) => {
+groupForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   try {
     const bundle = readBundleData();
@@ -446,13 +514,13 @@ groupForm.addEventListener('submit', (event) => {
     if (!section) throw new Error('Choose a book section.');
     const chosen = Array.from(groupBooks.querySelectorAll('input:checked')).map((input) => Number(input.value));
     scheduleState.groups = { ...scheduleState.groups, [section.label]: window.ReadingSchedule.validateGroups(section.books, [...section.groups, chosen]) };
-    scheduleChanged();
+    await scheduleChanged();
   } catch (error) {
     scheduleStatus.textContent = error.message;
   }
 });
 
-calculateButton.addEventListener('click', () => {
+calculateButton.addEventListener('click', async () => {
   try {
     const bundle = readBundleData();
     if (!bundle) throw new Error('Import a bundle before calculating the schedule.');
@@ -460,7 +528,7 @@ calculateButton.addEventListener('click', () => {
     scheduleState.baselines = window.ReadingSchedule.calculateBaselines(sections, scheduleState.startDate, scheduleState.endDate, scheduleState.restDays);
     window.ReadingSchedule.applyPersistedOverrides(sections, scheduleState.baselines, scheduleState.endDate, window.ReadingSchedule.today(), scheduleState.restDays);
     scheduleState.needsRecalculation = false;
-    saveSchedule();
+    await saveSchedule();
     renderSchedule('Baseline schedule calculated on this device.');
   } catch (error) {
     scheduleStatus.textContent = error.message;
@@ -477,6 +545,14 @@ const quarterFrom = document.querySelector('#quarter-from');
 const quarterTo = document.querySelector('#quarter-to');
 const quarterList = document.querySelector('#quarter-list');
 const quarterStatus = document.querySelector('#quarter-status');
+let editingPlannedBook = null;
+const cancelPlannedEdit = () => {
+  editingPlannedBook = null;
+  quarterBookForm.reset();
+  quarterSection.disabled = false;
+  quarterBookForm.querySelector('button[type="submit"]').textContent = 'Add planned book';
+};
+document.querySelector('#cancel-planned-edit').addEventListener('click', cancelPlannedEdit);
 
 const decodeFile = (encoded, name) => new TextDecoder().decode(Uint8Array.from(atob(encoded[name]), (character) => character.charCodeAt(0)));
 const encodeFile = (bytes) => {
@@ -507,27 +583,43 @@ const digest = async (bytes) => Array.from(
 ).join('');
 
 // Rewrite the changed files, keep the rest byte for byte, and re-checksum the bundle.
+let bundleWritePending = false;
 const writeBundleFiles = async (updates) => {
-  const current = readBundleFiles();
-  if (!current) throw new Error('Import a bundle before changing its plan.');
-  const encoder = new TextEncoder();
-  const data = {};
-  for (const name of bundleNames.slice(0, 3)) {
-    data[name] = updates[name]
-      ? encoder.encode(JSON.stringify(updates[name]))
-      : Uint8Array.from(atob(current.encoded[name]), (character) => character.charCodeAt(0));
+  if (bundleWritePending) throw new Error('A save is already in progress. Wait for its saved message.');
+  bundleWritePending = true;
+  const controls = [...document.querySelectorAll('button, input, select')].filter((control) => !control.disabled);
+  controls.forEach((control) => { control.disabled = true; });
+  try {
+    const original = localStorage.getItem(bundleKey);
+    const current = readBundleFiles() || (bundleNames.slice(0, 3).every((name) => updates[name])
+      ? { manifest: { schema_version: 2, revision: 0 }, encoded: {} } : null);
+    if (!current) throw new Error('Import a bundle before changing its plan.');
+    const encoder = new TextEncoder();
+    const data = {};
+    for (const name of bundleNames.slice(0, 3)) {
+      data[name] = updates[name]
+        ? encoder.encode(JSON.stringify(updates[name]))
+        : Uint8Array.from(atob(current.encoded[name]), (character) => character.charCodeAt(0));
+    }
+    const manifest = {
+      ...current.manifest,
+      revision: Number(current.manifest.revision) + 1,
+      last_modified: new Date().toISOString(),
+      modified_by: 'web app',
+      files: {},
+    };
+    for (const name of bundleNames.slice(0, 3)) manifest.files[name] = await digest(data[name]);
+    data['manifest.json'] = encoder.encode(JSON.stringify(manifest));
+    window.validateBundleContents({ 'plan.json': updates['plan.json'] || current.plan,
+      'books.json': updates['books.json'] || current.books,
+      'sessions.json': updates['sessions.json'] || current.sessions }, new WeakMap());
+    if (localStorage.getItem(bundleKey) !== original) throw new Error('The plan changed during this save. Try again.');
+    localStorage.setItem(bundleKey, JSON.stringify(Object.fromEntries(bundleNames.map((name) => [name, encodeFile(data[name])]))));
+    showExports();
+  } finally {
+    bundleWritePending = false;
+    controls.forEach((control) => { control.disabled = false; });
   }
-  const manifest = {
-    ...current.manifest,
-    revision: Number(current.manifest.revision) + 1,
-    last_modified: new Date().toISOString(),
-    modified_by: 'web app',
-    files: {},
-  };
-  for (const name of bundleNames.slice(0, 3)) manifest.files[name] = await digest(data[name]);
-  data['manifest.json'] = encoder.encode(JSON.stringify(manifest));
-  localStorage.setItem(bundleKey, JSON.stringify(Object.fromEntries(bundleNames.map((name) => [name, encodeFile(data[name])]))));
-  showExports();
 };
 
 const plannedDraft = () => {
@@ -596,7 +688,7 @@ const rollover = async () => {
     baselines,
     needsRecalculation: false,
   };
-  saveSchedule();
+  localStorage.removeItem(scheduleKey);
   renderSchedule(`Next quarter activated: ${result.start} to ${result.end}.`);
   return result;
 };
@@ -648,6 +740,20 @@ const renderQuarter = (message = '') => {
       const to = audio ? book.end_time_seconds : book.end_page;
       const item = document.createElement('li');
       const remove = document.createElement('button');
+      const edit = document.createElement('button');
+      edit.type = 'button';
+      edit.textContent = 'Edit';
+      edit.setAttribute('aria-label', `Edit planned book ${book.title}`);
+      edit.addEventListener('click', () => {
+        editingPlannedBook = book.id;
+        quarterSection.value = section.label;
+        quarterSection.disabled = true;
+        quarterTitle.value = book.title;
+        quarterFrom.value = from;
+        quarterTo.value = to;
+        quarterBookForm.querySelector('button[type="submit"]').textContent = 'Save planned book';
+        quarterTitle.focus();
+      });
       remove.type = 'button';
       remove.textContent = 'Remove';
       remove.setAttribute('aria-label', `Remove planned book ${book.title}`);
@@ -660,7 +766,7 @@ const renderQuarter = (message = '') => {
           quarterStatus.textContent = error.message;
         }
       });
-      item.append(`${section.label}: ${book.title} (${from} to ${to} ${audio ? 'seconds' : 'pages'}) `, remove);
+      item.append(`${section.label}: ${book.title} (${from} to ${to} ${audio ? 'seconds' : 'pages'}) `, edit, ' ', remove);
       items.push(item);
     }
   }
@@ -695,13 +801,17 @@ quarterBookForm.addEventListener('submit', async (event) => {
     const title = quarterTitle.value.trim();
     if (!title) throw new Error('A planned book needs a title.');
     if (!quarterFrom.value || !quarterTo.value) throw new Error('Set the start and end pages or times.');
-    const from = Number(quarterFrom.value), to = Number(quarterTo.value);
+    const from = window.parseReadingUnits(quarterFrom.value, audio), to = window.parseReadingUnits(quarterTo.value, audio);
     if (!Number.isInteger(from) || !Number.isInteger(to) || to < from || (!audio && from < 1)) {
       throw new Error(audio ? 'Set whole-second times, with the end time on or after the start.' : 'Set whole page numbers, with the end page on or after the start page.');
     }
-    section.books.push(window.ReadingQuarter.newBook(section.label, title, from, to));
+    if (editingPlannedBook) {
+      const index = section.books.findIndex((book) => book.id === editingPlannedBook);
+      if (index < 0) throw new Error('This planned book changed. Cancel and choose it again.');
+      section.books[index] = { ...window.ReadingQuarter.newBook(section.label, title, from, to), id: editingPlannedBook, number: index + 1 };
+    } else section.books.push(window.ReadingQuarter.newBook(section.label, title, from, to));
     await savePlanned(planned, `Planned ${title} for the next quarter.`);
-    quarterBookForm.reset();
+    cancelPlannedEdit();
   } catch (error) {
     quarterStatus.textContent = error.message;
   }

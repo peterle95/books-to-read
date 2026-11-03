@@ -43,6 +43,13 @@ The output shows physical and digital remaining page totals, audiobook remaining
 
 You can choose consecutive Book IDs within each table to read simultaneously. The books start and finish together, their daily page allocation is split according to their remaining page counts, and the table is recalculated. Simultaneous groups are saved in JSON and CSV exports.
 
+## Offline web app
+
+The installable [web app](web/README.md) supports offline books, reading history,
+schedules, charts, quarter plans and manual desktop bundle transfers. Keep using
+the native and desktop apps until the [release/device checklist](docs/web-release-verification.md)
+has been completed. There is no automatic web synchronization.
+
 ## Requirements
 
 Python 3.7+ (standard library only, no external dependencies).

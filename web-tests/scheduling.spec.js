@@ -173,7 +173,9 @@ write_json_bundle(sys.argv[1], [
     await expect(page.getByTestId('schedule-status')).toHaveText(/baseline stays unchanged/);
     await expect(row('First').locator('td').nth(3)).toHaveText('2026-02-14');
     await expect(row('First').locator('td').nth(4)).toHaveText('0.44');
-    expect(await page.evaluate(() => localStorage.getItem('reading-plan-bundle-v1'))).toBe(storedBundle);
+    const updatedBundle = JSON.parse(await page.evaluate(() => localStorage.getItem('reading-plan-bundle-v1')));
+    expect(JSON.parse(Buffer.from(updatedBundle['books.json'], 'base64')).sections[0].books[0].baseline_schedule)
+      .toEqual(JSON.parse(Buffer.from(JSON.parse(storedBundle)['books.json'], 'base64')).sections[0].books[0].baseline_schedule);
 
     await page.reload();
     await expect(page.getByLabel('Plan finish')).toHaveValue('2026-03-30');
