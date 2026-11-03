@@ -10,7 +10,6 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
 
 import static com.petermolnar.readingplan.PlanPrimitives.*;
@@ -45,9 +44,9 @@ final class ReadingPlanSessionView {
         Book selected = selectedSessionBook();
         LinearLayout bookCard = activity.surfaceCard();
         bookCard.addView(activity.sectionTitle("Choose a book"));
-        List<Book> sessionBooks = sessionBooks(section);
+        List<Book> sessionBooks = section.books;
         if (sessionBooks.isEmpty()) {
-            TextView empty = activity.label("No books are available to read today.");
+            TextView empty = activity.label("Add a book to record a reading session.");
             empty.setTextColor(MainActivity.MOCHA);
             bookCard.addView(empty);
         } else {
@@ -185,7 +184,7 @@ final class ReadingPlanSessionView {
 
     private Book selectedSessionBook() {
         BookSection section = activity.sectionByLabel(activity.selectedBookSection);
-        List<Book> books = sessionBooks(section);
+        List<Book> books = section.books;
         for (Book book : books) {
             if (book.number == activity.selectedSessionBookNumber) {
                 return book;
@@ -200,15 +199,4 @@ final class ReadingPlanSessionView {
         return first;
     }
 
-    private List<Book> sessionBooks(BookSection section) {
-        List<Book> available = new ArrayList<>();
-        LocalDate today = LocalDate.now();
-        for (Book book : section.books) {
-            if (unitsRemaining(book, section.label) > 0
-                    && (book.baselineSchedule == null || !book.baselineSchedule.startDate.isAfter(today))) {
-                available.add(book);
-            }
-        }
-        return available;
-    }
 }

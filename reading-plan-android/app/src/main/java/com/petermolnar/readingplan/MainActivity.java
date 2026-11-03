@@ -1900,7 +1900,11 @@ public class MainActivity extends Activity {
         bookProgress.addReadingSession(book, sessionDate, currentPage, sectionLabel);
     }
 
-    void removeReadingSession(Book book, int index) { bookProgress.removeReadingSession(book, index); }
+    void removeReadingSession(Book book, int index, String sectionLabel) { bookProgress.removeReadingSession(book, index, sectionLabel); }
+
+    void replaceReadingSession(Book book, ReadingSession old, LocalDate date, int page, String sectionLabel) {
+        bookProgress.replaceReadingSession(book, old, date, page, sectionLabel);
+    }
 
     void moveSelectedBook(BookSection section, int offset) { bookProgress.moveSelectedBook(section, offset); }
 

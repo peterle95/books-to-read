@@ -22,6 +22,16 @@ tasks.register("checkChartProjection", JavaExec) {
             androidComponents.sdkComponents.bootClasspath)
 }
 
+tasks.register("checkReadingSessions", JavaExec) {
+    dependsOn "compileDebugUnitTestJavaWithJavac"
+    mainClass = "com.petermolnar.readingplan.ReadingSessionsCheck"
+    enableAssertions = true
+    classpath = files(
+            tasks.named("compileDebugJavaWithJavac").map { it.destinationDirectory },
+            tasks.named("compileDebugUnitTestJavaWithJavac").map { it.destinationDirectory },
+            androidComponents.sdkComponents.bootClasspath)
+}
+
 android {
     namespace "com.petermolnar.readingplan"
     compileSdk 35

@@ -86,22 +86,34 @@ final class ReadingPlanBookProgress {
         });
     }
 
-    void removeReadingSession(Book book, int index) {
+    void removeReadingSession(Book book, int index, String sectionLabel) {
         if (index < 0 || index >= book.readingSessions.size()) {
             throw new IllegalArgumentException("reading session not found");
         }
         book.readingSessions.get(index).deleted = true;
-        int max = Integer.MIN_VALUE;
+        recalculateChain(book, sectionLabel);
+    }
+
+    void replaceReadingSession(Book book, ReadingSession old, LocalDate date, int page, String sectionLabel) {
+        int index = book.readingSessions.indexOf(old);
+        if (index < 0 || old.deleted) {
+            throw new IllegalArgumentException("reading session not found");
+        }
+        if (page < book.startPage || page > book.endPage) {
+            throw new IllegalArgumentException("value outside book range");
+        }
+        List<ReadingSession> previous = new ArrayList<>(book.readingSessions);
+        Integer previousPage = book.currentPage;
+        book.readingSessions.set(index, new ReadingSession(old.id, date, page, old.pagesRead, false));
+        recalculateChain(book, sectionLabel);
         for (ReadingSession session : book.readingSessions) {
-            if (!session.deleted) {
-                max = Math.max(max, session.currentPage);
+            if (!session.deleted && session.pagesRead <= 0) {
+                book.readingSessions.clear();
+                book.readingSessions.addAll(previous);
+                book.currentPage = previousPage;
+                throw new IllegalArgumentException("reading sessions must advance progress in date order");
             }
         }
-        if (max == Integer.MIN_VALUE) {
-            book.currentPage = null;
-            return;
-        }
-        book.currentPage = max;
     }
 
     private static void setBookProgress(Book book, int currentPage, String sectionLabel) {
