@@ -212,3 +212,185 @@ write_json_bundle(sys.argv[1], [
     fs.rmSync(directory, { recursive: true, force: true });
   }
 });
+
+const overridden = (book, deadline) => ({ ...book, deadline_override: deadline });
+
+const overrideCases = [
+  {
+    name: 'a group member override detaches only that book',
+    start: '2026-07-01', end: '2026-09-30', today: '2026-07-10', restDays: [],
+    books: booksFile([
+      section('Physical books', [
+        overridden(reading('one', 1, 10, 5), '2026-08-01'),
+        reading('two', 1, 20, null),
+        reading('three', 1, 30, null),
+      ], [['one', 'two', 'three']]),
+      section('Digital books', []),
+      section('Audiobooks', []),
+    ]),
+  },
+  {
+    name: 'overrides, groups and rest days in every unit',
+    start: '2026-07-01', end: '2026-09-30', today: '2026-07-20',
+    restDays: [
+      { start_date: '2026-07-05', end_date: '2026-07-07' },
+      { start_date: '2026-08-12', end_date: '2026-08-14' },
+    ],
+    books: booksFile([
+      section('Physical books', [
+        overridden(reading('first', 1, 40, 10), '2026-08-15'),
+        reading('second', 1, 60, null),
+      ], [['first', 'second']]),
+      section('Digital books', [overridden(reading('digital', 1, 40, 40), '2026-09-01')]),
+      section('Audiobooks', [overridden(audiobook('audio', 'Audio', 3600, 900), '2026-08-10')]),
+    ]),
+  },
+  {
+    name: 'an ungrouped override keeps the plan finish out of reach',
+    start: '2026-07-01', end: '2026-07-10', today: '2026-07-02', restDays: [{ start_date: '2026-07-08', end_date: '2026-07-08' }],
+    books: booksFile([
+      section('Physical books', [reading('one', 1, 10, null), overridden(reading('two', 1, 90, null), '2026-07-10')]),
+      section('Digital books', []),
+      section('Audiobooks', []),
+    ]),
+  },
+];
+
+const desktopOverrides = `
+import json, sys
+from datetime import date
+from reading_plan import (_bundle_books_values, build_section_plan, _store_baseline_schedules, total_units,
+                          apply_deadline_override, effective_remaining_start_date,
+                          available_reading_days_count, remaining_units, rest_day_ranges_from_json)
+
+payload = json.loads(sys.stdin.buffer.read().decode('utf-8'))
+start = date.fromisoformat(payload['start'])
+end = date.fromisoformat(payload['end'])
+today = date.fromisoformat(payload['today'])
+rest = rest_day_ranges_from_json(payload['restDays'])
+sections = _bundle_books_values(payload['books'])
+for section in sections:
+    _store_baseline_schedules(
+        section,
+        build_section_plan(section, start, end).deadlines,
+        lambda book, label=section.label: total_units(book, label),
+        rest,
+    )
+for section in sections:
+    for book in section.books:
+        if book.deadline_override is not None:
+            apply_deadline_override(section, book, book.deadline_override, end, today, rest)
+out = {}
+for section in sections:
+    for book in section.books:
+        baseline = book.baseline_schedule
+        if baseline is None:
+            continue
+        pace_start = effective_remaining_start_date(baseline.start_date, baseline.deadline, today, rest)
+        days = available_reading_days_count(pace_start, baseline.deadline, rest)
+        out[book.id] = {
+            'startDate': baseline.start_date.isoformat(),
+            'deadline': baseline.deadline.isoformat(),
+            'dailyTarget': baseline.daily_target,
+            'required': remaining_units(book, section.label) / days if days else 0.0,
+        }
+sys.stdout.write(json.dumps(out))
+`;
+
+test('groups and deadline overrides agree with the desktop calculation model', async ({ page }) => {
+  await page.goto('./');
+  for (const item of overrideCases) {
+    const expected = JSON.parse(execFileSync('python', ['-c', desktopOverrides], { input: JSON.stringify(item) }).toString());
+    const actual = await page.evaluate((payload) => {
+      const api = window.ReadingSchedule;
+      const state = api.stateFromBundle({ start_date: payload.start, end_date: payload.end, rest_days: payload.restDays }, payload.books);
+      const sections = api.withLocalSettings(api.sectionsFromBooksFile(payload.books), state.groups, state.overrides);
+      const baselines = api.calculateBaselines(sections, payload.start, payload.end, payload.restDays);
+      api.applyPersistedOverrides(sections, baselines, payload.end, payload.today, payload.restDays);
+      const pace = api.requiredPace(sections, baselines, payload.today, payload.restDays);
+      return Object.fromEntries(Object.entries(baselines).map(([id, value]) => [id, { ...value, required: pace[id] }]));
+    }, item);
+    expect(actual, item.name).toEqual(expected);
+  }
+});
+
+test('groups and deadline overrides can be planned, cleared and persist', async ({ page }) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'reading-overrides-'));
+  const names = ['plan.json', 'books.json', 'sessions.json', 'manifest.json'];
+  try {
+    execFileSync('python', ['-c', `
+from datetime import date
+from reading_plan import Book, BookSection, SummaryStatsOptions, write_json_bundle
+import sys
+write_json_bundle(sys.argv[1], [
+    BookSection('Physical books', [Book(1, 'First', 1, 20, id='first'), Book(2, 'Second', 1, 30, id='second'), Book(3, 'Third', 1, 20, id='third')], []),
+    BookSection('Digital books', [], []),
+    BookSection('Audiobooks', [], []),
+], date(2030, 1, 1), date(2030, 3, 31), 'Quarter end', SummaryStatsOptions(False, False, False, False, False))
+`, directory]);
+    const files = names.map((name) => ({ name, mimeType: 'application/json', buffer: fs.readFileSync(path.join(directory, name)) }));
+    const row = (title) => page.locator('#schedule-rows tr').filter({ has: page.getByRole('cell', { name: title, exact: true }) });
+
+    await page.goto('./');
+    await page.getByLabel('Bundle files').setInputFiles(files);
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.getByRole('button', { name: 'Import bundle' }).click();
+    await expect(page.getByTestId('schedule-status')).toHaveText('Baseline schedule saved. Required pace reflects today.');
+    await expect(row('First').locator('td').nth(3)).toHaveText('2030-01-26');
+
+    // Only adjacent books can share one shared schedule.
+    await page.getByLabel('Read together in').selectOption('Physical books');
+    await page.getByRole('checkbox', { name: 'First' }).check();
+    await page.getByRole('checkbox', { name: 'Third' }).check();
+    await page.getByRole('button', { name: 'Group selected books' }).click();
+    await expect(page.getByTestId('schedule-status')).toHaveText('Books read together must be consecutive in the section.');
+    await expect(page.getByLabel('Simultaneous groups').locator('li')).toHaveCount(0);
+
+    await page.getByRole('checkbox', { name: 'Third' }).uncheck();
+    await page.getByRole('checkbox', { name: 'Second' }).check();
+    await page.getByRole('button', { name: 'Group selected books' }).click();
+    await expect(page.getByLabel('Simultaneous groups').locator('li')).toHaveText('Physical books: First, Second Remove');
+    await expect(page.getByTestId('schedule-status')).toHaveText(/baseline stays unchanged/);
+    await expect(row('First').locator('td').nth(3)).toHaveText('2030-01-26');
+
+    await page.getByRole('button', { name: 'Calculate schedule' }).click();
+    await expect(row('First').locator('td').nth(2)).toHaveText('2030-01-01');
+    await expect(row('First').locator('td').nth(3)).toHaveText('2030-03-06');
+    await expect(row('Second').locator('td').nth(2)).toHaveText('2030-01-01');
+    await expect(row('Second').locator('td').nth(3)).toHaveText('2030-03-06');
+    await expect(row('First').locator('td').nth(4)).toHaveText('0.31');
+    await expect(row('Second').locator('td').nth(4)).toHaveText('0.46');
+    await expect(row('Third').locator('td').nth(2)).toHaveText('2030-03-07');
+    await expect(row('Third').locator('td').nth(4)).toHaveText('0.8');
+
+    // A deadline override gives one book an independent schedule.
+    await page.getByLabel('Deadline override for First').fill('2030-04-05');
+    await page.getByRole('button', { name: 'Save the deadline for First' }).click();
+    await expect(page.getByTestId('schedule-status')).toHaveText('A deadline override cannot be after the plan finish date.');
+    await page.getByLabel('Deadline override for First').fill('2030-02-14');
+    await page.getByRole('button', { name: 'Save the deadline for First' }).click();
+    await expect(page.getByTestId('schedule-status')).toHaveText('Deadline override saved for First.');
+    await expect(row('First').locator('td').nth(3)).toHaveText('2030-02-14');
+    await expect(row('First').locator('td').nth(4)).toHaveText('0.44');
+    await expect(row('Second').locator('td').nth(3)).toHaveText('2030-03-06');
+    await expect(row('Third').locator('td').nth(3)).toHaveText('2030-03-31');
+
+    await page.reload();
+    await expect(page.getByLabel('Deadline override for First')).toHaveValue('2030-02-14');
+    await expect(page.getByLabel('Simultaneous groups').locator('li')).toHaveText('Physical books: First, Second Remove');
+    await expect(row('First').locator('td').nth(3)).toHaveText('2030-02-14');
+
+    // Clearing returns the book to the remaining group and leaves the rest alone.
+    await page.getByRole('button', { name: 'Clear the deadline for First' }).click();
+    await expect(page.getByTestId('schedule-status')).toHaveText('Deadline override cleared for First.');
+    await expect(page.getByLabel('Deadline override for First')).toHaveValue('');
+    await expect(row('First').locator('td').nth(3)).toHaveText('2030-03-06');
+    await expect(row('Second').locator('td').nth(3)).toHaveText('2030-03-06');
+    await expect(row('First').locator('td').nth(4)).toHaveText('0.31');
+    await expect(row('Second').locator('td').nth(4)).toHaveText('0.46');
+    await expect(row('Third').locator('td').nth(3)).toHaveText('2030-03-31');
+    await expect(row('Third').locator('td').nth(4)).toHaveText('0.8');
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});

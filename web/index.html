@@ -22,7 +22,7 @@
     <p id="status" role="status" aria-live="polite"></p>
     <section aria-labelledby="schedule-heading">
       <h2 id="schedule-heading">Reading schedule</h2>
-      <p>Set the plan dates and rest days, then calculate the baseline schedule. Rest days reduce the days available for reading, but they do not move the baseline dates. The baseline schedule stays saved until you calculate it again.</p>
+      <p>Set the plan dates and rest days, then calculate the baseline schedule. Rest days reduce the days available for reading, but they do not move the baseline dates. Books in a simultaneous group share a start and finish while their daily targets are split by remaining work. A deadline override gives one book an independent schedule until you clear it. The baseline schedule stays saved until you calculate it again.</p>
       <p id="schedule-empty">Import a bundle to schedule its books.</p>
       <form id="schedule-form">
         <label for="plan-start">Plan start</label>
@@ -39,12 +39,22 @@
         <button type="submit">Add rest days</button>
       </form>
       <ul id="rest-list" aria-label="Rest days"></ul>
+      <form id="group-form" hidden>
+        <label for="group-section">Read together in</label>
+        <select id="group-section"></select>
+        <fieldset>
+          <legend>Books in the group</legend>
+          <div id="group-books"></div>
+        </fieldset>
+        <button type="submit">Group selected books</button>
+      </form>
+      <ul id="group-list" aria-label="Simultaneous groups"></ul>
       <button id="calculate-schedule" type="button">Calculate schedule</button>
       <p id="schedule-status" data-testid="schedule-status" role="status" aria-live="polite"></p>
       <table id="schedule-table" hidden>
-        <caption>Baseline schedule and current required pace. Pages are used for physical and digital books; seconds are used for audiobooks.</caption>
+        <caption>Baseline schedule and current required pace. Pages are used for physical and digital books; seconds are used for audiobooks. A deadline override applies immediately; clearing it returns the book to the plan finish or its group's deadline.</caption>
         <thead>
-          <tr><th scope="col">Book</th><th scope="col">Left</th><th scope="col">Baseline start</th><th scope="col">Baseline finish</th><th scope="col">Baseline per day</th><th scope="col">Required now</th></tr>
+          <tr><th scope="col">Book</th><th scope="col">Left</th><th scope="col">Baseline start</th><th scope="col">Baseline finish</th><th scope="col">Baseline per day</th><th scope="col">Required now</th><th scope="col">Deadline override</th></tr>
         </thead>
         <tbody id="schedule-rows"></tbody>
       </table>

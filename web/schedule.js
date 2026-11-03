@@ -74,6 +74,8 @@
       title: typeof book.title === 'string' ? book.title : String(book.title ?? ''),
       audio,
       baseline: book.baseline_schedule,
+      deadlineOverride: book.deadline_override == null ? null : String(book.deadline_override),
+      startDateOverride: book.start_date_override == null ? null : String(book.start_date_override),
       ...units(book, audio),
     }));
     const numbers = new Map(books.map((book) => [book.id, book.number]));
@@ -83,12 +85,26 @@
     return { label, audio, books, groups };
   });
 
+  // A book with its own override leaves its simultaneous group for scheduling purposes.
+  const activeGroups = (section) => section.groups
+    .map((group) => group.filter((number) => {
+      const book = section.books.find((item) => item.number === number);
+      return book && !book.deadlineOverride && !book.startDateOverride;
+    }))
+    .filter((group) => group.length >= 2);
+
+  const effectiveRemainingStart = (start, end, today, restDays) => {
+    const candidate = Math.min(Math.max(start, today), end);
+    const days = availableDays(candidate, end, restDays);
+    return days.length ? days[0] : end;
+  };
+
   // Books are scheduled in order at the section's pace; groups share a start and deadline.
-  const calculateDeadlines = (section, start, end, dailyPace, restDays) => {
-    const groupByFirst = new Map(section.groups.map((group) => [group[0], group]));
-    const grouped = new Set(section.groups.flat());
+  const calculateDeadlines = (section, start, end, dailyPace, groups) => {
+    const groupByFirst = new Map(groups.map((group) => [group[0], group]));
+    const grouped = new Set(groups.flat());
     const byNumber = new Map(section.books.map((book) => [book.number, book]));
-    const readingDays = availableDays(start, end, restDays);
+    const readingDays = availableDays(start, end);
     const deadlines = [];
     let cumulativeWork = 0, previousDays = 0;
     for (const book of section.books) {
@@ -115,7 +131,7 @@
   // Baseline dates ignore rest days; rest days only reduce the days available for each target.
   const restAdjustedTargets = (section, deadlines, restDays) => {
     const groupOf = new Map();
-    for (const group of section.groups) for (const number of group) groupOf.set(number, group);
+    for (const group of activeGroups(section)) for (const number of group) groupOf.set(number, group);
     const byNumber = new Map(section.books.map((book) => [book.number, book]));
     const targets = new Map();
     for (const deadline of deadlines) {
@@ -140,7 +156,7 @@
       const periodDays = availableDays(start, end).length;
       const work = total(section.books.map((book) => book.total));
       const dailyPace = periodDays ? work / periodDays : 0;
-      const deadlines = calculateDeadlines(section, start, end, dailyPace, []);
+      const deadlines = calculateDeadlines(section, start, end, dailyPace, activeGroups(section));
       const targets = restAdjustedTargets(section, deadlines, rest);
       for (const deadline of deadlines) {
         baselines[deadline.book.id] = {
@@ -152,6 +168,91 @@
     }
     return baselines;
   };
+
+  // A deadline override replaces one book's baseline without recalculating unrelated books.
+  const applyDeadlineOverride = (section, baselines, book, override, planEndIso, todayIso, restDays) => {
+    const baseline = baselines[book.id];
+    if (!baseline) throw new Error('Calculate the schedule before setting a deadline override.');
+    const today = parse(todayIso), planEnd = parse(planEndIso);
+    const overrideDay = override ? parse(override) : null;
+    if (overrideDay != null) {
+      if (overrideDay < today) throw new Error('A deadline override cannot be before today.');
+      if (overrideDay > planEnd) throw new Error('A deadline override cannot be after the plan finish date.');
+    }
+    const rest = normalizeRestDays(restDays);
+    const containingGroup = section.groups.find((group) => group.includes(book.number)) || null;
+    book.deadlineOverride = override || null;
+    let deadline = planEnd;
+    if (overrideDay != null) {
+      deadline = overrideDay;
+    } else if (containingGroup) {
+      const other = containingGroup
+        .map((number) => section.books.find((item) => item.number === number))
+        .find((item) => item && item.id !== book.id && baselines[item.id]);
+      if (other) deadline = parse(baselines[other.id].deadline);
+    }
+    const remaining = book.remaining;
+    const paceStart = effectiveRemainingStart(parse(baseline.startDate), deadline, today, rest);
+    const days = availableDays(paceStart, deadline, rest).length;
+    baselines[book.id] = { startDate: iso(paceStart), deadline: iso(deadline), dailyTarget: remaining && days ? remaining / days : 0 };
+    if (containingGroup) {
+      const active = containingGroup.filter((number) => {
+        const member = section.books.find((item) => item.number === number);
+        return member && !member.deadlineOverride && !member.startDateOverride;
+      });
+      if (active.length >= 2) {
+        const reference = baselines[section.books.find((item) => item.number === active[0]).id];
+        const sharedStart = parse(reference.startDate), sharedDeadline = parse(reference.deadline);
+        const groupBooks = active.map((number) => section.books.find((item) => item.number === number));
+        const groupRemaining = total(groupBooks.map((item) => item.remaining));
+        const groupStart = effectiveRemainingStart(sharedStart, sharedDeadline, today, rest);
+        const groupDays = availableDays(groupStart, sharedDeadline, rest).length;
+        const groupPace = groupRemaining && groupDays ? groupRemaining / groupDays : 0;
+        for (const member of groupBooks) {
+          baselines[member.id] = {
+            startDate: iso(groupStart),
+            deadline: iso(sharedDeadline),
+            dailyTarget: groupRemaining && member.remaining ? groupPace * member.remaining / groupRemaining : 0,
+          };
+        }
+      }
+    }
+    return baselines;
+  };
+
+  // Persisted overrides are reapplied after a calculation, in book order.
+  const applyPersistedOverrides = (sections, baselines, planEndIso, todayIso, restDays) => {
+    for (const section of sections) {
+      for (const book of section.books) {
+        if (book.deadlineOverride) applyDeadlineOverride(section, baselines, book, book.deadlineOverride, planEndIso, todayIso, restDays);
+      }
+    }
+    return baselines;
+  };
+
+  const validateGroups = (books, groups) => {
+    const used = new Set();
+    return groups.map((group) => {
+      const ids = group.map(Number).sort((a, b) => a - b);
+      if (ids.length < 2) throw new Error('Choose at least two books to read together.');
+      if (new Set(ids).size !== ids.length) throw new Error('Each book can appear only once in a simultaneous group.');
+      if (ids[0] < 1 || ids[ids.length - 1] > books.length) throw new Error(`Book numbers must be from 1 to ${books.length}.`);
+      if (ids.some((number, index) => number !== ids[0] + index)) throw new Error('Books read together must be consecutive in the section.');
+      if (ids.some((number) => used.has(number))) throw new Error('A book can belong to only one simultaneous group.');
+      for (const number of ids) used.add(number);
+      return ids;
+    });
+  };
+
+  // Local group and override edits are layered over what the imported bundle stores.
+  const withLocalSettings = (sections, groups, overrides) => sections.map((section) => ({
+    ...section,
+    groups: groups && groups[section.label] ? groups[section.label].map((group) => group.map(Number).sort((a, b) => a - b)) : section.groups,
+    books: section.books.map((book) => ({
+      ...book,
+      deadlineOverride: overrides && overrides[book.id] !== undefined ? overrides[book.id] : book.deadlineOverride,
+    })),
+  }));
 
   // Current required pace only reads the saved baseline; it never changes it.
   const requiredPace = (sections, baselines, todayIso, restDays) => {
@@ -197,6 +298,8 @@
       startDate: planFile.start_date,
       endDate: planFile.end_date,
       restDays,
+      groups: Object.fromEntries(sections.map((section) => [section.label, section.groups.map((group) => [...group])])),
+      overrides: Object.fromEntries(sections.flatMap((section) => section.books.map((book) => [book.id, book.deadlineOverride || null]))),
       baselines,
       needsRecalculation: !complete,
     };
@@ -206,7 +309,12 @@
     sectionsFromBooksFile,
     normalizeRestDays,
     availableReadingDays,
+    activeGroups,
     calculateBaselines,
+    applyDeadlineOverride,
+    applyPersistedOverrides,
+    validateGroups,
+    withLocalSettings,
     requiredPace,
     stateFromBundle,
     iso,

@@ -132,6 +132,10 @@ const scheduleStatus = document.querySelector('#schedule-status');
 const scheduleTable = document.querySelector('#schedule-table');
 const scheduleRows = document.querySelector('#schedule-rows');
 const scheduleEmpty = document.querySelector('#schedule-empty');
+const groupForm = document.querySelector('#group-form');
+const groupSection = document.querySelector('#group-section');
+const groupBooks = document.querySelector('#group-books');
+const groupList = document.querySelector('#group-list');
 let scheduleState = null;
 
 const readBundleData = () => {
@@ -149,13 +153,16 @@ const readBundleData = () => {
 const formatUnits = (value) => String(Math.round(value * 100) / 100);
 
 const loadSchedule = (bundle) => {
+  const defaults = window.ReadingSchedule.stateFromBundle(bundle.plan, bundle.books);
   try {
     const saved = JSON.parse(localStorage.getItem(scheduleKey) || 'null');
-    if (saved && saved.version === 1 && saved.startDate && saved.endDate) return saved;
+    if (saved && saved.version === 1 && saved.startDate && saved.endDate) {
+      return { ...saved, groups: saved.groups ?? defaults.groups, overrides: saved.overrides ?? defaults.overrides };
+    }
   } catch {
     // Fall back to the imported bundle's own dates and baselines.
   }
-  return window.ReadingSchedule.stateFromBundle(bundle.plan, bundle.books);
+  return defaults;
 };
 
 const saveSchedule = () => {
@@ -166,15 +173,111 @@ const saveSchedule = () => {
   }
 };
 
+const sectionsForState = (bundle, state) => window.ReadingSchedule.withLocalSettings(bundle.sections, state.groups, state.overrides);
+
+const setOverride = (bookId, value) => {
+  try {
+    const bundle = readBundleData();
+    if (!bundle) throw new Error('Import a bundle before scheduling its books.');
+    const sections = sectionsForState(bundle, scheduleState);
+    let section = null, book = null;
+    for (const candidate of sections) {
+      const found = candidate.books.find((item) => item.id === bookId);
+      if (found) {
+        section = candidate;
+        book = found;
+        break;
+      }
+    }
+    if (!book) throw new Error('That book is not part of the imported bundle.');
+    const baselines = { ...scheduleState.baselines };
+    window.ReadingSchedule.applyDeadlineOverride(section, baselines, book, value || null, scheduleState.endDate, window.ReadingSchedule.today(), scheduleState.restDays);
+    scheduleState.baselines = baselines;
+    scheduleState.overrides = { ...scheduleState.overrides, [bookId]: value || null };
+    saveSchedule();
+    renderSchedule(value ? `Deadline override saved for ${book.title}.` : `Deadline override cleared for ${book.title}.`);
+  } catch (error) {
+    scheduleStatus.textContent = error.message;
+  }
+};
+
+const removeGroup = (label, index) => {
+  const bundle = readBundleData();
+  if (!bundle) return;
+  const section = sectionsForState(bundle, scheduleState).find((item) => item.label === label);
+  if (!section) return;
+  scheduleState.groups = { ...scheduleState.groups, [label]: section.groups.filter((_, position) => position !== index) };
+  scheduleChanged();
+};
+
+const renderGroups = (sections) => {
+  const previous = groupSection.value;
+  const options = sections.filter((section) => section.books.length);
+  groupSection.replaceChildren(...options.map((section) => {
+    const option = document.createElement('option');
+    option.value = section.label;
+    option.textContent = section.label;
+    return option;
+  }));
+  const section = options.find((item) => item.label === previous) || options[0];
+  groupSection.value = section ? section.label : '';
+  groupBooks.replaceChildren(...(section ? section.books.map((book) => {
+    const label = document.createElement('label');
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.value = String(book.number);
+    input.checked = section.groups.some((group) => group.includes(book.number));
+    label.append(input, ` ${book.title}`);
+    return label;
+  }) : []));
+  const items = [];
+  for (const item of sections) {
+    item.groups.forEach((group, index) => {
+      const listItem = document.createElement('li');
+      const titles = group.map((number) => item.books.find((book) => book.number === number)?.title ?? `Book ${number}`);
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.textContent = 'Remove';
+      remove.setAttribute('aria-label', `Remove simultaneous group ${item.label} ${titles.join(', ')}`);
+      remove.addEventListener('click', () => removeGroup(item.label, index));
+      listItem.append(`${item.label}: ${titles.join(', ')} `, remove);
+      items.push(listItem);
+    });
+  }
+  groupList.replaceChildren(...items);
+};
+
+const overrideCell = (book) => {
+  const cell = document.createElement('td');
+  const input = document.createElement('input');
+  input.type = 'date';
+  input.value = scheduleState.overrides[book.id] || '';
+  input.setAttribute('aria-label', `Deadline override for ${book.title}`);
+  const set = document.createElement('button');
+  set.type = 'button';
+  set.textContent = 'Set deadline';
+  set.setAttribute('aria-label', `Save the deadline for ${book.title}`);
+  set.addEventListener('click', () => setOverride(book.id, input.value));
+  const clear = document.createElement('button');
+  clear.type = 'button';
+  clear.textContent = 'Clear';
+  clear.setAttribute('aria-label', `Clear the deadline for ${book.title}`);
+  clear.addEventListener('click', () => setOverride(book.id, ''));
+  cell.append(input, set, clear);
+  return cell;
+};
+
 const renderSchedule = (message = '') => {
   const bundle = readBundleData();
   scheduleEmpty.hidden = !!bundle;
   scheduleForm.hidden = !bundle;
   restForm.hidden = !bundle;
+  groupForm.hidden = !bundle;
   calculateButton.hidden = !bundle;
   if (!bundle) {
     scheduleTable.hidden = true;
     restList.replaceChildren();
+    groupList.replaceChildren();
     return;
   }
   if (!scheduleState) scheduleState = loadSchedule(bundle);
@@ -195,13 +298,14 @@ const renderSchedule = (message = '') => {
     item.append(remove);
     return item;
   }));
-  const pace = window.ReadingSchedule.requiredPace(bundle.sections, scheduleState.baselines, window.ReadingSchedule.today(), scheduleState.restDays);
+  const sections = sectionsForState(bundle, scheduleState);
+  const pace = window.ReadingSchedule.requiredPace(sections, scheduleState.baselines, window.ReadingSchedule.today(), scheduleState.restDays);
   const rows = [];
-  for (const section of bundle.sections) {
+  for (const section of sections) {
     if (!section.books.length) continue;
     const header = document.createElement('tr'), headerCell = document.createElement('th');
     headerCell.scope = 'rowgroup';
-    headerCell.colSpan = 6;
+    headerCell.colSpan = 7;
     headerCell.textContent = `${section.label} · ${section.audio ? 'seconds' : 'pages'}`;
     header.append(headerCell);
     rows.push(header);
@@ -216,11 +320,13 @@ const renderSchedule = (message = '') => {
         cell.textContent = String(value);
         row.append(cell);
       }
+      row.append(overrideCell(book));
       rows.push(row);
     }
   }
   scheduleRows.replaceChildren(...rows);
   scheduleTable.hidden = !rows.length;
+  renderGroups(sections);
   if (!Object.keys(scheduleState.baselines).length) {
     scheduleStatus.textContent = 'No baseline schedule is saved yet. Calculate the schedule.';
   } else if (scheduleState.needsRecalculation) {
@@ -261,11 +367,34 @@ restForm.addEventListener('submit', (event) => {
   }
 });
 
+groupSection.addEventListener('change', () => {
+  const bundle = readBundleData();
+  if (bundle) renderGroups(sectionsForState(bundle, scheduleState));
+});
+
+groupForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  try {
+    const bundle = readBundleData();
+    if (!bundle) throw new Error('Import a bundle before grouping its books.');
+    const sections = sectionsForState(bundle, scheduleState);
+    const section = sections.find((item) => item.label === groupSection.value);
+    if (!section) throw new Error('Choose a book section.');
+    const chosen = Array.from(groupBooks.querySelectorAll('input:checked')).map((input) => Number(input.value));
+    scheduleState.groups = { ...scheduleState.groups, [section.label]: window.ReadingSchedule.validateGroups(section.books, [...section.groups, chosen]) };
+    scheduleChanged();
+  } catch (error) {
+    scheduleStatus.textContent = error.message;
+  }
+});
+
 calculateButton.addEventListener('click', () => {
   try {
     const bundle = readBundleData();
     if (!bundle) throw new Error('Import a bundle before calculating the schedule.');
-    scheduleState.baselines = window.ReadingSchedule.calculateBaselines(bundle.sections, scheduleState.startDate, scheduleState.endDate, scheduleState.restDays);
+    const sections = sectionsForState(bundle, scheduleState);
+    scheduleState.baselines = window.ReadingSchedule.calculateBaselines(sections, scheduleState.startDate, scheduleState.endDate, scheduleState.restDays);
+    window.ReadingSchedule.applyPersistedOverrides(sections, scheduleState.baselines, scheduleState.endDate, window.ReadingSchedule.today(), scheduleState.restDays);
     scheduleState.needsRecalculation = false;
     saveSchedule();
     renderSchedule('Baseline schedule calculated on this device.');

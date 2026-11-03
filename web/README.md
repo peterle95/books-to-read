@@ -14,7 +14,11 @@ After importing a bundle, set the plan start and finish dates and add any rest-d
 
 The table keeps two separate values. The **baseline per day** is the persisted target created when the schedule was calculated. **Required now** is the amount needed each reading day, from today to that book's baseline finish, to finish the remaining work; it never changes the baseline. Editing the plan dates or rest days marks the schedule as changed and leaves the saved baseline alone until you calculate again. Importing a bundle resets the saved schedule because it belongs to the replaced bundle.
 
-Simultaneous groups already stored in a bundle are scheduled together, as in the desktop app. Creating or editing groups and deadline overrides is not available yet.
+Simultaneous groups stored in a bundle are scheduled together, as in the desktop app. To plan one, choose a section, tick two or more adjacent books, and select **Group selected books**. The members share a start date and finish while their daily targets are split in proportion to their remaining work. A group change marks the schedule as changed and applies on the next calculation; removing a group returns its books to the ordinary order.
+
+A **deadline override** gives one book an independent schedule immediately: its baseline finish becomes the override date and its target is recalculated from its remaining work. When the book belongs to a group, the other members stay grouped with their shared schedule. **Clear** returns the book to the plan finish date, or to the group's shared finish when another group member still supplies one.
+
+Groups and overrides belong to the imported bundle's saved schedule: they persist across reloads and are cleared when a bundle is imported. Start-date overrides saved by another app stay in the bundle but are not editable here.
 
 ## Deploy and install
 
@@ -31,4 +35,4 @@ Real-device verification has not been performed by the automated tests. PWA inst
 
 ## Automated checks
 
-From the repository root, run `npm ci`, `npx playwright install chromium`, and `npm run test:web`. The tests serve the app at a repository-like subpath, verify persistence and an offline reload in Chromium, and compare the browser's baseline schedules and required pace with the desktop calculation model in `reading_plan.py`, so Python must be available as `python`.
+From the repository root, run `npm ci`, `npx playwright install chromium`, and `npm run test:web`. The tests serve the app at a repository-like subpath, verify persistence and an offline reload in Chromium, and compare the browser's baseline schedules, simultaneous groups, deadline overrides and required pace with the desktop calculation model in `reading_plan.py`, so Python must be available as `python`.

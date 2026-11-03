@@ -6,4 +6,6 @@ label { display: block; font-weight: 600; margin: 1.5rem 0 .5rem; }
 textarea { box-sizing: border-box; width: 100%; padding: .75rem; font: inherit; border: 1px solid #758b81; border-radius: .4rem; resize: vertical; }
 button { margin-top: .75rem; padding: .7rem 1.2rem; color: white; background: #244b42; border: 0; border-radius: .4rem; font: inherit; cursor: pointer; }
 button:focus-visible, textarea:focus-visible { outline: 3px solid #c17c18; outline-offset: 2px; }
+#group-books label { font-weight: 400; margin: .25rem 0; }
+td button { margin: .25rem .25rem 0 0; padding: .4rem .6rem; font-size: .9rem; }
 .note { color: #4a6058; font-size: .9rem; }
