@@ -1,0 +1,54 @@
+{
+  "schema_version": 2,
+  "sections": [
+    {
+      "label": "Physical books",
+      "baseline_needs_recalculation": false,
+      "simultaneous_groups": [],
+      "books": [
+        {
+          "id": "physical-id",
+          "number": 1,
+          "title": "Pages",
+          "baseline_schedule": null,
+          "deadline_override": null,
+          "start_date_override": null,
+          "target_completed_date": null,
+          "start_page": 1,
+          "end_page": 100,
+          "current_page": 30,
+          "pages": 100,
+          "pages_read": 30
+        }
+      ]
+    },
+    {
+      "label": "Digital books",
+      "baseline_needs_recalculation": false,
+      "simultaneous_groups": [],
+      "books": []
+    },
+    {
+      "label": "Audiobooks",
+      "baseline_needs_recalculation": false,
+      "simultaneous_groups": [],
+      "books": [
+        {
+          "id": "audio-id",
+          "number": 1,
+          "title": "Audio",
+          "baseline_schedule": null,
+          "deadline_override": null,
+          "start_date_override": null,
+          "target_completed_date": null,
+          "start_time_seconds": 0,
+          "end_time_seconds": 3600,
+          "current_time_seconds": 1800,
+          "duration_seconds": 3600,
+          "time_listened_seconds": 1800,
+          "remaining_time_seconds": 1800
+        }
+      ]
+    }
+  ]
+}

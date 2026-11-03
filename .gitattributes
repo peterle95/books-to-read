@@ -1,1 +1,3 @@
 reading_plan_data/*.json -text
+fixtures/android-session-contract/*.json text eol=lf
+reading-plan-android/app/src/androidTest/assets/desktop-session-contract/*.json text eol=lf

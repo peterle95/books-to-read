@@ -1,0 +1,11 @@
+{
+  "schema_version": 2,
+  "revision": 1,
+  "last_modified": "2026-11-03T11:49:55+01:00",
+  "modified_by": "android-test",
+  "files": {
+    "plan.json": "d91a571cee2b19661e12b8ad969022ea60a2d325254c6d65bf71edac9153a90c",
+    "books.json": "429d315443565c4910100ce221664c5f3043d6b55d5ed511c67907e9f6555a1c",
+    "sessions.json": "9511c8674b333eec0790484d6a5b179bb17ec0fbbd0ede5be86b340f49921b0e"
+  }
+}

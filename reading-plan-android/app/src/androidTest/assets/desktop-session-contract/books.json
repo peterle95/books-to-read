@@ -1,0 +1,63 @@
+{
+  "schema_version": 2,
+  "sections": [
+    {
+      "label": "Physical books",
+      "baseline_needs_recalculation": false,
+      "books": [
+        {
+          "id": "physical-id",
+          "number": 1,
+          "title": "Pages",
+          "start_page": 1,
+          "end_page": 100,
+          "current_page": 30,
+          "pages": 100,
+          "pages_read": 30,
+          "baseline_schedule": {
+            "start_date": "2026-09-01",
+            "deadline": "2026-09-30",
+            "daily_target": 3.333333333333334
+          },
+          "deadline_override": null,
+          "start_date_override": null,
+          "target_completed_date": null
+        }
+      ],
+      "simultaneous_groups": []
+    },
+    {
+      "label": "Digital books",
+      "baseline_needs_recalculation": false,
+      "books": [],
+      "simultaneous_groups": []
+    },
+    {
+      "label": "Audiobooks",
+      "baseline_needs_recalculation": false,
+      "books": [
+        {
+          "id": "audio-id",
+          "number": 1,
+          "title": "Audio",
+          "start_time_seconds": 0,
+          "end_time_seconds": 3600,
+          "current_time_seconds": 1800,
+          "duration_seconds": 3600,
+          "time_listened_seconds": 1800,
+          "remaining_time_seconds": 1800,
+          "baseline_schedule": {
+            "start_date": "2026-09-01",
+            "deadline": "2026-09-30",
+            "daily_target": 120.0
+          },
+          "deadline_override": null,
+          "start_date_override": null,
+          "target_completed_date": null
+        }
+      ],
+      "simultaneous_groups": []
+    }
+  ],
+  "planned_quarter": null
+}

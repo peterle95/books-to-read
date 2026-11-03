@@ -1,0 +1,41 @@
+{
+  "schema_version": 2,
+  "sessions": {
+    "physical-id": [
+      {
+        "id": "first",
+        "date": "2026-09-16",
+        "current_page": 10,
+        "pages_read": 10
+      },
+      {
+        "id": "middle",
+        "date": "2026-09-17",
+        "current_page": 20,
+        "pages_read": 10
+      },
+      {
+        "id": "last",
+        "date": "2026-09-17",
+        "current_page": 30,
+        "pages_read": 10
+      }
+    ],
+    "audio-id": [
+      {
+        "id": "audio-first",
+        "date": "2026-09-16",
+        "current_time_seconds": 600,
+        "time_listened_seconds": 600,
+        "remaining_time_seconds": 3000
+      },
+      {
+        "id": "audio-last",
+        "date": "2026-09-17",
+        "current_time_seconds": 1800,
+        "time_listened_seconds": 1200,
+        "remaining_time_seconds": 1800
+      }
+    ]
+  }
+}

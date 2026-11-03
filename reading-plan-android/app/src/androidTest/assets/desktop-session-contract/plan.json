@@ -1,0 +1,14 @@
+{
+  "schema_version": 2,
+  "start_date": "2026-09-01",
+  "end_date": "2026-09-30",
+  "end_label": "Target finish date",
+  "stats_options": {
+    "book_counts": true,
+    "page_share": true,
+    "average_pages": true,
+    "reading_period": true,
+    "pace_driver": true
+  },
+  "rest_days": []
+}

@@ -42,7 +42,9 @@ android {
         targetSdk 35
         versionCode 3
         versionName "2.1"
-        testInstrumentationRunner "com.petermolnar.readingplan.ReadingPlanChartDeviceCheck"
+        testInstrumentationRunner providers.gradleProperty("sessionDeviceCheck").isPresent()
+                ? "com.petermolnar.readingplan.ReadingPlanSessionDeviceCheck"
+                : "com.petermolnar.readingplan.ReadingPlanChartDeviceCheck"
     }
 
     compileOptions {

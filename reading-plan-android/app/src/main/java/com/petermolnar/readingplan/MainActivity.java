@@ -1369,20 +1369,26 @@ public class MainActivity extends Activity {
                             ? "time_listened_seconds"
                             : "pages_read";
                     if (!deleted && rawSession.has(amountField) && !rawSession.isNull(amountField)) {
+                        if (sessionPagesRead <= 0 || sessionPagesRead > totalUnits) {
+                            throw new IllegalArgumentException(isAudiobookSection(sectionLabel)
+                                    ? "reading session time is outside the book range"
+                                    : "reading session pages are outside the book range");
+                        }
                         int previousTotal = previousCurrentPage == null
                                 ? 0
                                 : previousCurrentPage - startPage + (isAudiobookSection(sectionLabel) ? 0 : 1);
                         int expected = sessionCurrentPage - startPage
                                 - previousTotal
                                 + (isAudiobookSection(sectionLabel) ? 0 : 1);
+                        if (expected <= 0) {
+                            throw new IllegalArgumentException("reading session progress must advance in date order");
+                        }
                         if (sessionPagesRead != expected) {
                             // Tolerant chain: recompute instead of bricking the load.
                             // A same-day inversion previously threw here and left the
                             // app stuck on "Reading plan data unavailable".
-                            if (expected > 0) {
-                                sessionPagesRead = expected;
-                                bundleRepairedThisLoad = true;
-                            }
+                            sessionPagesRead = expected;
+                            bundleRepairedThisLoad = true;
                         }
                     }
                 }

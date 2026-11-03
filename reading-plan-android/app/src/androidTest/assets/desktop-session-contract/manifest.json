@@ -1,0 +1,11 @@
+{
+  "schema_version": 2,
+  "revision": 1,
+  "last_modified": "2026-11-03T11:51:07+01:00",
+  "modified_by": "desktop",
+  "files": {
+    "plan.json": "5f7dc9cef5ae068c1caed1278fbfd870f5618ec4583090588bf14c210b95ef0c",
+    "books.json": "d6421c8fd299a9c018b2e25d0d527fe105496959c1a5490f3208c6f34dc061db",
+    "sessions.json": "9511c8674b333eec0790484d6a5b179bb17ec0fbbd0ede5be86b340f49921b0e"
+  }
+}
