@@ -1125,7 +1125,6 @@ class ReadingPlanApp(tk.Tk):
         self.set_status(f"New plan saved to {self.data_directory}")
 
     def load_plan_from_json(self, path: Path) -> None:
-        metadata = read_json_bundle_metadata(path)
         (
             sections,
             start_date,
@@ -1136,10 +1135,7 @@ class ReadingPlanApp(tk.Tk):
             rest_days,
             planned_quarter,
         ) = load_json_bundle(path, include_planned=True)
-        if read_json_bundle_metadata(path) != metadata:
-            raise ExternalPlanChangeError(
-                "reading-plan data changed while it was loading; reload it again"
-            )
+        metadata = read_json_bundle_metadata(path)
         self.suspend_autosave = True
         try:
             self.sections = sections

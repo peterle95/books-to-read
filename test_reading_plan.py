@@ -86,6 +86,58 @@ class BundlePersistenceTests(unittest.TestCase):
         self.assertEqual(book.id, loaded[0].books[0].id)
         self.assertEqual(book.reading_sessions[0].id, loaded[0].books[0].reading_sessions[0].id)
 
+    def test_bundle_repairs_positive_chain_mismatch_once_but_rejects_zero(self):
+        sections = self.make_sections()
+        add_reading_session(sections[0].books[0], date(2026, 7, 2), 20)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_json_bundle(
+                root, sections, date(2026, 7, 1), date(2026, 9, 30),
+                "Quarter end", SummaryStatsOptions(True, True, True, True, True),
+            )
+
+            def change_amount(amount):
+                sessions_path = root / "sessions.json"
+                payload = json.loads(sessions_path.read_text(encoding="utf-8"))
+                payload["sessions"][sections[0].books[0].id][1]["pages_read"] = amount
+                sessions_path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+                manifest_path = root / "manifest.json"
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                manifest["files"]["sessions.json"] = hashlib.sha256(sessions_path.read_bytes()).hexdigest()
+                manifest_path.write_text(json.dumps(manifest) + "\n", encoding="utf-8")
+
+            change_amount(5)
+            repaired = load_json_bundle(root)[0][0].books[0]
+            self.assertEqual([10, 10], [s.pages_read for s in repaired.reading_sessions])
+            self.assertEqual(2, read_json_bundle_metadata(root).revision)
+            load_json_bundle(root)
+            self.assertEqual(2, read_json_bundle_metadata(root).revision)
+            change_amount(0)
+            with self.assertRaises(JsonBundleError):
+                load_json_bundle(root)
+            self.assertEqual(2, read_json_bundle_metadata(root).revision)
+
+    def test_bundle_writer_orders_backdated_sessions_canonically(self):
+        sections = self.make_sections()
+        book = sections[0].books[0]
+        add_reading_session(book, date(2026, 7, 2), 20)
+        book.reading_sessions[1].pages_read = 5
+        book.reading_sessions.reverse()
+        with tempfile.TemporaryDirectory() as directory:
+            write_json_bundle(
+                directory, sections, date(2026, 7, 1), date(2026, 9, 30),
+                "Quarter end", SummaryStatsOptions(True, True, True, True, True),
+            )
+            raw = json.loads((Path(directory) / "sessions.json").read_text(encoding="utf-8"))
+            self.assertEqual(
+                [10, 20],
+                [session["current_page"] for session in raw["sessions"][book.id]],
+            )
+            self.assertEqual(
+                [10, 10],
+                [session["pages_read"] for session in raw["sessions"][book.id]],
+            )
+
     def test_bundle_rejects_checksum_mismatch_without_fallback(self):
         sections = self.make_sections()
         with tempfile.TemporaryDirectory() as directory:

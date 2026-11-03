@@ -3000,7 +3000,7 @@ def _bundle_books_values(value: dict[str, object]) -> list[BookSection]:
 
 def _bundle_sessions_values(
     value: dict[str, object], sections: list[BookSection]
-) -> None:
+) -> bool:
     raw_sessions = value.get("sessions")
     if not isinstance(raw_sessions, dict):
         raise JsonBundleError("sessions.json", "$.sessions", "sessions must be an object")
@@ -3025,6 +3025,7 @@ def _bundle_sessions_values(
         )
 
     session_ids: set[str] = set()
+    repaired = False
     for book_id, (book, section_label) in books_by_id.items():
         raw_book_sessions = raw_sessions[book_id]
         path = f"$.sessions[{json.dumps(book_id)}]"
@@ -3074,27 +3075,39 @@ def _bundle_sessions_values(
                 path,
                 "book progress conflicts with reading sessions",
             )
+        previous = 0
+        for session in parsed_book.reading_sessions:
+            if session.deleted:
+                continue
+            completed = session.current_page - book.start_page
+            if not is_audiobook_section(section_label):
+                completed += 1
+            contribution = completed - previous
+            if contribution <= 0:
+                raise JsonBundleError(
+                    "sessions.json", path, "reading session progress must advance in date order"
+                )
+            if session.pages_read != contribution:
+                session.pages_read = contribution
+                repaired = True
+            previous = completed
         book.reading_sessions = parsed_book.reading_sessions
         book.current_page = parsed_book.current_page
+    return repaired
 
 
 def _bundle_state(
     values: dict[str, dict[str, object]],
 ) -> tuple[
-    list[BookSection],
-    date,
-    date,
-    str,
-    str,
-    SummaryStatsOptions,
-    list[RestDayRange],
+    tuple[list[BookSection], date, date, str, str, SummaryStatsOptions, list[RestDayRange]],
+    bool,
 ]:
     try:
         start_date, end_date, end_label, end_name, stats_options, rest_days = _bundle_plan_values(
             values["plan.json"]
         )
         sections = _bundle_books_values(values["books.json"])
-        _bundle_sessions_values(values["sessions.json"], sections)
+        repaired = _bundle_sessions_values(values["sessions.json"], sections)
         try:
             planned_quarter_from_json(values["books.json"].get("planned_quarter"), sections)
         except (TypeError, ValueError) as error:
@@ -3103,17 +3116,30 @@ def _bundle_state(
         raise
     except (TypeError, ValueError) as error:
         raise JsonBundleError("plan.json", "$", str(error)) from error
-    return sections, start_date, end_date, end_label, end_name, stats_options, rest_days
+    return (sections, start_date, end_date, end_label, end_name, stats_options, rest_days), repaired
 
 
 def load_json_bundle(
     directory: str | Path,
     *, include_planned: bool = False,
 ) -> tuple:
-    _metadata, values, _raw_files = _bundle_manifest(directory)
-    state = _bundle_state(values)
+    metadata, values, _raw_files = _bundle_manifest(directory)
+    state, repaired = _bundle_state(values)
+    sections, start_date, end_date, end_label, _end_name, options, rest_days = state
+    planned = planned_quarter_from_json(values["books.json"].get("planned_quarter"), sections)
+    if repaired:
+        metadata = write_json_bundle(
+            directory,
+            sections, start_date, end_date, end_label, options, rest_days,
+            metadata=metadata,
+            planned_quarter=planned,
+        )
+    if read_json_bundle_metadata(directory) != metadata:
+        raise ExternalPlanChangeError(
+            "reading-plan data changed while it was loading; reload it again"
+        )
     if include_planned:
-        return (*state, planned_quarter_from_json(values["books.json"].get("planned_quarter"), state[0]))
+        return (*state, planned)
     return state
 
 
@@ -3221,6 +3247,10 @@ def _bundle_payloads(
     modified_by: str,
     planned_quarter: PlannedQuarter | None = None,
 ) -> dict[str, bytes]:
+    for section in sections:
+        for book in section.books:
+            if book.reading_sessions:
+                _recalculate_session_chain(book, section.label)
     if (
         not any(section.baseline_needs_recalculation for section in sections)
         and any(
@@ -3249,7 +3279,10 @@ def _bundle_payloads(
         for book in section.books:
             sessions[book.id] = [
                 reading_session_to_json(session, section.label, book)
-                for session in book.reading_sessions
+                for session in sorted(
+                    book.reading_sessions,
+                    key=lambda s: (s.date, s.current_page, s.id),
+                )
             ]
     session_payload = {
         "schema_version": BUNDLE_SCHEMA_VERSION,
