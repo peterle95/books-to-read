@@ -24,6 +24,7 @@ final class ReadingPlanChartsView {
     ScrollView build() {
         ScrollView scroll = new ScrollView(activity);
         LinearLayout box = activity.verticalBox();
+        box.setPadding(box.getPaddingLeft(), box.getPaddingTop(), box.getPaddingRight(), activity.dp(8));
         scroll.addView(box);
         LinearLayout header = activity.row();
         header.addView(activity.heading("Charts"), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
@@ -44,7 +45,6 @@ final class ReadingPlanChartsView {
             activity.showMetricsDialog();
         }));
         box.addView(header);
-        box.addView(activity.label(activity.showAllCharts ? "All books" : "Currently reading"));
 
         List<ReadingPlanChartData> charts = chartData();
         if (charts.isEmpty()) {
@@ -56,14 +56,14 @@ final class ReadingPlanChartsView {
         for (ReadingPlanChartData chart : charts) {
             choices.add(chart.sectionLabel + " - " + chart.book.number + ". " + chart.book.title);
         }
-        box.addView(activity.label("Book"));
         Spinner bookSpinner = activity.spinner(choices, choices.get(0));
+        bookSpinner.setContentDescription("Book");
         box.addView(bookSpinner);
 
         ReadingPlanChartView chartView = new ReadingPlanChartView(activity, charts.get(0));
         chartView.setProjectionVisible(activity.showActualPaceProjection);
         CheckBox projectionToggle = activity.checkBox(
-                "Show projection based on actual reading pace",
+                "Show projection and estimated finish range",
                 activity.showActualPaceProjection
         );
         projectionToggle.setOnCheckedChangeListener((button, checked) -> {
@@ -72,7 +72,7 @@ final class ReadingPlanChartsView {
         });
         box.addView(projectionToggle);
         box.addView(chartView, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, activity.dp(420)
+                ViewGroup.LayoutParams.MATCH_PARENT, activity.dp(500)
         ));
 
         TextView chartDetails = activity.label(chartDetails(charts.get(0)));
@@ -105,14 +105,15 @@ final class ReadingPlanChartsView {
 
     private String chartDetails(ReadingPlanChartData chart) {
         boolean audiobook = isAudiobookSection(chart.sectionLabel);
+        int todayRequired = Math.max(0, chart.dailyTargetPages.get(chart.todayIndex));
         String projection = chart.actualPace <= 0.0
                 ? "no actual pace yet"
                 : "actual pace " + (audiobook ? formatDuration(chart.actualPace) : MainActivity.format2(chart.actualPace))
                 + (audiobook ? "/day" : " pages/day");
         return chart.startDate + " to " + chart.plannedDeadline
                 + " | today " + (audiobook
-                ? formatDuration(chart.dailyTargetPages.get(chart.todayIndex))
-                : chart.dailyTargetPages.get(chart.todayIndex))
+                ? formatDuration(todayRequired)
+                : todayRequired)
                 + (audiobook ? "/day" : " pages/day")
                 + " | " + projection;
     }

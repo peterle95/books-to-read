@@ -29,6 +29,7 @@ The apps compare the loaded revision and SHA-256 hashes before saving. If anothe
 - Books tab: view today's reading targets with planned starts and deadlines, and add, insert, replace, delete, reorder, and group physical, digital, or audiobook entries. Audiobook times use `HH:MM` and also accept `HH:MM:SS`.
 - Charts tab: view charts directly, then open Metrics to see key metrics or one focused detail view at a time.
 - Charts **All** toggle: slate/off shows unfinished books by default; green/on includes completed books, with press animation.
+- Charts projection: a history-based central estimate, an approximate 80% shaded range after seven completed observation days, and an estimated finish window. See [forecast assumptions and limitations](../docs/reading-projections.md).
 - Plan **Plan next quarter**: save and edit a separate book list. On the next quarter boundary (January/April/July/October 1), unfinished books continue before the planned books with their progress and history. See [quarter-planning details](../README.md#planning-the-next-quarter).
 - CSV import/export is included for compatibility with the desktop program's CSV flow.
 

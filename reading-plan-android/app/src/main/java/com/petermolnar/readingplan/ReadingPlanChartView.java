@@ -1,10 +1,11 @@
 package com.petermolnar.readingplan;
 
-import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.DashPathEffect;
 import android.graphics.Paint;
 import android.graphics.Path;
+import android.text.StaticLayout;
+import android.text.TextPaint;
 import android.view.View;
 
 import java.time.LocalDate;
@@ -41,8 +42,10 @@ final class ReadingPlanChartView extends View {
     }
 
     private void updateContentDescription() {
+        String description = "Reading progress chart. Right axis: actual daily reading before today; "
+                + "required pace from today, assuming no further progress, through the deadline.";
         setContentDescription(projectionVisible && chart != null
-                ? chart.projectionLabel() : "Reading progress chart");
+                ? description + "\n" + chart.projectionLabel() + "\n" + chart.projectionRangeLabel() : description);
     }
 
     @Override
@@ -53,7 +56,9 @@ final class ReadingPlanChartView extends View {
         }
 
         float left = activity.dp(54);
-        float top = activity.dp(projectionVisible ? 62 : 42);
+        StaticLayout projectionLegend = projectionVisible
+                ? projectionLegend(Math.max(1, getWidth() - (int) left - activity.dp(8))) : null;
+        float top = projectionLegend == null ? activity.dp(42) : activity.dp(50) + projectionLegend.getHeight();
         float right = getWidth() - activity.dp(48);
         float bottom = getHeight() - activity.dp(52);
         if (right <= left || bottom <= top) {
@@ -89,6 +94,7 @@ final class ReadingPlanChartView extends View {
         }
         canvas.drawText(audiobook ? "Time/day" : "Pages/day", right - activity.dp(42), top - activity.dp(10), paint);
 
+        if (projectionVisible) drawProjectionRange(canvas, left, top, plotWidth, plotHeight);
         drawSeries(canvas, chart.plannedPages, left, top, plotWidth, plotHeight, MainActivity.MOCHA, activity.dp(3), chart.yMax, null);
         drawSeries(canvas, chart.actualPages, left, top, plotWidth, plotHeight, MainActivity.SUCCESS, activity.dp(2), chart.yMax, null);
         drawSeries(
@@ -111,13 +117,11 @@ final class ReadingPlanChartView extends View {
         paint.setTextSize(activity.dp(11));
         canvas.drawText("Today", Math.max(left, todayX - activity.dp(17)), top - activity.dp(10), paint);
 
-        int labelStep = Math.max(1, (chart.dates.size() - 1) / 4);
-        for (int index = 0; index < chart.dates.size(); index += labelStep) {
-            drawDateLabel(canvas, chart.dates.get(index), index, chart.dates.size(), left, right, bottom, paint);
-        }
         int last = chart.dates.size() - 1;
-        if (last % labelStep != 0) {
-            drawDateLabel(canvas, chart.dates.get(last), last, chart.dates.size(), left, right, bottom, paint);
+        int labelIntervals = Math.min(4, last);
+        for (int tick = 0; tick <= labelIntervals; tick++) {
+            int index = labelIntervals == 0 ? 0 : (int) Math.round((double) last * tick / labelIntervals);
+            drawDateLabel(canvas, chart.dates.get(index), index, chart.dates.size(), left, right, bottom, paint);
         }
 
         paint.setColor(MainActivity.MOCHA);
@@ -125,11 +129,13 @@ final class ReadingPlanChartView extends View {
         paint.setColor(MainActivity.SUCCESS);
         canvas.drawText("Actual", left + activity.dp(60), activity.dp(18), paint);
         paint.setColor(MainActivity.CARAMEL);
-        canvas.drawText("Daily target", left + activity.dp(120), activity.dp(18), paint);
+        canvas.drawText("Read / required", left + activity.dp(120), activity.dp(18), paint);
         if (projectionVisible) {
-            paint.setColor(MainActivity.VIOLET);
-            // Keep the complete estimate readable on phone-width charts.
-            canvas.drawText(chart.projectionLabel(), left, activity.dp(36), paint);
+            // Native text wrapping keeps dates and unavailable/open-ended ranges readable on phones.
+            canvas.save();
+            canvas.translate(left, activity.dp(24));
+            projectionLegend.draw(canvas);
+            canvas.restore();
         }
         canvas.save();
         canvas.rotate(-90, activity.dp(15), (top + bottom) / 2);
@@ -140,6 +146,40 @@ final class ReadingPlanChartView extends View {
 
     private String chartValue(int value, boolean audiobook) {
         return audiobook ? formatDuration(value) : String.valueOf(value);
+    }
+
+    StaticLayout projectionLegend(int width) {
+        String text = chart.projectionLabel() + "\n" + chart.projectionRangeLabel();
+        TextPaint paint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+        paint.setColor(MainActivity.VIOLET);
+        paint.setTextSize(activity.dp(11));
+        return StaticLayout.Builder.obtain(text, 0, text.length(), paint, width).setIncludePad(false).build();
+    }
+
+    private void drawProjectionRange(Canvas canvas, float left, float top, float width, float height) {
+        if (!chart.projection.rangeAvailable) return;
+        int first = chart.todayIndex;
+        int count = chart.dates.size();
+        Path path = new Path();
+        for (int index = first; index < count; index++) {
+            float x = xForIndex(index, count, left, width);
+            float y = top + height - height * chart.projectionUpperPages.get(index) / chart.yMax;
+            if (index == first) path.moveTo(x, y);
+            else path.lineTo(x, y);
+        }
+        for (int index = count - 1; index >= first; index--) {
+            path.lineTo(xForIndex(index, count, left, width),
+                    top + height - height * chart.projectionLowerPages.get(index) / chart.yMax);
+        }
+        path.close();
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        paint.setColor(MainActivity.VIOLET);
+        paint.setAlpha(48);
+        paint.setStyle(Paint.Style.FILL);
+        canvas.save();
+        canvas.clipRect(left, top, left + width, top + height);
+        canvas.drawPath(path, paint);
+        canvas.restore();
     }
 
     private void drawSeries(

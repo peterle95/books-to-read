@@ -3,95 +3,61 @@
   "sections": [
     {
       "label": "Physical books",
-      "baseline_needs_recalculation": false,
+      "baseline_needs_recalculation": true,
       "simultaneous_groups": [],
       "books": [
         {
-          "id": "9824dc65-173b-4c21-b817-59935bb80995",
+          "id": "451001c6-fa5b-4cc7-8440-36e9bdb8c926",
           "number": 1,
-          "title": "the coming wave",
-          "baseline_schedule": {
-            "start_date": "2026-09-24",
-            "deadline": "2026-11-03",
-            "daily_target": 6.9
-          },
+          "title": "coming wave",
+          "baseline_schedule": null,
           "deadline_override": null,
-          "start_date_override": "2026-09-24",
-          "target_completed_date": "2026-10-18",
-          "start_page": 3,
-          "end_page": 286,
-          "current_page": 192,
-          "pages": 284,
-          "pages_read": 190
+          "start_date_override": null,
+          "target_completed_date": "2026-11-01",
+          "start_page": 235,
+          "end_page": 288,
+          "current_page": 242,
+          "pages": 54,
+          "pages_read": 8
         },
         {
-          "id": "9edb544e-48ab-4f86-9ee6-6739ec7afb79",
+          "id": "b426b299-cd4c-45b4-b518-155a79807854",
           "number": 2,
-          "title": "Morte accidentale",
-          "baseline_schedule": {
-            "start_date": "2026-11-04",
-            "deadline": "2026-11-16",
-            "daily_target": 8.76923076923077
-          },
+          "title": "byung chul",
+          "baseline_schedule": null,
           "deadline_override": null,
           "start_date_override": null,
           "target_completed_date": null,
-          "start_page": 7,
-          "end_page": 120,
-          "current_page": null,
-          "pages": 114,
-          "pages_read": 0
-        },
-        {
-          "id": "85b28577-af3e-4632-96f7-b2fc78e2cdfe",
-          "number": 3,
-          "title": "byung-chul",
-          "baseline_schedule": {
-            "start_date": "2026-11-17",
-            "deadline": "2026-11-30",
-            "daily_target": 7.928571428571429
-          },
-          "deadline_override": null,
-          "start_date_override": null,
-          "target_completed_date": null,
-          "start_page": 9,
-          "end_page": 119,
+          "start_page": 1,
+          "end_page": 111,
           "current_page": null,
           "pages": 111,
           "pages_read": 0
         },
         {
-          "id": "ddc6a210-a4d7-4412-8317-c3be08eb52e5",
-          "number": 4,
+          "id": "97a43244-cd28-4ea5-87ad-6ef28c7fdc3b",
+          "number": 3,
           "title": "the fall",
-          "baseline_schedule": {
-            "start_date": "2026-12-01",
-            "deadline": "2026-12-10",
-            "daily_target": 9
-          },
+          "baseline_schedule": null,
           "deadline_override": null,
           "start_date_override": null,
           "target_completed_date": null,
-          "start_page": 3,
-          "end_page": 92,
+          "start_page": 1,
+          "end_page": 90,
           "current_page": null,
           "pages": 90,
           "pages_read": 0
         },
         {
-          "id": "0f7de496-f893-4666-8b07-debcec074463",
-          "number": 5,
+          "id": "93c7a99f-a0c9-472e-b0e6-e8c6af19eb3e",
+          "number": 4,
           "title": "specchio americano",
-          "baseline_schedule": {
-            "start_date": "2026-12-11",
-            "deadline": "2026-12-31",
-            "daily_target": 8.333333333333334
-          },
+          "baseline_schedule": null,
           "deadline_override": null,
           "start_date_override": null,
           "target_completed_date": null,
-          "start_page": 3,
-          "end_page": 177,
+          "start_page": 1,
+          "end_page": 175,
           "current_page": null,
           "pages": 175,
           "pages_read": 0
@@ -100,73 +66,42 @@
     },
     {
       "label": "Digital books",
-      "baseline_needs_recalculation": false,
-      "simultaneous_groups": [
-        [
-          "612d440c-4d69-4ca1-9266-47f8ff658dac",
-          "5586a600-9615-45b1-8936-14bb5564de05"
-        ]
-      ],
+      "baseline_needs_recalculation": true,
+      "simultaneous_groups": [],
       "books": [
         {
-          "id": "612d440c-4d69-4ca1-9266-47f8ff658dac",
+          "id": "8cb74618-c1a6-485f-bf34-069eb2552d56",
           "number": 1,
-          "title": "le perfezioni",
-          "baseline_schedule": {
-            "start_date": "2026-09-25",
-            "deadline": "2026-10-09",
-            "daily_target": 5.266666666666667
-          },
-          "deadline_override": null,
-          "start_date_override": "2026-09-25",
-          "target_completed_date": "2026-10-06",
-          "start_page": 1,
-          "end_page": 100,
-          "current_page": 100,
-          "pages": 100,
-          "pages_read": 100
-        },
-        {
-          "id": "5586a600-9615-45b1-8936-14bb5564de05",
-          "number": 2,
           "title": "designing apps",
-          "baseline_schedule": {
-            "start_date": "2026-10-01",
-            "deadline": "2026-12-31",
-            "daily_target": 9.231707317073171
-          },
+          "baseline_schedule": null,
           "deadline_override": null,
-          "start_date_override": "2026-10-01",
-          "target_completed_date": "2026-10-17",
-          "start_page": 3,
+          "start_date_override": null,
+          "target_completed_date": null,
+          "start_page": 283,
           "end_page": 759,
-          "current_page": 211,
-          "pages": 757,
-          "pages_read": 209
+          "current_page": 286,
+          "pages": 477,
+          "pages_read": 4
         }
       ]
     },
     {
       "label": "Audiobooks",
-      "baseline_needs_recalculation": false,
+      "baseline_needs_recalculation": true,
       "simultaneous_groups": [],
       "books": [
         {
-          "id": "8977a3b8-df81-4114-866a-cd043c13772d",
+          "id": "6115376b-5502-4497-9a9a-657239e21cbb",
           "number": 1,
           "title": "tools",
-          "baseline_schedule": {
-            "start_date": "2026-11-01",
-            "deadline": "2026-12-31",
-            "daily_target": 426.3114754098361
-          },
+          "baseline_schedule": null,
           "deadline_override": null,
-          "start_date_override": "2026-11-01",
+          "start_date_override": null,
           "target_completed_date": null,
           "start_time_seconds": 0,
-          "end_time_seconds": 26005,
+          "end_time_seconds": 25980,
           "current_time_seconds": null,
-          "duration_seconds": 26005,
+          "duration_seconds": 25980,
           "time_listened_seconds": 0,
           "remaining_time_seconds": null
         }

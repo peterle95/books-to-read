@@ -67,3 +67,21 @@ _Avoid_: File order, entry list
 **Canonical session order**:
 The ordering of reading sessions by calendar date, then page position, then stable session ID; the order readers validate and writers persist.
 _Avoid_: File order, creation order
+
+## Reading forecasts
+
+**Reading projection**:
+An estimate of a book's future progress based on its recorded reading history, separate from its baseline schedule and current required pace.
+_Avoid_: Reading commitment, guaranteed progress
+
+**Projection range**:
+An estimated range of plausible future reading progress around a reading projection, reflecting uncertainty in reading behavior rather than guaranteed bounds.
+_Avoid_: Random variation, best-case and worst-case guarantees
+
+**Estimated finish date**:
+The date on which a reading projection reaches the end of a book.
+_Avoid_: Deadline, promised finish date
+
+**Estimated finish range**:
+An estimated window of earlier and later dates when a book may be completed, consistent with its projection range rather than a guaranteed completion window.
+_Avoid_: Deadline range, guaranteed completion window
