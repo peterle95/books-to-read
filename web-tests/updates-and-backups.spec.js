@@ -32,6 +32,8 @@ test('an update is offered without interrupting the reader and saved data surviv
   await page.getByLabel('Reading plan').fill('Saved before the update');
   await page.getByRole('button', { name: 'Save plan' }).click();
   await importBundle(page);
+  await page.getByLabel('Reading plan', { exact: true }).fill('Unsaved during the update');
+  await page.getByLabel('Current book title').fill('Unfinished book edit');
   await expect(page.getByTestId('update-notice')).toBeHidden();
   await page.evaluate(() => { window.__noAutomaticReload = true; });
   await page.request.get(new URL('__bump-sw', page.url()).href);
@@ -43,7 +45,8 @@ test('an update is offered without interrupting the reader and saved data surviv
   await expect(page.getByTestId('update-notice')).toContainText(/new version/i);
   // The reader is not interrupted: the page did not reload and the draft is untouched.
   expect(await page.evaluate(() => window.__noAutomaticReload)).toBe(true);
-  await expect(page.getByLabel('Reading plan')).toHaveValue('Saved before the update');
+  await expect(page.getByLabel('Reading plan')).toHaveValue('Unsaved during the update');
+  await expect(page.getByLabel('Current book title')).toHaveValue('Unfinished book edit');
   await page.getByRole('button', { name: 'Reload to update' }).click();
   await page.waitForFunction(() => !window.__noAutomaticReload);
   await expect(page.getByTestId('update-notice')).toBeHidden();

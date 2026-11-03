@@ -103,6 +103,11 @@ ordering when imported contributions already match. The real-data workflow uses 
 four recorded sessions) and asserts the source files are unchanged. This is
 automated transfer evidence, not desktop GUI or actual Android verification.
 
+Final automated run: `npm run test:web` — **28 passed**. JavaScript syntax
+checks (`node --check` for every `web/*.js` file) passed. There is no configured
+TypeScript/typechecking task. Both review axes have no remaining implementation
+blockers after the history-order and implicit-progress fixes.
+
 The baseline Python suite has two existing failures:
 `test_remaining_plan_reflow_excludes_rest_days` and
 `test_session_target_starts_from_today_current_page`. They predate these web
