@@ -13,15 +13,30 @@
 <body>
   <main>
     <h1>Reading Plan</h1>
-    <p>Write a simple plan to keep on this device, even when you're offline.</p>
+    <p>Write a separate text draft to keep on this device, even when you're offline.</p>
     <form id="plan-form">
       <label for="plan">Reading plan</label>
       <textarea id="plan" rows="8" placeholder="What would you like to read?"></textarea>
       <button type="submit">Save plan</button>
     </form>
     <p id="status" role="status" aria-live="polite"></p>
+    <section aria-labelledby="bundle-heading">
+      <h2 id="bundle-heading">Transfer desktop bundle</h2>
+      <p>Select all four JSON files to validate and replace the stored bundle. This does not change the text draft. Export a ZIP to transfer the bundle back to desktop.</p>
+      <form id="bundle-form">
+        <label for="bundle-files">Bundle files</label>
+        <input id="bundle-files" type="file" accept=".json,application/json" multiple required>
+        <button type="submit">Import bundle</button>
+      </form>
+      <div id="bundle-exports" hidden>
+        <button type="button">Export bundle ZIP</button>
+      </div>
+      <p id="bundle-status" data-testid="bundle-status" role="status"></p>
+    </section>
     <p class="note">Your plan stays in this browser. It does not sync with the desktop or Android app. Clearing browser data can delete it.</p>
   </main>
+  <script src="./bundle-validator.js" defer></script>
+  <script src="./bundle-export.js" defer></script>
   <script src="./app.js" defer></script>
 </body>
 </html>

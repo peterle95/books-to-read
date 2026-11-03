@@ -1,6 +1,12 @@
 # Reading Plan web app
 
-This is an early, separate web app. It saves a simple text plan in this browser only; it does **not** yet contain the native apps' features, import their data, or synchronize with them. Clearing site data or losing the device can erase the plan. Keep using the existing apps for your full reading plan.
+This early web app stores a text draft separately from an imported desktop bundle. It does not edit the structured bundle or synchronize with other apps. Clearing site data or losing the device can erase both; keep backups.
+
+## Transfer a bundle
+
+Select `plan.json`, `books.json`, `sessions.json`, and `manifest.json` together, then import. Validation runs before confirmation; confirming replaces the previously stored bundle, not the text draft. To transfer back, download the bundle ZIP, extract its four files into an empty folder, and open that folder in the desktop app. The original file bytes are preserved.
+
+There is no merge or automatic sync. Use one active editor at a time: finish and export from one app before importing into the other, and keep a backup before replacement. Changes made independently in two places cannot be combined here.
 
 ## Deploy and install
 
