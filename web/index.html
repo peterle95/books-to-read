@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#244b42">
+  <meta name="description" content="A private, offline reading plan on this device.">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="apple-touch-icon" href="./icon-192.png">
+  <link rel="stylesheet" href="./style.css">
+  <title>Reading Plan</title>
+</head>
+<body>
+  <main>
+    <h1>Reading Plan</h1>
+    <p>Write a simple plan to keep on this device, even when you're offline.</p>
+    <form id="plan-form">
+      <label for="plan">Reading plan</label>
+      <textarea id="plan" rows="8" placeholder="What would you like to read?"></textarea>
+      <button type="submit">Save plan</button>
+    </form>
+    <p id="status" role="status" aria-live="polite"></p>
+    <p class="note">Your plan stays in this browser. It does not sync with the desktop or Android app. Clearing browser data can delete it.</p>
+  </main>
+  <script src="./app.js" defer></script>
+</body>
+</html>

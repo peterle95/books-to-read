@@ -10,3 +10,6 @@ reading-plan-android/local.properties
 *.sync-conflict-*
 .reading_plan.json.*
 reading_plan.json
+node_modules/
+playwright-report/
+test-results/
