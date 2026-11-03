@@ -1883,8 +1883,9 @@ class ReadingPlanApp(tk.Tk):
             section_index, book_index, session_index = (
                 int(part) for part in selection[0].split(":")
             )
-            book = self.sections[section_index].books[book_index]
-            remove_reading_session(book, session_index)
+            section = self.sections[section_index]
+            book = section.books[book_index]
+            remove_reading_session(book, session_index, section.label)
         except (IndexError, ValueError) as error:
             self.show_error(str(error))
             return

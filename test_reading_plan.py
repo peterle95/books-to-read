@@ -18,6 +18,7 @@ from reading_plan import (
     book_from_json,
     book_to_json,
     merge_reading_sessions,
+    remove_reading_session,
     available_reading_days,
     available_reading_days_count,
     add_reading_session,
@@ -1207,6 +1208,36 @@ if __name__ == "__main__":
 
 class SessionChainTests(unittest.TestCase):
     """Canonical session order (date, current_page, id) never bricks a load."""
+
+    def test_deleting_middle_session_recalculates_persisted_page_and_audio_chains(self):
+        pages = Book(1, "Pages", 1, 100)
+        audio = Book(1, "Audio", 0, 3600)
+        for index, position in enumerate((10, 20, 30)):
+            add_reading_session(pages, date(2026, 9, 16 + index), position)
+        for index, position in enumerate((600, 1200, 1800)):
+            add_reading_session(audio, date(2026, 9, 16 + index), position, "Audiobooks")
+        remove_reading_session(pages, 1, "Physical books")
+        remove_reading_session(audio, 1, "Audiobooks")
+        self.assertEqual(
+            (20, 1200),
+            (pages.reading_sessions[2].pages_read, audio.reading_sessions[2].pages_read),
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            write_json_bundle(
+                directory,
+                [
+                    BookSection("Physical books", [pages], []),
+                    BookSection("Digital books", [], []),
+                    BookSection("Audiobooks", [audio], []),
+                ],
+                date(2026, 9, 1),
+                date(2026, 9, 30),
+                "Target finish date",
+                SummaryStatsOptions(True, True, True, True, True),
+            )
+            reloaded = load_json_bundle(directory)[0]
+        self.assertEqual(20, reloaded[0].books[0].reading_sessions[2].pages_read)
+        self.assertEqual(1200, reloaded[2].books[0].reading_sessions[2].pages_read)
 
     def test_same_day_inversion_loads_in_canonical_order(self):
         payload = {

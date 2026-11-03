@@ -453,16 +453,14 @@ def add_reading_session(
         raise ValueError("current page must be after the previously recorded page")
 
 
-def remove_reading_session(book: Book, session_index: int) -> None:
+def remove_reading_session(
+    book: Book, session_index: int, section_label: str = PHYSICAL_BOOKS_LABEL
+) -> None:
     try:
         book.reading_sessions[session_index].deleted = True
     except IndexError as error:
         raise ValueError("reading session not found") from error
-    active_sessions = [session for session in book.reading_sessions if not session.deleted]
-    if not active_sessions:
-        book.current_page = None
-        return
-    book.current_page = max(session.current_page for session in active_sessions)
+    _recalculate_session_chain(book, section_label)
 
 
 def merge_reading_sessions(
