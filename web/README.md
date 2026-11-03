@@ -8,6 +8,10 @@ Select `plan.json`, `books.json`, `sessions.json`, and `manifest.json` together,
 
 There is no merge or automatic sync. Use one active editor at a time: finish and export from one app before importing into the other, and keep a backup before replacement. Changes made independently in two places cannot be combined here.
 
+## Back up
+
+**Export bundle ZIP** is the complete backup: the same four bundle files, byte for byte, that also open in the desktop app. The app shows an unobtrusive reminder in this section when no backup has been made on this device or the last one is more than a week old; exporting resets it. Keep the ZIP somewhere other than this browser, because clearing site data or losing the device deletes the stored plan.
+
 ## Schedule the plan
 
 After importing a bundle, set the plan start and finish dates and add any rest-day ranges. **Calculate schedule** stores a baseline schedule for every book in all three sections: physical and digital books are measured in pages, audiobooks in seconds. Rest days remove reading days from the pace without moving the baseline dates.
@@ -34,15 +38,25 @@ Rollover runs once, automatically, when the app opens or is used on or after the
 
 In the repository's **Settings → Pages**, select **GitHub Actions** as the build and deployment source. A push to `main` or a manually started **Deploy web app** workflow publishes this directory. Confirm the workflow succeeds and open its Pages URL over HTTPS. On Android, use the browser's **Install app** or **Add to Home screen** menu. Wording and availability depend on the browser.
 
+## Update the app
+
+Every deployment publishes a new app version. The app looks for an update when it opens or regains focus, but discovery timing is a browser decision and is not promised. When an update is found, a notice at the top of the page says so and the app keeps running: nothing reloads on its own, so an edit in progress is not interrupted. **Reload to update** applies the update when you choose.
+
+Updates replace only the cached app files. The text draft, reading schedule and imported bundle stay in this browser across versions, so no migration step is needed between current versions.
+
 ## Verify on a real device
 
 1. Open the Pages URL online on Android and install the app from the browser menu.
 2. Open the installed app, save a plan, and reload to check it remains.
 3. Wait for the initial load to finish, close the app, enable airplane mode, and reopen it. Check the plan is still there and can be edited and saved.
 4. Disable airplane mode and confirm the original native and desktop apps have not been changed.
+5. After a new deployment, reopen or refocus the installed app until the update notice appears. Leave an edit unsaved, check the app has not reloaded by itself, then use **Reload to update** and confirm the saved plan, schedule and bundle are still there.
+6. Import a bundle, export it, and confirm the backup reminder disappears; open the exported ZIP in the desktop app. Confirm the reminder returns once a week has passed without an export.
 
-Real-device verification has not been performed by the automated tests. PWA installation and offline storage behavior vary by browser and operating system.
+Real-device verification has not been performed by the automated tests. PWA installation, update discovery and offline storage behavior vary by browser and operating system.
 
 ## Automated checks
 
 From the repository root, run `npm ci`, `npx playwright install chromium`, and `npm run test:web`. The tests serve the app at a repository-like subpath, verify persistence and an offline reload in Chromium, and compare the browser's baseline schedules, simultaneous groups, deadline overrides, required pace and quarter rollover with the desktop calculation model in `reading_plan.py`, so Python must be available as `python`.
+
+The update test publishes a simulated deployment through the test server, then checks that the notice appears without reloading the page, that an edit is untouched, and that saved data survives applying the update. The backup test checks the export, the reminder, and that the reminder returns once the last backup is a week old.

@@ -13,6 +13,10 @@
 <body>
   <main>
     <h1>Reading Plan</h1>
+    <section id="update-notice" class="notice" data-testid="update-notice" aria-live="polite" hidden>
+      <p>A new version of the app is ready. Your saved plan stays on this device.</p>
+      <button id="reload-update" type="button">Reload to update</button>
+    </section>
     <p>Write a separate text draft to keep on this device, even when you're offline.</p>
     <form id="plan-form">
       <label for="plan">Reading plan</label>
@@ -105,6 +109,7 @@
       <div id="bundle-exports" hidden>
         <button type="button">Export bundle ZIP</button>
       </div>
+      <p id="backup-reminder" class="note" data-testid="backup-reminder" hidden></p>
       <p id="bundle-status" data-testid="bundle-status" role="status"></p>
     </section>
     <p class="note">Your plan stays in this browser. It does not sync with the desktop or Android app. Clearing browser data can delete it.</p>

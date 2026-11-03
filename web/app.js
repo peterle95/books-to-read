@@ -6,9 +6,21 @@ const bundleKey = 'reading-plan-bundle-v1';
 const bundleNames = ['plan.json', 'books.json', 'sessions.json', 'manifest.json'];
 const bundleMessage = document.querySelector('#bundle-status');
 const exports = document.querySelector('#bundle-exports');
+const backupReminder = document.querySelector('#backup-reminder');
+const lastBackupKey = 'reading-plan-last-backup-v1';
+const backupReminderDays = 7;
 
+// The export is a complete backup; remind only when it is missing or a week old.
 function showExports() {
   exports.hidden = !localStorage.getItem(bundleKey);
+  const last = Date.parse(localStorage.getItem(lastBackupKey) || '');
+  const due = !Number.isFinite(last) || Date.now() - last >= backupReminderDays * 24 * 60 * 60 * 1000;
+  backupReminder.hidden = exports.hidden || !due;
+  if (!backupReminder.hidden) {
+    backupReminder.textContent = Number.isFinite(last)
+      ? `Your last backup was on ${new Date(last).toLocaleDateString()}. Export a bundle ZIP to keep your own copy.`
+      : 'No backup has been made on this device yet. Export a bundle ZIP to keep your own copy.';
+  }
 }
 
 try {
@@ -116,6 +128,8 @@ exports.addEventListener('click', () => {
     link.href = url;
     link.download = 'reading-plan-bundle.zip';
     link.click();
+    localStorage.setItem(lastBackupKey, new Date().toISOString());
+    showExports();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   } catch (error) {
     bundleMessage.textContent = `Bundle could not be exported: ${error.message}`;
@@ -698,11 +712,49 @@ renderQuarter();
 checkRollover();
 setInterval(checkRollover, 30000);
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) checkRollover();
+  if (!document.hidden) {
+    checkRollover();
+    showExports();
+  }
 });
+setInterval(showExports, 60 * 60 * 1000);
+
+const updateNotice = document.querySelector('#update-notice');
+const updateReload = document.querySelector('#reload-update');
+let waitingWorker = null;
+let applyingUpdate = false;
+
+// A worker that installs beside an existing active one is an update, not the first install.
+const offerUpdate = (registration, worker) => {
+  if (!worker || !registration.active) return;
+  waitingWorker = worker;
+  updateNotice.hidden = false;
+};
 
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js').catch(() => {
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (applyingUpdate) window.location.reload();
+  });
+  updateReload.addEventListener('click', () => {
+    if (!waitingWorker) return;
+    applyingUpdate = true;
+    waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+  });
+  navigator.serviceWorker.register('./sw.js').then((registration) => {
+    if (registration.waiting) offerUpdate(registration, registration.waiting);
+    registration.addEventListener('updatefound', () => {
+      const worker = registration.installing;
+      if (!worker) return;
+      worker.addEventListener('statechange', () => {
+        if (worker.state === 'installed') offerUpdate(registration, worker);
+      });
+    });
+    const checkForUpdate = () => registration.update().catch(() => {});
+    setInterval(checkForUpdate, 60 * 60 * 1000);
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) checkForUpdate();
+    });
+  }).catch(() => {
     status.textContent = 'Offline access is unavailable. Please reconnect and reload.';
   });
 }
