@@ -59,6 +59,29 @@
         <tbody id="schedule-rows"></tbody>
       </table>
     </section>
+    <section aria-labelledby="quarter-heading">
+      <h2 id="quarter-heading">Next quarter</h2>
+      <p>Plan the books for the next quarter here. When the quarter starts, unfinished current books carry forward first with their history and stable IDs, completed books leave the plan, and the baseline schedule is recalculated. The plan activates automatically when you open or use the app on or after its start date.</p>
+      <p id="quarter-empty">Import a bundle to plan the next quarter.</p>
+      <form id="quarter-form">
+        <label for="quarter-start">Next quarter starts</label>
+        <input id="quarter-start" type="date" required>
+        <button type="submit">Save quarter start</button>
+      </form>
+      <form id="quarter-book-form">
+        <label for="quarter-section">Format</label>
+        <select id="quarter-section"></select>
+        <label for="quarter-title">Book title</label>
+        <input id="quarter-title" type="text" required>
+        <label for="quarter-from">Start page or time in seconds</label>
+        <input id="quarter-from" type="number" min="0" step="1" required>
+        <label for="quarter-to">End page or time in seconds</label>
+        <input id="quarter-to" type="number" min="0" step="1" required>
+        <button type="submit">Add planned book</button>
+      </form>
+      <ul id="quarter-list" aria-label="Next-quarter books"></ul>
+      <p id="quarter-status" data-testid="quarter-status" role="status" aria-live="polite"></p>
+    </section>
     <section aria-labelledby="bundle-heading">
       <h2 id="bundle-heading">Transfer desktop bundle</h2>
       <p>Select all four JSON files to validate and replace the stored bundle. This does not change the text draft, and importing a bundle replaces the reading schedule saved for the previous bundle. Export a ZIP to transfer the bundle back to desktop.</p>
@@ -75,6 +98,7 @@
     <p class="note">Your plan stays in this browser. It does not sync with the desktop or Android app. Clearing browser data can delete it.</p>
   </main>
   <script src="./schedule.js" defer></script>
+  <script src="./quarter.js" defer></script>
   <script src="./bundle-validator.js" defer></script>
   <script src="./bundle-export.js" defer></script>
   <script src="./app.js" defer></script>

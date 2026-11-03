@@ -86,7 +86,7 @@ book.reading_sessions[0].id = 'session-stable'
 audio = Book(1, 'Audio', 0, 3600, id='audio-stable')
 add_reading_session(audio, date(2026, 7, 3), 600, 'Audiobooks')
 audio.reading_sessions[0].id = 'audio-session'
-planned = PlannedQuarter(date(2026, 10, 1), [BookSection('Physical books', [Book(1, 'Next', 1, 50, id='planned-stable')], []), BookSection('Digital books', [], []), BookSection('Audiobooks', [], [])])
+planned = PlannedQuarter(date(2027, 10, 1), [BookSection('Physical books', [Book(1, 'Next', 1, 50, id='planned-stable')], []), BookSection('Digital books', [], []), BookSection('Audiobooks', [], [])])
 write_json_bundle(sys.argv[1], [BookSection('Physical books', [book], []), BookSection('Digital books', [Book(1, 'First', 1, 20, id='first'), Book(2, 'Companion', 1, 20, id='companion')], [(1, 2)]), BookSection('Audiobooks', [audio], [])], date(2026, 7, 1), date(2026, 9, 30), 'Quarter end', SummaryStatsOptions(True, False, True, False, True), [RestDayRange(date(2026, 8, 1), date(2026, 8, 2))], planned_quarter=planned)
 `, directory]);
     const files = names.map((name) => ({ name, mimeType: 'application/json', buffer: fs.readFileSync(path.join(directory, name)) }));

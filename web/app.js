@@ -102,7 +102,10 @@ document.querySelector('#bundle-form').addEventListener('submit', async (event) 
   } catch (error) {
     bundleMessage.textContent = `Bundle could not be imported: ${error.message}`;
   }
-  if (imported) renderSchedule();
+  if (imported) {
+    renderSchedule();
+    if (!(await checkRollover())) renderQuarter();
+  }
 });
 
 exports.addEventListener('click', () => {
@@ -403,7 +406,253 @@ calculateButton.addEventListener('click', () => {
   }
 });
 
+const quarterEmpty = document.querySelector('#quarter-empty');
+const quarterForm = document.querySelector('#quarter-form');
+const quarterStartInput = document.querySelector('#quarter-start');
+const quarterBookForm = document.querySelector('#quarter-book-form');
+const quarterSection = document.querySelector('#quarter-section');
+const quarterTitle = document.querySelector('#quarter-title');
+const quarterFrom = document.querySelector('#quarter-from');
+const quarterTo = document.querySelector('#quarter-to');
+const quarterList = document.querySelector('#quarter-list');
+const quarterStatus = document.querySelector('#quarter-status');
+
+const decodeFile = (encoded, name) => new TextDecoder().decode(Uint8Array.from(atob(encoded[name]), (character) => character.charCodeAt(0)));
+const encodeFile = (bytes) => {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 8192) binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+  return btoa(binary);
+};
+
+const readBundleFiles = () => {
+  try {
+    const encoded = JSON.parse(localStorage.getItem(bundleKey));
+    if (!encoded) return null;
+    return {
+      encoded,
+      plan: JSON.parse(decodeFile(encoded, 'plan.json')),
+      books: JSON.parse(decodeFile(encoded, 'books.json')),
+      sessions: JSON.parse(decodeFile(encoded, 'sessions.json')),
+      manifest: JSON.parse(decodeFile(encoded, 'manifest.json')),
+    };
+  } catch {
+    return null;
+  }
+};
+
+const digest = async (bytes) => Array.from(
+  new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)),
+  (byte) => byte.toString(16).padStart(2, '0'),
+).join('');
+
+// Rewrite the changed files, keep the rest byte for byte, and re-checksum the bundle.
+const writeBundleFiles = async (updates) => {
+  const current = readBundleFiles();
+  if (!current) throw new Error('Import a bundle before changing its plan.');
+  const encoder = new TextEncoder();
+  const data = {};
+  for (const name of bundleNames.slice(0, 3)) {
+    data[name] = updates[name]
+      ? encoder.encode(JSON.stringify(updates[name]))
+      : Uint8Array.from(atob(current.encoded[name]), (character) => character.charCodeAt(0));
+  }
+  const manifest = {
+    ...current.manifest,
+    revision: Number(current.manifest.revision) + 1,
+    last_modified: new Date().toISOString(),
+    modified_by: 'web app',
+    files: {},
+  };
+  for (const name of bundleNames.slice(0, 3)) manifest.files[name] = await digest(data[name]);
+  data['manifest.json'] = encoder.encode(JSON.stringify(manifest));
+  localStorage.setItem(bundleKey, JSON.stringify(Object.fromEntries(bundleNames.map((name) => [name, encodeFile(data[name])]))));
+  showExports();
+};
+
+const plannedDraft = () => {
+  const current = readBundleFiles();
+  if (!current) return null;
+  const planned = window.ReadingQuarter.plannedFromBundle(current.books);
+  if (planned) return planned;
+  let after = window.ReadingSchedule.today();
+  try {
+    const planStart = window.ReadingSchedule.iso(window.ReadingSchedule.parseDate(current.plan.start_date));
+    if (planStart > after) after = planStart;
+  } catch {
+    // Fall back to the current date when the plan start is unreadable.
+  }
+  return {
+    startDate: window.ReadingQuarter.nextQuarterStart(after),
+    sections: window.ReadingQuarter.blankSections(),
+  };
+};
+
+// Unfinished books carry forward, then the new quarter's schedule replaces the old baseline.
+const rollover = async () => {
+  const bundle = readBundleFiles();
+  if (!bundle) return null;
+  const result = window.ReadingQuarter.activate(bundle.books, window.ReadingSchedule.today());
+  if (!result) return null;
+  const restDays = (scheduleState ? scheduleState.restDays : window.ReadingSchedule.stateFromBundle(bundle.plan, bundle.books).restDays)
+    .filter((range) => range.end >= result.start);
+  const sections = window.ReadingSchedule.sectionsFromBooksFile({ sections: result.sections });
+  const baselines = window.ReadingSchedule.calculateBaselines(sections, result.start, result.end, restDays, true);
+  const books = {
+    ...bundle.books,
+    sections: result.sections.map((section) => ({
+      ...section,
+      baseline_needs_recalculation: false,
+      books: section.books.map((book) => ({
+        ...book,
+        baseline_schedule: baselines[book.id]
+          ? { start_date: baselines[book.id].startDate, deadline: baselines[book.id].deadline, daily_target: baselines[book.id].dailyTarget }
+          : null,
+      })),
+    })),
+    planned_quarter: null,
+  };
+  const ids = books.sections.flatMap((section) => section.books.map((book) => book.id));
+  await writeBundleFiles({
+    'plan.json': {
+      ...bundle.plan,
+      start_date: result.start,
+      end_date: result.end,
+      rest_days: restDays.map((range) => ({ start_date: range.start, end_date: range.end })),
+    },
+    'books.json': books,
+    'sessions.json': {
+      ...bundle.sessions,
+      sessions: Object.fromEntries(ids.map((id) => [id, (bundle.sessions.sessions || {})[id] || []])),
+    },
+  });
+  scheduleState = {
+    version: 1,
+    startDate: result.start,
+    endDate: result.end,
+    restDays,
+    groups: Object.fromEntries(sections.map((section) => [section.label, section.groups.map((group) => [...group])])),
+    overrides: Object.fromEntries(sections.flatMap((section) => section.books.map((book) => [book.id, null]))),
+    baselines,
+    needsRecalculation: false,
+  };
+  saveSchedule();
+  renderSchedule(`Next quarter activated: ${result.start} to ${result.end}.`);
+  return result;
+};
+
+const checkRollover = async () => {
+  try {
+    const result = await rollover();
+    if (result) renderQuarter(`Next quarter activated: ${result.start} to ${result.end}.`);
+    return result;
+  } catch (error) {
+    quarterStatus.textContent = error.message;
+    return null;
+  }
+};
+
+const savePlanned = async (planned, message) => {
+  const current = readBundleFiles();
+  await writeBundleFiles({
+    'books.json': { ...current.books, planned_quarter: window.ReadingQuarter.plannedToJson(planned) },
+  });
+  if (!(await checkRollover())) renderQuarter(message);
+};
+
+const renderQuarter = (message = '') => {
+  const current = readBundleFiles();
+  quarterEmpty.hidden = !!current;
+  quarterForm.hidden = !current;
+  quarterBookForm.hidden = !current;
+  if (!current) {
+    quarterList.replaceChildren();
+    quarterStatus.textContent = message;
+    return;
+  }
+  const planned = plannedDraft();
+  quarterStartInput.value = planned.startDate;
+  const chosen = quarterSection.value;
+  quarterSection.replaceChildren(...window.ReadingQuarter.blankSections().map((section) => {
+    const option = document.createElement('option');
+    option.value = section.label;
+    option.textContent = section.label;
+    return option;
+  }));
+  if (chosen) quarterSection.value = chosen;
+  const items = [];
+  for (const section of planned.sections) {
+    const audio = section.label === 'Audiobooks';
+    for (const book of section.books) {
+      const from = audio ? book.start_time_seconds : book.start_page;
+      const to = audio ? book.end_time_seconds : book.end_page;
+      const item = document.createElement('li');
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.textContent = 'Remove';
+      remove.setAttribute('aria-label', `Remove planned book ${book.title}`);
+      remove.addEventListener('click', async () => {
+        const draft = plannedDraft();
+        for (const candidate of draft.sections) candidate.books = candidate.books.filter((entry) => entry.id !== book.id);
+        try {
+          await savePlanned(draft, `Planned book ${book.title} removed.`);
+        } catch (error) {
+          quarterStatus.textContent = error.message;
+        }
+      });
+      item.append(`${section.label}: ${book.title} (${from} to ${to} ${audio ? 'seconds' : 'pages'}) `, remove);
+      items.push(item);
+    }
+  }
+  quarterList.replaceChildren(...items);
+  const count = items.length;
+  quarterStatus.textContent = message || (count
+    ? `Next-quarter plan saved: ${count} ${count === 1 ? 'book' : 'books'}. Unfinished current books carry forward first, and the plan activates on ${planned.startDate}.`
+    : 'No books are planned for the next quarter yet.');
+};
+
+quarterForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  try {
+    if (!quarterStartInput.value) throw new Error('Set the next-quarter start date.');
+    if (!window.ReadingQuarter.isQuarterStart(quarterStartInput.value)) throw new Error('A next-quarter plan must start on 1 January, 1 April, 1 July or 1 October.');
+    const planned = plannedDraft();
+    planned.startDate = window.ReadingSchedule.iso(window.ReadingSchedule.parseDate(quarterStartInput.value));
+    await savePlanned(planned, `Next-quarter start date saved: ${planned.startDate}.`);
+  } catch (error) {
+    quarterStatus.textContent = error.message;
+  }
+});
+
+quarterBookForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  try {
+    const planned = plannedDraft();
+    if (!planned) throw new Error('Import a bundle to plan the next quarter.');
+    const section = planned.sections.find((item) => item.label === quarterSection.value);
+    if (!section) throw new Error('Choose a book section.');
+    const audio = section.label === 'Audiobooks';
+    const title = quarterTitle.value.trim();
+    if (!title) throw new Error('A planned book needs a title.');
+    if (!quarterFrom.value || !quarterTo.value) throw new Error('Set the start and end pages or times.');
+    const from = Number(quarterFrom.value), to = Number(quarterTo.value);
+    if (!Number.isInteger(from) || !Number.isInteger(to) || to < from || (!audio && from < 1)) {
+      throw new Error(audio ? 'Set whole-second times, with the end time on or after the start.' : 'Set whole page numbers, with the end page on or after the start page.');
+    }
+    section.books.push(window.ReadingQuarter.newBook(section.label, title, from, to));
+    await savePlanned(planned, `Planned ${title} for the next quarter.`);
+    quarterBookForm.reset();
+  } catch (error) {
+    quarterStatus.textContent = error.message;
+  }
+});
+
 renderSchedule();
+renderQuarter();
+checkRollover();
+setInterval(checkRollover, 30000);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) checkRollover();
+});
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').catch(() => {

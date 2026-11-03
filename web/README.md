@@ -20,6 +20,12 @@ A **deadline override** gives one book an independent schedule immediately: its 
 
 Groups and overrides belong to the imported bundle's saved schedule: they persist across reloads and are cleared when a bundle is imported. Start-date overrides saved by another app stay in the bundle but are not editable here.
 
+## Plan the next quarter
+
+Each imported bundle can carry a next-quarter plan. Set the quarter start to 1 January, 1 April, 1 July or 1 October, then add planned books with a section, title and page or second range. **Save quarter start** and **Add planned book**, like **Remove**, write the plan into `books.json` and re-checksum the bundle; the other files keep their imported bytes.
+
+Rollover runs once, automatically, when the app opens or is used on or after the planned start date. Unfinished books carry forward first with their stable IDs and reading history, completed books leave the plan, and the baseline schedule is recalculated for the quarter containing today. Rest-day ranges that end before the new start date are dropped. The activated plan, its recalculated baseline and the trimmed rest days are written to the bundle, so an export after rollover transfers the activated plan to the desktop app.
+
 ## Deploy and install
 
 In the repository's **Settings → Pages**, select **GitHub Actions** as the build and deployment source. A push to `main` or a manually started **Deploy web app** workflow publishes this directory. Confirm the workflow succeeds and open its Pages URL over HTTPS. On Android, use the browser's **Install app** or **Add to Home screen** menu. Wording and availability depend on the browser.
@@ -35,4 +41,4 @@ Real-device verification has not been performed by the automated tests. PWA inst
 
 ## Automated checks
 
-From the repository root, run `npm ci`, `npx playwright install chromium`, and `npm run test:web`. The tests serve the app at a repository-like subpath, verify persistence and an offline reload in Chromium, and compare the browser's baseline schedules, simultaneous groups, deadline overrides and required pace with the desktop calculation model in `reading_plan.py`, so Python must be available as `python`.
+From the repository root, run `npm ci`, `npx playwright install chromium`, and `npm run test:web`. The tests serve the app at a repository-like subpath, verify persistence and an offline reload in Chromium, and compare the browser's baseline schedules, simultaneous groups, deadline overrides, required pace and quarter rollover with the desktop calculation model in `reading_plan.py`, so Python must be available as `python`.

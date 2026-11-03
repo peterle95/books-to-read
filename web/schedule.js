@@ -100,25 +100,26 @@
   };
 
   // Books are scheduled in order at the section's pace; groups share a start and deadline.
-  const calculateDeadlines = (section, start, end, dailyPace, groups) => {
+  // A rollover schedules unfinished work instead of whole books and skips rest days.
+  const calculateDeadlines = (section, start, end, dailyPace, groups, workOf, restDays = []) => {
     const groupByFirst = new Map(groups.map((group) => [group[0], group]));
     const grouped = new Set(groups.flat());
     const byNumber = new Map(section.books.map((book) => [book.number, book]));
-    const readingDays = availableDays(start, end);
+    const readingDays = availableDays(start, end, restDays);
     const deadlines = [];
     let cumulativeWork = 0, previousDays = 0;
     for (const book of section.books) {
       if (grouped.has(book.number) && !groupByFirst.has(book.number)) continue;
       const group = groupByFirst.get(book.number) || [book.number];
       const groupBooks = group.map((number) => byNumber.get(number));
-      const groupWork = total(groupBooks.map((item) => item.total));
+      const groupWork = total(groupBooks.map(workOf));
       cumulativeWork += groupWork;
       const cumulativeDays = dailyPace <= 0 || cumulativeWork === 0 ? previousDays : Math.max(1, Math.ceil(cumulativeWork / dailyPace - 1e-9));
       const allocated = cumulativeDays - previousDays;
       const deadline = readingDays.length ? readingDays[Math.min(cumulativeDays, readingDays.length) - 1] : end;
       const groupStart = readingDays.length ? (allocated === 0 ? deadline : readingDays[previousDays]) : end;
       for (const member of groupBooks) {
-        const work = member.total;
+        const work = workOf(member);
         let dailyPages = 0;
         if (work > 0 && groupWork > 0) dailyPages = groupBooks.length === 1 ? dailyPace : dailyPace * work / groupWork;
         deadlines.push({ book: member, start: groupStart, deadline, dailyPages, status: deadline < end ? 'before end' : deadline === end ? 'on end date' : 'after end' });
@@ -129,7 +130,7 @@
   };
 
   // Baseline dates ignore rest days; rest days only reduce the days available for each target.
-  const restAdjustedTargets = (section, deadlines, restDays) => {
+  const restAdjustedTargets = (section, deadlines, restDays, workOf) => {
     const groupOf = new Map();
     for (const group of activeGroups(section)) for (const number of group) groupOf.set(number, group);
     const byNumber = new Map(section.books.map((book) => [book.number, book]));
@@ -137,27 +138,28 @@
     for (const deadline of deadlines) {
       const group = groupOf.get(deadline.book.number) || [deadline.book.number];
       const groupBooks = group.map((number) => byNumber.get(number));
-      const groupWork = total(groupBooks.map((book) => book.total));
+      const groupWork = total(groupBooks.map(workOf));
       const groupDays = availableDays(deadline.start, deadline.deadline, restDays).length;
       const groupPace = groupWork && groupDays ? groupWork / groupDays : 0;
-      const work = deadline.book.total;
+      const work = workOf(deadline.book);
       targets.set(deadline.book.number, groupWork && work ? groupPace * work / groupWork : 0);
     }
     return targets;
   };
 
-  const calculateBaselines = (sections, startIso, endIso, restDays) => {
+  const calculateBaselines = (sections, startIso, endIso, restDays, remaining = false) => {
     const start = parse(startIso), end = parse(endIso);
     if (end < start) throw new Error('The plan finish date is before its start date.');
     const rest = normalizeRestDays(restDays);
     const baselines = {};
     for (const section of sections) {
       if (!section.books.length) continue;
-      const periodDays = availableDays(start, end).length;
-      const work = total(section.books.map((book) => book.total));
+      const workOf = remaining ? (book) => book.remaining : (book) => book.total;
+      const periodDays = availableDays(start, end, remaining ? rest : []).length;
+      const work = total(section.books.map(workOf));
       const dailyPace = periodDays ? work / periodDays : 0;
-      const deadlines = calculateDeadlines(section, start, end, dailyPace, activeGroups(section));
-      const targets = restAdjustedTargets(section, deadlines, rest);
+      const deadlines = calculateDeadlines(section, start, end, dailyPace, activeGroups(section), workOf, remaining ? rest : []);
+      const targets = restAdjustedTargets(section, deadlines, rest, workOf);
       for (const deadline of deadlines) {
         baselines[deadline.book.id] = {
           startDate: iso(deadline.start),
@@ -318,6 +320,7 @@
     requiredPace,
     stateFromBundle,
     iso,
+    parseDate: parse,
     today: () => {
       const now = new Date();
       return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
