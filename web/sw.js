@@ -1,5 +1,5 @@
 const CACHE = 'reading-plan-__VERSION__';
-const ASSETS = ['./', './index.html', './style.css', './bundle-validator.js', './bundle-export.js', './app.js', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
+const ASSETS = ['./', './index.html', './style.css', './schedule.js', './bundle-validator.js', './bundle-export.js', './app.js', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(ASSETS)));

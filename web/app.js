@@ -35,6 +35,7 @@ plan.addEventListener('input', () => {
 document.querySelector('#bundle-form').addEventListener('submit', async (event) => {
   event.preventDefault();
   bundleMessage.textContent = '';
+  let imported = false;
   try {
     const files = Array.from(document.querySelector('#bundle-files').files);
     const names = bundleNames;
@@ -93,11 +94,15 @@ document.querySelector('#bundle-form').addEventListener('submit', async (event) 
       return [name, btoa(binary)];
     }));
     localStorage.setItem(bundleKey, JSON.stringify(encoded));
+    localStorage.removeItem(scheduleKey);
+    scheduleState = null;
     showExports();
     bundleMessage.textContent = 'Bundle imported on this device.';
+    imported = true;
   } catch (error) {
     bundleMessage.textContent = `Bundle could not be imported: ${error.message}`;
   }
+  if (imported) renderSchedule();
 });
 
 exports.addEventListener('click', () => {
@@ -113,6 +118,163 @@ exports.addEventListener('click', () => {
     bundleMessage.textContent = `Bundle could not be exported: ${error.message}`;
   }
 });
+
+const scheduleKey = 'reading-plan-schedule-v1';
+const scheduleForm = document.querySelector('#schedule-form');
+const startInput = document.querySelector('#plan-start');
+const finishInput = document.querySelector('#plan-finish');
+const restForm = document.querySelector('#rest-form');
+const restStart = document.querySelector('#rest-start');
+const restEnd = document.querySelector('#rest-end');
+const restList = document.querySelector('#rest-list');
+const calculateButton = document.querySelector('#calculate-schedule');
+const scheduleStatus = document.querySelector('#schedule-status');
+const scheduleTable = document.querySelector('#schedule-table');
+const scheduleRows = document.querySelector('#schedule-rows');
+const scheduleEmpty = document.querySelector('#schedule-empty');
+let scheduleState = null;
+
+const readBundleData = () => {
+  try {
+    const encoded = JSON.parse(localStorage.getItem(bundleKey));
+    if (!encoded) return null;
+    const file = (name) => JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(encoded[name]), (character) => character.charCodeAt(0))));
+    const planData = file('plan.json'), booksFile = file('books.json');
+    return { plan: planData, books: booksFile, sections: window.ReadingSchedule.sectionsFromBooksFile(booksFile) };
+  } catch {
+    return null;
+  }
+};
+
+const formatUnits = (value) => String(Math.round(value * 100) / 100);
+
+const loadSchedule = (bundle) => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(scheduleKey) || 'null');
+    if (saved && saved.version === 1 && saved.startDate && saved.endDate) return saved;
+  } catch {
+    // Fall back to the imported bundle's own dates and baselines.
+  }
+  return window.ReadingSchedule.stateFromBundle(bundle.plan, bundle.books);
+};
+
+const saveSchedule = () => {
+  try {
+    localStorage.setItem(scheduleKey, JSON.stringify(scheduleState));
+  } catch {
+    scheduleStatus.textContent = 'Unable to save the schedule on this device.';
+  }
+};
+
+const renderSchedule = (message = '') => {
+  const bundle = readBundleData();
+  scheduleEmpty.hidden = !!bundle;
+  scheduleForm.hidden = !bundle;
+  restForm.hidden = !bundle;
+  calculateButton.hidden = !bundle;
+  if (!bundle) {
+    scheduleTable.hidden = true;
+    restList.replaceChildren();
+    return;
+  }
+  if (!scheduleState) scheduleState = loadSchedule(bundle);
+  startInput.value = scheduleState.startDate;
+  finishInput.value = scheduleState.endDate;
+  restList.replaceChildren(...scheduleState.restDays.map((range, index) => {
+    const item = document.createElement('li');
+    const label = range.start === range.end ? range.start : `${range.start} to ${range.end}`;
+    const remove = document.createElement('button');
+    item.append(`${label} `);
+    remove.type = 'button';
+    remove.textContent = 'Remove';
+    remove.setAttribute('aria-label', `Remove rest days ${label}`);
+    remove.addEventListener('click', () => {
+      scheduleState.restDays = scheduleState.restDays.filter((_, position) => position !== index);
+      scheduleChanged();
+    });
+    item.append(remove);
+    return item;
+  }));
+  const pace = window.ReadingSchedule.requiredPace(bundle.sections, scheduleState.baselines, window.ReadingSchedule.today(), scheduleState.restDays);
+  const rows = [];
+  for (const section of bundle.sections) {
+    if (!section.books.length) continue;
+    const header = document.createElement('tr'), headerCell = document.createElement('th');
+    headerCell.scope = 'rowgroup';
+    headerCell.colSpan = 6;
+    headerCell.textContent = `${section.label} · ${section.audio ? 'seconds' : 'pages'}`;
+    header.append(headerCell);
+    rows.push(header);
+    for (const book of section.books) {
+      const baseline = scheduleState.baselines[book.id];
+      const values = baseline
+        ? [book.title, book.remaining, baseline.startDate, baseline.deadline, formatUnits(baseline.dailyTarget), formatUnits(pace[book.id] ?? 0)]
+        : [book.title, book.remaining, 'Not scheduled', 'Not scheduled', 'Not scheduled', 'Not scheduled'];
+      const row = document.createElement('tr');
+      for (const value of values) {
+        const cell = document.createElement('td');
+        cell.textContent = String(value);
+        row.append(cell);
+      }
+      rows.push(row);
+    }
+  }
+  scheduleRows.replaceChildren(...rows);
+  scheduleTable.hidden = !rows.length;
+  if (!Object.keys(scheduleState.baselines).length) {
+    scheduleStatus.textContent = 'No baseline schedule is saved yet. Calculate the schedule.';
+  } else if (scheduleState.needsRecalculation) {
+    scheduleStatus.textContent = 'Plan changes are saved. The saved baseline stays unchanged until you calculate the schedule again.';
+  } else {
+    scheduleStatus.textContent = message || 'Baseline schedule saved. Required pace reflects today.';
+  }
+};
+
+const scheduleChanged = () => {
+  if (Object.keys(scheduleState.baselines).length) scheduleState.needsRecalculation = true;
+  saveSchedule();
+  renderSchedule();
+};
+
+scheduleForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  try {
+    if (!startInput.value || !finishInput.value) throw new Error('Set both plan dates.');
+    if (!window.ReadingSchedule.availableReadingDays(startInput.value, finishInput.value, []).length) throw new Error('The plan finish date is before its start date.');
+    scheduleState.startDate = startInput.value;
+    scheduleState.endDate = finishInput.value;
+    scheduleChanged();
+  } catch (error) {
+    scheduleStatus.textContent = error.message;
+  }
+});
+
+restForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  try {
+    if (!restStart.value || !restEnd.value) throw new Error('Set both rest-day dates.');
+    const ranges = window.ReadingSchedule.normalizeRestDays([...scheduleState.restDays, { start: restStart.value, end: restEnd.value }]);
+    scheduleState.restDays = ranges.map((range) => ({ start: window.ReadingSchedule.iso(range.start), end: window.ReadingSchedule.iso(range.end) }));
+    scheduleChanged();
+  } catch (error) {
+    scheduleStatus.textContent = error.message;
+  }
+});
+
+calculateButton.addEventListener('click', () => {
+  try {
+    const bundle = readBundleData();
+    if (!bundle) throw new Error('Import a bundle before calculating the schedule.');
+    scheduleState.baselines = window.ReadingSchedule.calculateBaselines(bundle.sections, scheduleState.startDate, scheduleState.endDate, scheduleState.restDays);
+    scheduleState.needsRecalculation = false;
+    saveSchedule();
+    renderSchedule('Baseline schedule calculated on this device.');
+  } catch (error) {
+    scheduleStatus.textContent = error.message;
+  }
+});
+
+renderSchedule();
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').catch(() => {

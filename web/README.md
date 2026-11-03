@@ -8,6 +8,14 @@ Select `plan.json`, `books.json`, `sessions.json`, and `manifest.json` together,
 
 There is no merge or automatic sync. Use one active editor at a time: finish and export from one app before importing into the other, and keep a backup before replacement. Changes made independently in two places cannot be combined here.
 
+## Schedule the plan
+
+After importing a bundle, set the plan start and finish dates and add any rest-day ranges. **Calculate schedule** stores a baseline schedule for every book in all three sections: physical and digital books are measured in pages, audiobooks in seconds. Rest days remove reading days from the pace without moving the baseline dates.
+
+The table keeps two separate values. The **baseline per day** is the persisted target created when the schedule was calculated. **Required now** is the amount needed each reading day, from today to that book's baseline finish, to finish the remaining work; it never changes the baseline. Editing the plan dates or rest days marks the schedule as changed and leaves the saved baseline alone until you calculate again. Importing a bundle resets the saved schedule because it belongs to the replaced bundle.
+
+Simultaneous groups already stored in a bundle are scheduled together, as in the desktop app. Creating or editing groups and deadline overrides is not available yet.
+
 ## Deploy and install
 
 In the repository's **Settings → Pages**, select **GitHub Actions** as the build and deployment source. A push to `main` or a manually started **Deploy web app** workflow publishes this directory. Confirm the workflow succeeds and open its Pages URL over HTTPS. On Android, use the browser's **Install app** or **Add to Home screen** menu. Wording and availability depend on the browser.
@@ -23,4 +31,4 @@ Real-device verification has not been performed by the automated tests. PWA inst
 
 ## Automated checks
 
-From the repository root, run `npm ci`, `npx playwright install chromium`, and `npm run test:web`. The test serves the app at a repository-like subpath and verifies persistence and an offline reload in Chromium.
+From the repository root, run `npm ci`, `npx playwright install chromium`, and `npm run test:web`. The tests serve the app at a repository-like subpath, verify persistence and an offline reload in Chromium, and compare the browser's baseline schedules and required pace with the desktop calculation model in `reading_plan.py`, so Python must be available as `python`.
