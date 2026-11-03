@@ -20,6 +20,10 @@ A **deadline override** gives one book an independent schedule immediately: its 
 
 Groups and overrides belong to the imported bundle's saved schedule: they persist across reloads and are cleared when a bundle is imported. Start-date overrides saved by another app stay in the bundle but are not editable here.
 
+## Reading projections
+
+After importing a bundle, **Reading projections** estimates when each book will be finished from its recorded reading history, separately from the baseline schedule and deadline. The estimate and its approximate 80% range follow the Android forecast in [docs/reading-projections.md](../docs/reading-projections.md): they use the whole history, treat same-day sessions as one day, exclude deleted and future-dated sessions, and skip rest days. A range needs seven completed observation days and positive mean progress; otherwise the table says why it is unavailable. Projections never change the baseline schedule, required pace or stored bundle, and the range is an estimate rather than a guarantee.
+
 ## Plan the next quarter
 
 Each imported bundle can carry a next-quarter plan. Set the quarter start to 1 January, 1 April, 1 July or 1 October, then add planned books with a section, title and page or second range. **Save quarter start** and **Add planned book**, like **Remove**, write the plan into `books.json` and re-checksum the bundle; the other files keep their imported bytes.

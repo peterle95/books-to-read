@@ -309,6 +309,7 @@
 
   window.ReadingSchedule = {
     sectionsFromBooksFile,
+    units,
     normalizeRestDays,
     availableReadingDays,
     activeGroups,

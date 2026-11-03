@@ -59,6 +59,18 @@
         <tbody id="schedule-rows"></tbody>
       </table>
     </section>
+    <section aria-labelledby="projection-heading">
+      <h2 id="projection-heading">Reading projections</h2>
+      <p>Each projection estimates when a book will be finished from its recorded reading history, separately from its baseline schedule and deadline. The estimated finish range shows how uncertain that estimate is; it is not a guarantee. Projections never change the baseline schedule or the required pace.</p>
+      <p id="projection-empty" data-testid="projection-empty">Import a bundle to see its reading projections.</p>
+      <table id="projection-table" hidden>
+        <caption>History-based projection and estimated finish range for each book. Pages are used for physical and digital books; seconds are used for audiobooks.</caption>
+        <thead>
+          <tr><th scope="col">Book</th><th scope="col">Projection</th><th scope="col">Estimated finish range</th></tr>
+        </thead>
+        <tbody id="projection-rows"></tbody>
+      </table>
+    </section>
     <section aria-labelledby="quarter-heading">
       <h2 id="quarter-heading">Next quarter</h2>
       <p>Plan the books for the next quarter here. When the quarter starts, unfinished current books carry forward first with their history and stable IDs, completed books leave the plan, and the baseline schedule is recalculated. The plan activates automatically when you open or use the app on or after its start date.</p>
@@ -98,6 +110,7 @@
     <p class="note">Your plan stays in this browser. It does not sync with the desktop or Android app. Clearing browser data can delete it.</p>
   </main>
   <script src="./schedule.js" defer></script>
+  <script src="./projection.js" defer></script>
   <script src="./quarter.js" defer></script>
   <script src="./bundle-validator.js" defer></script>
   <script src="./bundle-export.js" defer></script>

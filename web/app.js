@@ -135,6 +135,9 @@ const scheduleStatus = document.querySelector('#schedule-status');
 const scheduleTable = document.querySelector('#schedule-table');
 const scheduleRows = document.querySelector('#schedule-rows');
 const scheduleEmpty = document.querySelector('#schedule-empty');
+const projectionEmpty = document.querySelector('#projection-empty');
+const projectionTable = document.querySelector('#projection-table');
+const projectionRows = document.querySelector('#projection-rows');
 const groupForm = document.querySelector('#group-form');
 const groupSection = document.querySelector('#group-section');
 const groupBooks = document.querySelector('#group-books');
@@ -146,8 +149,13 @@ const readBundleData = () => {
     const encoded = JSON.parse(localStorage.getItem(bundleKey));
     if (!encoded) return null;
     const file = (name) => JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(encoded[name]), (character) => character.charCodeAt(0))));
-    const planData = file('plan.json'), booksFile = file('books.json');
-    return { plan: planData, books: booksFile, sections: window.ReadingSchedule.sectionsFromBooksFile(booksFile) };
+    const planData = file('plan.json'), booksFile = file('books.json'), sessionFile = file('sessions.json');
+    return {
+      plan: planData,
+      books: booksFile,
+      sessions: sessionFile.sessions || {},
+      sections: window.ReadingSchedule.sectionsFromBooksFile(booksFile),
+    };
   } catch {
     return null;
   }
@@ -270,15 +278,53 @@ const overrideCell = (book) => {
   return cell;
 };
 
+// Projections read recorded history only; they never change the baseline schedule or required pace.
+const renderProjections = (bundle) => {
+  const today = window.ReadingSchedule.today();
+  const rows = [];
+  for (const section of bundle.books.sections || []) {
+    const label = String(section.label).trim();
+    const books = section.books || [];
+    if (!books.length) continue;
+    const header = document.createElement('tr'), headerCell = document.createElement('th');
+    headerCell.scope = 'rowgroup';
+    headerCell.colSpan = 3;
+    headerCell.textContent = `${label} · ${label === 'Audiobooks' ? 'seconds' : 'pages'}`;
+    header.append(headerCell);
+    rows.push(header);
+    for (const book of books) {
+      const forecast = window.ReadingProjection.forecast({
+        book,
+        sectionLabel: label,
+        sessions: bundle.sessions[String(book.id).trim()] || [],
+        restDays: scheduleState.restDays,
+        today,
+      });
+      const row = document.createElement('tr');
+      for (const value of [String(book.title ?? ''), forecast.projectionLabel, forecast.rangeLabel]) {
+        const cell = document.createElement('td');
+        cell.textContent = value;
+        row.append(cell);
+      }
+      rows.push(row);
+    }
+  }
+  projectionRows.replaceChildren(...rows);
+  projectionTable.hidden = !rows.length;
+};
+
 const renderSchedule = (message = '') => {
   const bundle = readBundleData();
   scheduleEmpty.hidden = !!bundle;
+  projectionEmpty.hidden = !!bundle;
   scheduleForm.hidden = !bundle;
   restForm.hidden = !bundle;
   groupForm.hidden = !bundle;
   calculateButton.hidden = !bundle;
   if (!bundle) {
     scheduleTable.hidden = true;
+    projectionTable.hidden = true;
+    projectionRows.replaceChildren();
     restList.replaceChildren();
     groupList.replaceChildren();
     return;
@@ -330,6 +376,7 @@ const renderSchedule = (message = '') => {
   scheduleRows.replaceChildren(...rows);
   scheduleTable.hidden = !rows.length;
   renderGroups(sections);
+  renderProjections(bundle);
   if (!Object.keys(scheduleState.baselines).length) {
     scheduleStatus.textContent = 'No baseline schedule is saved yet. Calculate the schedule.';
   } else if (scheduleState.needsRecalculation) {
