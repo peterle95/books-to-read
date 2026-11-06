@@ -10,8 +10,58 @@ const backupReminder = document.querySelector('#backup-reminder');
 const lastBackupKey = 'reading-plan-last-backup-v1';
 const backupReminderDays = 7;
 
+const screens = [...document.querySelectorAll('main > .screen')];
+const tabs = [...document.querySelectorAll('.tab-bar button')];
+let previousScreen = 'session';
+function showScreen(name) {
+  if (name !== 'settings') previousScreen = name;
+  for (const screen of screens) screen.hidden = screen.id !== `screen-${name}`;
+  for (const tab of tabs) {
+    if (tab.dataset.screen === name) tab.setAttribute('aria-current', 'page');
+    else tab.removeAttribute('aria-current');
+  }
+  for (const button of document.querySelectorAll('.header-actions button')) button.setAttribute('aria-expanded', String(name === 'settings'));
+}
+tabs.forEach((tab) => tab.addEventListener('click', () => showScreen(tab.dataset.screen)));
+for (const button of document.querySelectorAll('.header-actions button')) button.addEventListener('click', () => showScreen('settings'));
+document.querySelector('#settings-done').addEventListener('click', () => showScreen(previousScreen));
+
+async function showSourceStatus() {
+  let loaded = false, stored;
+  try {
+    stored = localStorage.getItem(bundleKey);
+    const encoded = JSON.parse(stored);
+    const values = {};
+    const bytes = {};
+    for (const name of bundleNames) {
+      bytes[name] = Uint8Array.from(atob(encoded[name]), (character) => character.charCodeAt(0));
+      values[name] = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes[name]));
+      if (values[name]?.schema_version !== 2) throw new Error('Invalid schema.');
+    }
+    window.validateBundleContents(values, new WeakMap());
+    const manifest = values['manifest.json'];
+    if (!Number.isSafeInteger(manifest.revision) || manifest.revision < 0 || !manifest.last_modified || !manifest.modified_by || Object.keys(manifest.files).length !== 3) throw new Error('Invalid manifest.');
+    for (const name of bundleNames.slice(0, 3)) {
+      const hash = await crypto.subtle.digest('SHA-256', bytes[name]);
+      const actual = Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, '0')).join('');
+      if (actual !== manifest.files[name]?.toLowerCase()) throw new Error('Invalid checksum.');
+    }
+    loaded = true;
+  } catch {
+    // Missing, unreadable or invalid local data is not a loaded JSON source.
+  }
+  try { if (localStorage.getItem(bundleKey) !== stored) return; } catch { /* Storage may be unavailable. */ }
+  const button = document.querySelector('#json-status');
+  const label = loaded ? 'JSON loaded' : 'JSON not loaded';
+  button.textContent = 'JSON';
+  button.dataset.loaded = String(loaded);
+  button.setAttribute('aria-label', `${label}. Open Settings`);
+  document.querySelector('#source-status').textContent = `${label} in this browser. Transfers are manual.`;
+}
+
 // The export is a complete backup; remind only when it is missing or a week old.
 function showExports() {
+  showSourceStatus();
   exports.hidden = !localStorage.getItem(bundleKey);
   const last = Date.parse(localStorage.getItem(lastBackupKey) || '');
   const due = !Number.isFinite(last) || Date.now() - last >= backupReminderDays * 24 * 60 * 60 * 1000;
@@ -157,9 +207,13 @@ const scheduleKey = 'reading-plan-schedule-v1';
 const scheduleForm = document.querySelector('#schedule-form');
 const startInput = document.querySelector('#plan-start');
 const finishInput = document.querySelector('#plan-finish');
+window.AndroidControls.date(startInput, { mode: 'text' });
+window.AndroidControls.date(finishInput, { mode: 'text' });
 const restForm = document.querySelector('#rest-form');
 const restStart = document.querySelector('#rest-start');
 const restEnd = document.querySelector('#rest-end');
+window.ReadingCalendar.attach(restStart);
+window.ReadingCalendar.attach(restEnd);
 const restList = document.querySelector('#rest-list');
 const calculateButton = document.querySelector('#calculate-schedule');
 const scheduleStatus = document.querySelector('#schedule-status');
@@ -169,9 +223,6 @@ const scheduleEmpty = document.querySelector('#schedule-empty');
 const projectionEmpty = document.querySelector('#projection-empty');
 const projectionTable = document.querySelector('#projection-table');
 const projectionRows = document.querySelector('#projection-rows');
-const groupForm = document.querySelector('#group-form');
-const groupSection = document.querySelector('#group-section');
-const groupBooks = document.querySelector('#group-books');
 const groupList = document.querySelector('#group-list');
 let scheduleState = null;
 
@@ -242,10 +293,11 @@ const saveSchedule = async () => {
 
 const sectionsForState = (bundle, state) => window.ReadingSchedule.withLocalSettings(bundle.sections, state.groups, state.overrides, state.startOverrides);
 
-const setOverride = async (bookId, value) => {
+const setOverride = async (bookId, value, status = scheduleStatus) => {
   try {
     const bundle = readBundleData();
     if (!bundle) throw new Error('Import a bundle before scheduling its books.');
+    scheduleState = loadSchedule(bundle);
     const sections = sectionsForState(bundle, scheduleState);
     let section = null, book = null;
     for (const candidate of sections) {
@@ -262,52 +314,43 @@ const setOverride = async (bookId, value) => {
     scheduleState.baselines = baselines;
     scheduleState.overrides = { ...scheduleState.overrides, [bookId]: value || null };
     await saveSchedule();
-    renderSchedule(value ? `Deadline override saved for ${book.title}.` : `Deadline override cleared for ${book.title}.`);
+    const message = value ? `Deadline override saved for ${book.title}.` : `Deadline override cleared for ${book.title}.`;
+    renderSchedule(message);
+    status.textContent = message;
+    return true;
   } catch (error) {
-    scheduleStatus.textContent = error.message;
+    status.textContent = error.message;
+    return false;
   }
 };
 
-const removeGroup = async (label, index) => {
-  const bundle = readBundleData();
-  if (!bundle) return;
-  const section = sectionsForState(bundle, scheduleState).find((item) => item.label === label);
-  if (!section) return;
-  scheduleState.groups = { ...scheduleState.groups, [label]: section.groups.filter((_, position) => position !== index) };
-  try { await scheduleChanged(); } catch (error) { scheduleStatus.textContent = error.message; }
+const setStartOverride = async (bookId, value, status = scheduleStatus) => {
+  try {
+    const bundle = readBundleData();
+    if (!bundle) throw new Error('Import a bundle before scheduling its books.');
+    scheduleState = loadSchedule(bundle);
+    const book = sectionsForState(bundle, scheduleState).flatMap((section) => section.books).find((item) => item.id === bookId);
+    if (!book) throw new Error('That book is not part of the imported bundle.');
+    window.ReadingSchedule.applyStartOverride(book, scheduleState.baselines, value, scheduleState.startDate, window.ReadingSchedule.today(), scheduleState.restDays);
+    scheduleState.startOverrides = { ...scheduleState.startOverrides, [book.id]: value || null };
+    await saveSchedule();
+    const message = value ? `Start date override saved for ${book.title}.` : `Start date override cleared for ${book.title}.`;
+    renderSchedule(message);
+    status.textContent = message;
+    return true;
+  } catch (error) {
+    status.textContent = error.message;
+    return false;
+  }
 };
 
 const renderGroups = (sections) => {
-  const previous = groupSection.value;
-  const options = sections.filter((section) => section.books.length);
-  groupSection.replaceChildren(...options.map((section) => {
-    const option = document.createElement('option');
-    option.value = section.label;
-    option.textContent = section.label;
-    return option;
-  }));
-  const section = options.find((item) => item.label === previous) || options[0];
-  groupSection.value = section ? section.label : '';
-  groupBooks.replaceChildren(...(section ? section.books.map((book) => {
-    const label = document.createElement('label');
-    const input = document.createElement('input');
-    input.type = 'checkbox';
-    input.value = String(book.number);
-    input.checked = section.groups.some((group) => group.includes(book.number));
-    label.append(input, ` ${book.title}`);
-    return label;
-  }) : []));
   const items = [];
   for (const item of sections) {
-    item.groups.forEach((group, index) => {
+    item.groups.forEach((group) => {
       const listItem = document.createElement('li');
       const titles = group.map((number) => item.books.find((book) => book.number === number)?.title ?? `Book ${number}`);
-      const remove = document.createElement('button');
-      remove.type = 'button';
-      remove.textContent = 'Remove';
-      remove.setAttribute('aria-label', `Remove simultaneous group ${item.label} ${titles.join(', ')}`);
-      remove.addEventListener('click', () => removeGroup(item.label, index));
-      listItem.append(`${item.label}: ${titles.join(', ')} `, remove);
+      listItem.textContent = `${item.label}: ${titles.join(', ')}`;
       items.push(listItem);
     });
   }
@@ -317,14 +360,20 @@ const renderGroups = (sections) => {
 const overrideCell = (book) => {
   const cell = document.createElement('td');
   const input = document.createElement('input');
-  input.type = 'date';
+  input.type = 'text';
   input.value = scheduleState.overrides[book.id] || '';
   input.setAttribute('aria-label', `Deadline override for ${book.title}`);
+  window.ReadingCalendar.attach(input);
   const set = document.createElement('button');
   set.type = 'button';
   set.textContent = 'Set deadline';
   set.setAttribute('aria-label', `Save the deadline for ${book.title}`);
-  set.addEventListener('click', () => setOverride(book.id, input.value));
+  set.addEventListener('click', () => {
+    try {
+      window.AndroidControls.parseDate(input.value);
+      setOverride(book.id, input.value);
+    } catch (error) { scheduleStatus.textContent = error.message; }
+  });
   const clear = document.createElement('button');
   clear.type = 'button';
   clear.textContent = 'Clear';
@@ -332,27 +381,25 @@ const overrideCell = (book) => {
   clear.addEventListener('click', () => setOverride(book.id, ''));
   cell.append(input, set, clear);
   const start = document.createElement('input');
-  start.type = 'date';
+  start.type = 'text';
   start.value = scheduleState.startOverrides?.[book.id] || '';
   start.setAttribute('aria-label', `Start date override for ${book.title}`);
+  window.ReadingCalendar.attach(start);
   const saveStart = document.createElement('button');
   saveStart.type = 'button';
   saveStart.textContent = 'Set start date';
   saveStart.setAttribute('aria-label', `Save the start date for ${book.title}`);
-  const updateStart = async (value) => {
+  saveStart.addEventListener('click', () => {
     try {
-      window.ReadingSchedule.applyStartOverride(book, scheduleState.baselines, value, scheduleState.startDate, window.ReadingSchedule.today(), scheduleState.restDays);
-      scheduleState.startOverrides = { ...scheduleState.startOverrides, [book.id]: value || null };
-      await saveSchedule();
-      renderSchedule(value ? `Start date override saved for ${book.title}.` : `Start date override cleared for ${book.title}.`);
+      window.AndroidControls.parseDate(start.value);
+      setStartOverride(book.id, start.value);
     } catch (error) { scheduleStatus.textContent = error.message; }
-  };
-  saveStart.addEventListener('click', () => updateStart(start.value));
+  });
   const clearStart = document.createElement('button');
   clearStart.type = 'button';
   clearStart.textContent = 'Clear start date';
   clearStart.setAttribute('aria-label', `Clear the start date for ${book.title}`);
-  clearStart.addEventListener('click', () => updateStart(''));
+  clearStart.addEventListener('click', () => setStartOverride(book.id, ''));
   cell.append(start, saveStart, clearStart);
   return cell;
 };
@@ -401,9 +448,9 @@ const renderSchedule = (message = '') => {
   projectionEmpty.hidden = !!bundle;
   scheduleForm.hidden = !bundle;
   restForm.hidden = !bundle;
-  groupForm.hidden = !bundle;
   calculateButton.hidden = !bundle;
   if (!bundle) {
+    showPlanActions();
     scheduleTable.hidden = true;
     projectionTable.hidden = true;
     projectionRows.replaceChildren();
@@ -412,8 +459,8 @@ const renderSchedule = (message = '') => {
     return;
   }
   if (!scheduleState) scheduleState = loadSchedule(bundle);
-  startInput.value = scheduleState.startDate;
-  finishInput.value = scheduleState.endDate;
+  window.AndroidControls.sync(startInput, scheduleState.startDate);
+  window.AndroidControls.sync(finishInput, scheduleState.endDate);
   restList.replaceChildren(...scheduleState.restDays.map((range, index) => {
     const item = document.createElement('li');
     const label = range.start === range.end ? range.start : `${range.start} to ${range.end}`;
@@ -459,6 +506,7 @@ const renderSchedule = (message = '') => {
   scheduleTable.hidden = !rows.length;
   renderGroups(sections);
   renderProjections(bundle);
+  showPlanActions();
   if (!Object.keys(scheduleState.baselines).length) {
     scheduleStatus.textContent = 'No baseline schedule is saved yet. Calculate the schedule.';
   } else if (scheduleState.needsRecalculation) {
@@ -478,6 +526,8 @@ scheduleForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   try {
     if (!startInput.value || !finishInput.value) throw new Error('Set both plan dates.');
+    window.AndroidControls.parseDate(startInput.value);
+    window.AndroidControls.parseDate(finishInput.value);
     if (!window.ReadingSchedule.availableReadingDays(startInput.value, finishInput.value, []).length) throw new Error('The plan finish date is before its start date.');
     scheduleState.startDate = startInput.value;
     scheduleState.endDate = finishInput.value;
@@ -491,29 +541,10 @@ restForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   try {
     if (!restStart.value || !restEnd.value) throw new Error('Set both rest-day dates.');
+    window.AndroidControls.parseDate(restStart.value);
+    window.AndroidControls.parseDate(restEnd.value);
     const ranges = window.ReadingSchedule.normalizeRestDays([...scheduleState.restDays, { start: restStart.value, end: restEnd.value }]);
     scheduleState.restDays = ranges.map((range) => ({ start: window.ReadingSchedule.iso(range.start), end: window.ReadingSchedule.iso(range.end) }));
-    await scheduleChanged();
-  } catch (error) {
-    scheduleStatus.textContent = error.message;
-  }
-});
-
-groupSection.addEventListener('change', () => {
-  const bundle = readBundleData();
-  if (bundle) renderGroups(sectionsForState(bundle, scheduleState));
-});
-
-groupForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  try {
-    const bundle = readBundleData();
-    if (!bundle) throw new Error('Import a bundle before grouping its books.');
-    const sections = sectionsForState(bundle, scheduleState);
-    const section = sections.find((item) => item.label === groupSection.value);
-    if (!section) throw new Error('Choose a book section.');
-    const chosen = Array.from(groupBooks.querySelectorAll('input:checked')).map((input) => Number(input.value));
-    scheduleState.groups = { ...scheduleState.groups, [section.label]: window.ReadingSchedule.validateGroups(section.books, [...section.groups, chosen]) };
     await scheduleChanged();
   } catch (error) {
     scheduleStatus.textContent = error.message;
@@ -536,23 +567,30 @@ calculateButton.addEventListener('click', async () => {
 });
 
 const quarterEmpty = document.querySelector('#quarter-empty');
-const quarterForm = document.querySelector('#quarter-form');
-const quarterStartInput = document.querySelector('#quarter-start');
+const quarterDialog = document.querySelector('#quarter-dialog');
+const quarterOpen = document.querySelector('#open-quarter');
+const quarterDraftStatus = document.querySelector('#quarter-draft-status');
 const quarterBookForm = document.querySelector('#quarter-book-form');
 const quarterSection = document.querySelector('#quarter-section');
+window.AndroidControls.select(quarterSection);
 const quarterTitle = document.querySelector('#quarter-title');
 const quarterFrom = document.querySelector('#quarter-from');
 const quarterTo = document.querySelector('#quarter-to');
 const quarterList = document.querySelector('#quarter-list');
 const quarterStatus = document.querySelector('#quarter-status');
 let editingPlannedBook = null;
+let quarterDraft = null;
+let quarterOpeningToken = null;
 const cancelPlannedEdit = () => {
   editingPlannedBook = null;
   quarterBookForm.reset();
-  quarterSection.disabled = false;
-  quarterBookForm.querySelector('button[type="submit"]').textContent = 'Add planned book';
 };
-document.querySelector('#cancel-planned-edit').addEventListener('click', cancelPlannedEdit);
+quarterDialog.addEventListener('close', () => {
+  quarterDraft = null;
+  quarterOpeningToken = null;
+  cancelPlannedEdit();
+});
+document.querySelector('#cancel-quarter').addEventListener('click', () => quarterDialog.close());
 
 const decodeFile = (encoded, name) => new TextDecoder().decode(Uint8Array.from(atob(encoded[name]), (character) => character.charCodeAt(0)));
 const encodeFile = (bytes) => {
@@ -621,6 +659,109 @@ const writeBundleFiles = async (updates) => {
     controls.forEach((control) => { control.disabled = false; });
   }
 };
+
+const newPlanForm = document.querySelector('#create-plan-form');
+const newPlanStart = document.querySelector('#create-plan-start');
+const newPlanFinish = document.querySelector('#create-plan-finish');
+window.AndroidControls.date(newPlanStart, { mode: 'text' });
+window.AndroidControls.date(newPlanFinish, { mode: 'text' });
+const newPlanCustom = document.querySelector('#create-plan-custom');
+const newPlanStatus = document.querySelector('#new-plan-status');
+const newPlanSection = document.querySelector('#new-plan').closest('section');
+const quarterShortcut = document.createElement('button');
+quarterShortcut.type = 'button';
+quarterShortcut.textContent = 'Plan next quarter';
+quarterShortcut.addEventListener('click', () => quarterOpen.click());
+const activePlanHint = document.createElement('p');
+activePlanHint.textContent = 'Your current plan is active. Press New plan to choose start and finish dates.';
+const recalculatePlan = document.createElement('button');
+recalculatePlan.type = 'button';
+recalculatePlan.textContent = 'Recalculate current plan';
+recalculatePlan.addEventListener('click', () => calculateButton.click());
+newPlanSection.insertBefore(quarterShortcut, newPlanForm);
+newPlanSection.insertBefore(activePlanHint, newPlanForm);
+newPlanSection.insertBefore(recalculatePlan, newPlanForm);
+const showPlanActions = () => {
+  const current = readBundleFiles();
+  const active = !!current;
+  const planned = current && window.ReadingQuarter.plannedFromBundle(current.books);
+  quarterShortcut.textContent = planned ? `Edit next quarter — ${planned.startDate}` : 'Plan next quarter';
+  quarterShortcut.hidden = !active;
+  activePlanHint.hidden = !active || !newPlanForm.hidden;
+  recalculatePlan.hidden = activePlanHint.hidden;
+};
+const showPlanDates = () => {
+  const current = readBundleFiles();
+  const start = current?.plan.start_date || window.ReadingQuarter.nextQuarterStart(window.ReadingSchedule.today());
+  window.AndroidControls.sync(newPlanStart, start);
+  window.AndroidControls.sync(newPlanFinish, current?.plan.end_date || window.ReadingQuarter.periodEnd(start));
+  newPlanCustom.checked = current?.plan.end_label === 'Target finish date';
+  newPlanForm.hidden = false;
+  showPlanActions();
+};
+
+document.querySelector('#new-plan').addEventListener('click', async () => {
+  showPlanDates();
+  newPlanStatus.textContent = '';
+  if (!window.confirm('Replace the current plan?')) return;
+  try {
+    const current = readBundleFiles();
+    const start = window.ReadingQuarter.nextQuarterStart(window.ReadingSchedule.today());
+    await writeBundleFiles({
+      'plan.json': {
+        ...(current?.plan || {}), schema_version: 2, start_date: start,
+        end_date: window.ReadingQuarter.periodEnd(start), end_label: 'Quarter end', rest_days: [],
+        stats_options: { book_counts: true, page_share: true, average_pages: true, reading_period: true, pace_driver: true },
+      },
+      'books.json': { ...(current?.books || {}), schema_version: 2, sections: window.ReadingQuarter.blankSections() },
+      'sessions.json': { schema_version: 2, sessions: {} },
+    });
+    localStorage.removeItem(scheduleKey);
+    scheduleState = null;
+    if (typeof resetBook === 'function') resetBook();
+    if (typeof resetSession === 'function') resetSession();
+    renderSchedule();
+    renderQuarter();
+    showPlanDates();
+    newPlanStatus.textContent = 'New plan saved.';
+  } catch (error) {
+    newPlanStatus.textContent = `Unable to replace the plan: ${error.message}`;
+  }
+});
+
+newPlanForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  try {
+    const current = readBundleFiles();
+    if (!current) throw new Error('Replace the plan first.');
+    const start = newPlanStart.value, finish = newPlanFinish.value;
+    if (!start || !finish || finish < start) throw new Error('Finish date must be on or after the start date.');
+    window.AndroidControls.parseDate(start);
+    window.AndroidControls.parseDate(finish);
+    const end = newPlanCustom.checked ? finish : window.ReadingQuarter.periodEnd(start);
+    const bundle = readBundleData();
+    const state = scheduleState || loadSchedule(bundle);
+    const sections = sectionsForState(bundle, state);
+    const baselines = window.ReadingSchedule.calculateBaselines(sections, start, end, state.restDays);
+    window.ReadingSchedule.applyPersistedOverrides(sections, baselines, end, window.ReadingSchedule.today(), state.restDays);
+    const books = { ...current.books, sections: current.books.sections.map((section) => ({
+      ...section, baseline_needs_recalculation: false,
+      books: section.books.map((book) => ({ ...book, baseline_schedule: baselines[book.id]
+        ? { start_date: baselines[book.id].startDate, deadline: baselines[book.id].deadline, daily_target: baselines[book.id].dailyTarget }
+        : null })),
+    })) };
+    await writeBundleFiles({ 'plan.json': { ...current.plan, start_date: start, end_date: end,
+      end_label: newPlanCustom.checked ? 'Target finish date' : 'Quarter end' }, 'books.json': books });
+    localStorage.removeItem(scheduleKey);
+    scheduleState = null;
+    renderSchedule();
+    renderQuarter();
+    showPlanDates();
+    newPlanStatus.textContent = 'Plan recalculated.';
+  } catch (error) {
+    newPlanStatus.textContent = error.message;
+  }
+});
 
 const plannedDraft = () => {
   const current = readBundleFiles();
@@ -704,26 +845,41 @@ const checkRollover = async () => {
   }
 };
 
-const savePlanned = async (planned, message) => {
-  const current = readBundleFiles();
-  await writeBundleFiles({
-    'books.json': { ...current.books, planned_quarter: window.ReadingQuarter.plannedToJson(planned) },
-  });
-  if (!(await checkRollover())) renderQuarter(message);
-};
-
 const renderQuarter = (message = '') => {
+  showPlanActions();
   const current = readBundleFiles();
   quarterEmpty.hidden = !!current;
-  quarterForm.hidden = !current;
-  quarterBookForm.hidden = !current;
+  quarterOpen.hidden = !current;
   if (!current) {
-    quarterList.replaceChildren();
     quarterStatus.textContent = message;
     return;
   }
   const planned = plannedDraft();
-  quarterStartInput.value = planned.startDate;
+  const count = planned.sections.reduce((total, section) => total + section.books.length, 0);
+  quarterStatus.textContent = message || (count
+    ? `Next-quarter plan saved: ${count} ${count === 1 ? 'book' : 'books'}. Unfinished current books carry forward first, and the plan activates on ${planned.startDate}.`
+    : 'No books are planned for the next quarter yet.');
+};
+
+quarterOpen.addEventListener('click', async () => {
+  try {
+    await rollover();
+    const openingToken = localStorage.getItem(bundleKey);
+    const draft = plannedDraft();
+    if (!draft) throw new Error('Import a bundle to plan the next quarter.');
+    quarterOpeningToken = openingToken;
+    quarterDraft = draft;
+    cancelPlannedEdit();
+    quarterDraftStatus.textContent = '';
+    document.querySelector('#quarter-dialog-heading').textContent = `Next quarter — ${draft.startDate}`;
+    renderQuarterDraft();
+    quarterDialog.showModal();
+  } catch (error) {
+    quarterStatus.textContent = error.message;
+  }
+});
+
+const renderQuarterDraft = () => {
   const chosen = quarterSection.value;
   quarterSection.replaceChildren(...window.ReadingQuarter.blankSections().map((section) => {
     const option = document.createElement('option');
@@ -732,70 +888,55 @@ const renderQuarter = (message = '') => {
     return option;
   }));
   if (chosen) quarterSection.value = chosen;
+  window.AndroidControls.syncSelect(quarterSection);
   const items = [];
-  for (const section of planned.sections) {
+  for (const section of quarterDraft.sections) {
     const audio = section.label === 'Audiobooks';
     for (const book of section.books) {
       const from = audio ? book.start_time_seconds : book.start_page;
       const to = audio ? book.end_time_seconds : book.end_page;
       const item = document.createElement('li');
-      const remove = document.createElement('button');
       const edit = document.createElement('button');
       edit.type = 'button';
-      edit.textContent = 'Edit';
-      edit.setAttribute('aria-label', `Edit planned book ${book.title}`);
+      edit.textContent = `${section.label} — ${book.title}`;
+      edit.setAttribute('aria-pressed', String(editingPlannedBook === book.id));
       edit.addEventListener('click', () => {
         editingPlannedBook = book.id;
         quarterSection.value = section.label;
-        quarterSection.disabled = true;
         quarterTitle.value = book.title;
-        quarterFrom.value = from;
-        quarterTo.value = to;
-        quarterBookForm.querySelector('button[type="submit"]').textContent = 'Save planned book';
+        quarterFrom.value = audio ? window.formatReadingTime(from) : from;
+        quarterTo.value = audio ? window.formatReadingTime(to) : to;
+        renderQuarterDraft();
         quarterTitle.focus();
       });
-      remove.type = 'button';
-      remove.textContent = 'Remove';
-      remove.setAttribute('aria-label', `Remove planned book ${book.title}`);
-      remove.addEventListener('click', async () => {
-        const draft = plannedDraft();
-        for (const candidate of draft.sections) candidate.books = candidate.books.filter((entry) => entry.id !== book.id);
-        try {
-          await savePlanned(draft, `Planned book ${book.title} removed.`);
-        } catch (error) {
-          quarterStatus.textContent = error.message;
-        }
-      });
-      item.append(`${section.label}: ${book.title} (${from} to ${to} ${audio ? 'seconds' : 'pages'}) `, edit, ' ', remove);
+      item.append(edit);
       items.push(item);
     }
   }
   quarterList.replaceChildren(...items);
-  const count = items.length;
-  quarterStatus.textContent = message || (count
-    ? `Next-quarter plan saved: ${count} ${count === 1 ? 'book' : 'books'}. Unfinished current books carry forward first, and the plan activates on ${planned.startDate}.`
-    : 'No books are planned for the next quarter yet.');
 };
 
-quarterForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  try {
-    if (!quarterStartInput.value) throw new Error('Set the next-quarter start date.');
-    if (!window.ReadingQuarter.isQuarterStart(quarterStartInput.value)) throw new Error('A next-quarter plan must start on 1 January, 1 April, 1 July or 1 October.');
-    const planned = plannedDraft();
-    planned.startDate = window.ReadingSchedule.iso(window.ReadingSchedule.parseDate(quarterStartInput.value));
-    await savePlanned(planned, `Next-quarter start date saved: ${planned.startDate}.`);
-  } catch (error) {
-    quarterStatus.textContent = error.message;
+// Resolve legacy numeric groups before mutation, then retain only consecutive live IDs.
+const normalizePlannedSections = () => {
+  for (const section of quarterDraft.sections) {
+    const positions = new Map(section.books.map((book, index) => [book.id, index]));
+    section.simultaneous_groups = (section.simultaneous_groups || []).map((group) => group.filter((id) => positions.has(id))
+      .sort((left, right) => positions.get(left) - positions.get(right)))
+      .filter((group) => group.length > 1 && group.every((id, index) => !index || positions.get(id) === positions.get(group[index - 1]) + 1));
+    section.books.forEach((book, index) => { book.number = index + 1; });
   }
-});
+};
+const resolvePlannedGroups = () => {
+  for (const section of quarterDraft.sections) {
+    section.simultaneous_groups = (section.simultaneous_groups || []).map((group) => group.map((entry) =>
+      section.books.some((book) => book.id === entry) ? entry : section.books[Number(entry) - 1]?.id));
+  }
+};
 
-quarterBookForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
+const storePlannedBook = (replace) => {
   try {
-    const planned = plannedDraft();
-    if (!planned) throw new Error('Import a bundle to plan the next quarter.');
-    const section = planned.sections.find((item) => item.label === quarterSection.value);
+    if (!quarterDraft) return;
+    const section = quarterDraft.sections.find((item) => item.label === quarterSection.value);
     if (!section) throw new Error('Choose a book section.');
     const audio = section.label === 'Audiobooks';
     const title = quarterTitle.value.trim();
@@ -805,15 +946,55 @@ quarterBookForm.addEventListener('submit', async (event) => {
     if (!Number.isInteger(from) || !Number.isInteger(to) || to < from || (!audio && from < 1)) {
       throw new Error(audio ? 'Set whole-second times, with the end time on or after the start.' : 'Set whole page numbers, with the end page on or after the start page.');
     }
-    if (editingPlannedBook) {
-      const index = section.books.findIndex((book) => book.id === editingPlannedBook);
-      if (index < 0) throw new Error('This planned book changed. Cancel and choose it again.');
-      section.books[index] = { ...window.ReadingQuarter.newBook(section.label, title, from, to), id: editingPlannedBook, number: index + 1 };
-    } else section.books.push(window.ReadingQuarter.newBook(section.label, title, from, to));
-    await savePlanned(planned, `Planned ${title} for the next quarter.`);
-    cancelPlannedEdit();
+    const source = quarterDraft.sections.find((item) => item.books.some((book) => book.id === editingPlannedBook));
+    if (replace && !source) throw new Error('Select a planned book first.');
+    resolvePlannedGroups();
+    const book = window.ReadingQuarter.newBook(section.label, title, from, to);
+    if (replace) {
+      book.id = editingPlannedBook;
+      const index = source.books.findIndex((item) => item.id === book.id);
+      if (source === section) section.books[index] = book;
+      else {
+        source.books.splice(index, 1);
+        section.books.push(book);
+      }
+    } else section.books.push(book);
+    editingPlannedBook = book.id;
+    normalizePlannedSections();
+    renderQuarterDraft();
+    quarterDraftStatus.textContent = 'Draft updated. Save plan to keep these changes.';
   } catch (error) {
-    quarterStatus.textContent = error.message;
+    quarterDraftStatus.textContent = error.message;
+  }
+};
+quarterBookForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  storePlannedBook(false);
+});
+document.querySelector('#update-planned-book').addEventListener('click', () => storePlannedBook(true));
+document.querySelector('#remove-planned-book').addEventListener('click', () => {
+  if (!quarterDraft || !editingPlannedBook) return;
+  resolvePlannedGroups();
+  for (const section of quarterDraft.sections) section.books = section.books.filter((book) => book.id !== editingPlannedBook);
+  normalizePlannedSections();
+  cancelPlannedEdit();
+  renderQuarterDraft();
+  quarterDraftStatus.textContent = 'Draft updated. Save plan to keep these changes.';
+});
+document.querySelector('#save-quarter').addEventListener('click', async () => {
+  try {
+    await rollover();
+    if (localStorage.getItem(bundleKey) !== quarterOpeningToken) {
+      throw new Error('The plan changed while you were editing. Reopen the editor before saving.');
+    }
+    const current = readBundleFiles();
+    resolvePlannedGroups();
+    normalizePlannedSections();
+    await writeBundleFiles({ 'books.json': { ...current.books, planned_quarter: window.ReadingQuarter.plannedToJson(quarterDraft) } });
+    quarterDialog.close();
+    renderQuarter('Next-quarter plan saved.');
+  } catch (error) {
+    quarterDraftStatus.textContent = error.message;
   }
 });
 

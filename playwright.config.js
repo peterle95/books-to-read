@@ -1,11 +1,13 @@
 const { defineConfig } = require('@playwright/test');
+const port = Number(process.env.PLAYWRIGHT_PORT || 4173);
 
 module.exports = defineConfig({
   testDir: './web-tests',
-  use: { baseURL: 'http://127.0.0.1:4173/books-to-read/' },
+  workers: 1,
+  use: { baseURL: `http://127.0.0.1:${port}/books-to-read/` },
   webServer: {
     command: 'node web-tests/server.js',
-    port: 4173,
-    reuseExistingServer: !process.env.CI,
+    port,
+    reuseExistingServer: false,
   },
 });

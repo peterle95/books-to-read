@@ -298,12 +298,15 @@ test('readers see projections for an imported bundle without changing its schedu
   });
 
   await page.goto('./');
+  await page.getByRole('button', { name: 'Plan', exact: true }).click();
   await expect(page.getByTestId('projection-empty')).toBeVisible();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByLabel('Bundle files').setInputFiles(files);
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: 'Import bundle' }).click();
   await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
 
+  await page.getByRole('button', { name: 'Plan', exact: true }).click();
   const rows = page.locator('#projection-rows tr');
   await expect(rows).toHaveCount(2);
   await expect(rows.nth(0)).toHaveText('Digital books · pages');

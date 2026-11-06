@@ -19,11 +19,72 @@ actual Android/desktop device evidence. Keep the native Android and desktop apps
 | Summary settings and start-date overrides | Editable, persisted in bundles; verify on phone and desktop |
 | Desktop snapshot comparison | Desktop-only, intentionally out of scope |
 
-The reader requested all editing conveniences above; they are included in this
-implementation. Chart rendering is native-style SVG, not pixel-identical to
-Android, and chart display is bounded to ten years around today. The reader
-must still confirm usability and numerical results on the actual devices.
-Full desktop replacement is not a release goal. No native or desktop app is removed.
+The reader requested all editing conveniences above. As of 2026-11-06, history
+edit/delete dialogs with delete confirmation, the native-style simultaneous-group
+picker and replacement flow, Books chooser and overrides hierarchy, and header
+Settings access are implemented with automated coverage, not visual approval.
+The current Android build is the reference for screen structure,
+controls, chart content and interactions; chart/design divergence is **not** an
+accepted release exception. Web charts use SVG and display is bounded to ten
+years around today, but their presentation and behavior still need comparison
+against Android. The reader must confirm usability and numerical results on
+actual devices. Full desktop replacement is not a release goal. No native or
+desktop app is removed.
+
+## Android → web parity (in progress)
+
+Compare against the **current Android build**, not an older mockup. Scope is
+responsive mobile **and** desktop web layouts, with the same reader-used features
+and Android screen hierarchy, controls and visual presentation. Visual differences
+are not a second release exception. The only accepted exception is synchronization: Android
+directory/Syncthing access becomes manual four-file import and ZIP export on web,
+with one active editor and no automatic merge or sync.
+
+Browser-native controls are **not** an approved exception. Custom Android-style
+calendar and selection controls are integrated and covered by automated tests;
+their integration is not visual sign-off.
+
+| Area | Web implementation / parity evidence | Remaining before release |
+| --- | --- | --- |
+| Session | Session entry, targets and history actions implemented; focused browser contract covers page/audio corrections and deletions | Compare layout, history sheet and interactions with Android; actual-device check |
+| Plan | Dates, rest days, next quarter and New plan flows implemented; transactional next-quarter editor and stale-draft guard covered, including rollover; browser workflows cover draft retention and export | Compare Android controls, schedule values and responsive presentation; actual-device check |
+| Books | Three formats, Today reading, ordering, native-style chooser, overrides hierarchy and simultaneous-group picker/replacement implemented; browser workflows cover these controls, moves, completion and transfer | Compare editing on phone and desktop web against Android; actual-device check |
+| Charts | Single-book selection, All, projection toggle and Metrics action in the chart header implemented; focused browser checks cover chart elements and header placement | Compare plots, labels, scales and visual design against Android; numerical and actual-device check |
+| Settings | Header Settings access with wrench icon, bundle transfer and imported summary-option preservation implemented; browser checks cover header navigation and backup flow | Compare Android screen structure and backup flow; actual-device check |
+| History / metrics sheets | History edit/delete dialogs with delete confirmation and focused metrics tables with current required pace implemented; browser checks cover cancellation, validation, stale targets, pace calculations and sheet controls | Compare sheet content, gestures, dimensions and mobile/desktop behavior with Android; actual-device check |
+
+Reference evidence collected so far: Android emulator screenshots of Session,
+Plan, Books, Charts and Settings were saved in external temporary storage; web
+captures of Session, Plan, Books and Charts were also saved there. Browser visual
+tests in `web-tests/visual-parity.spec.js` capture all five screens at mobile,
+tablet and desktop viewports and check geometry/containment and navigation. They
+do not compare screenshots with Android references and do not load populated
+plan fixtures. Populated synthetic fixtures now cover first-fold layout at
+360×732 and chooser, group and history controls in
+`web-tests/visible-layout-parity.spec.js`; these layout changes are implemented
+with automated coverage, **not visual approval**. A fresh same-data Android/web
+comparison is actively pending, including populated books, groups, overrides,
+history, charts and open dialogs/sheets.
+Known visual residuals remain: History has a **−2.776 px origin offset**;
+calendar weekday/day ink alignment and shadows still differ; and quarter footer
+text remains **2 physical px lower** than native. The earlier 622.188 px quarter
+height discrepancy is historical: the latest verified snapshot covers measured
+mobile/desktop quarter geometry, including the native-source **27dp label box**
+and regular **400 footer weight**. This bounded geometry coverage is not visual
+approval. These residuals remain unresolved parity checks, not accepted exceptions.
+These captures are comparison inputs, **not**
+proof of visual equivalence or actual-device sign-off. Do not link local temp
+paths in release notes; retain evidence with the verification run instead.
+
+**Hard release gate:** do not approve the web switch until Session, Plan, Books,
+Charts and Settings, their history/metrics sheets, and all reader-used features
+match the current Android build in behavior and acceptable mobile/desktop visual
+presentation (apart from the manual-transfer-only sync exception). Review the
+Android emulator reference and web visual fixtures side by side; resolve
+differences rather than accepting chart/design divergence. Run the automated
+checks and complete the actual Android phone and desktop-browser checklist below,
+including safe two-way transfer and offline/update/backup checks. Record results
+and remaining limitations in #44. **Parity and device sign-off remain pending.**
 
 ## One active editor and safe transfers
 
@@ -103,12 +164,108 @@ ordering when imported contributions already match. The real-data workflow uses 
 four recorded sessions) and asserts the source files are unchanged. This is
 automated transfer evidence, not desktop GUI or actual Android verification.
 
-Final automated run: `npm run test:web` — **28 passed**. JavaScript syntax
-checks (`node --check` for every `web/*.js` file) passed. There is no configured
-TypeScript/typechecking task. Both review axes have no remaining implementation
-blockers after the history-order and implicit-progress fixes.
+Prior automated run (2026-11-03): `npm run test:web` — **28 passed**. JavaScript
+syntax checks (`node --check` for every `web/*.js` file) passed. There is no
+configured TypeScript/typechecking task. At that point both review axes had no
+remaining implementation blockers within the older functional scope after the
+history-order and implicit-progress fixes. The 28-test result and that review
+conclusion are historical, not evidence that the current Android parity scope
+passes or has no blockers. They do not close the parity and actual-device gate
+above.
 
-The baseline Python suite has two existing failures:
+The previously recorded baseline Python run reported two existing failures:
 `test_remaining_plan_reflow_excludes_rest_days` and
 `test_session_target_starts_from_today_current_page`. They predate these web
-changes; retain them as release limitations until triaged, not as passing checks.
+changes according to that prior evidence; they have not been newly rerun for
+this documentation update. Retain them as release limitations until triaged,
+not as passing checks.
+
+Historical supplied automated evidence (2026-11-06): full `npm run test:web` —
+**103 passed**, one worker, zero retries, terminal exit code **0**, in **5.5
+minutes**. Syntax checks (`node --check`) passed for all **11** `web/*.js`
+files, and the whitespace check (`git diff --check`) passed. The external run
+log is identified as `final-web-verify-20261106-121641`; no machine-specific
+path is needed here. This is an earlier baseline, not the current full-suite
+result. These results are supplied run evidence, not a fresh suite
+run for this docs-only update, and do not establish 1:1 visual parity. Fresh
+same-data comparison and actual Android/desktop device verification remain
+pending; issue #44 stays open and the web switch is not approved.
+
+Historical frozen full-suite evidence (2026-11-06), run
+`frozen-web-verify-20261106-165434`: **109 passed, 1 failed** out of 110,
+terminal exit code **1**, in **3.9 minutes**. The failing native-assets contract
+expected weight 500 for `#open-entries` but received 400. Contract resolution
+was pending at the end of that run; it is not a full-suite pass.
+
+Source review resolves that expectation to **400**: Android
+`ReadingPlanSessionView.java:31` creates Entries via `actionButton`;
+`MainActivity.java:279` delegates to `ReadingPlanUi.actionButton` (lines 26–42),
+which does not set a typeface or weight. `res/values/styles.xml:2–3` supplies
+AppTheme's explicit `android:fontFamily` of `sans`, overriding Material's
+medium button family. The stale test expectation was corrected, not the CSS.
+The focused rerun of `web-tests/native-assets.spec.js`, one worker, zero retries,
+on isolated port 44271: **4 passed**, terminal exit code **0**, in **10.6 seconds**;
+external log identifier `native-assets-contract-44271`. Only the test and this
+document changed for that correction; frozen web source hash
+`9571bbfd5dcf2d82b10094228f42a209fec0bf192689295bd0e4fd30962778fb`
+was unchanged for that correction. That focused run did not establish a
+full-suite pass; the settled complete run below now supersedes this historical
+109/110 result and any intermediate 154/155 result, not the visual release gate.
+
+### Historical pre-quarter complete web verification — AUTOMATED ONLY
+
+Verified supplied evidence (2026-11-06), run
+`final-fullverification-20261106-233923-154a7e05`: **157 total, 157 passed,
+0 failed, 0 skipped**, terminal exit code **0**, in **6.1 minutes**.
+`execution.txt`, `playwright-line.log` and `results/.last-run.json` record the
+completed run, not an in-progress count. Command: `npm.cmd run test:web --
+--workers=1 --retries=0 --reporter=line` with an external temporary output
+directory. Environment: `CI=1`, one worker, zero retries, ephemeral port
+**58303**, `reuseExistingServer=false`.
+
+`node-check.log` records **49 JavaScript files checked, 0 failures** across web
+and browser-test scripts. `git-diff-check.log` records whitespace-check exit
+**0**, with `reading_plan_data/` excluded. The start/end SHA-256 manifests and
+`stability.txt` record **145 source/configuration/documentation/asset files,
+0 hash differences** during the run; this documentation update follows that
+snapshot. Live `reading_plan_data/` is outside that source manifest; its
+separate metadata snapshots record **0 differences** during the run. This is
+run-local stability evidence, not a claim that the working tree or live data
+matches Git HEAD.
+
+### Latest settled complete web verification — AUTOMATED ONLY
+
+Verified supplied evidence (2026-11-07), run
+`quarter-full-verification-20261107-000852-90d9f808`: **159 total, 159 passed,
+0 failed, 0 skipped**, terminal exit code **0**, in **4.1 minutes**.
+`FINAL-REPORT.md`, `execution.txt`, `playwright-line.log` and
+`results/.last-run.json` confirm terminal completion. The run started at
+**00:08:59 +01:00** and ended at **00:13:05 +01:00**. Command:
+`npm.cmd run test:web -- --workers=1 --retries=0 --reporter=line` with an
+external temporary output directory. Environment: `CI=1`, one worker, zero
+retries, fresh ephemeral port **50545**, `reuseExistingServer=false`.
+
+`node-check.log` records **49 JavaScript files checked, 0 failures**.
+`git-diff-check.log` records whitespace-check exit **0**, excluding
+`reading_plan_data/`. The before/after SHA-256 manifests record **174
+source/configuration/documentation/test/native/asset files, 0 hash differences**.
+Both manifest files have SHA-256
+`d10806adae385b1190615511ca1d24b9568cc4f3d7da8956450a592df6c5f9f1`.
+Separate user-data metadata snapshots record **0 differences**; live user JSON
+contents were **not read or hashed**. Metadata stability does not establish
+content equivalence. The manifest identifies the tested dirty-working-tree
+snapshot, not Git HEAD or any later edits. This documentation update and any
+subsequent calendar/product changes are outside that verified snapshot.
+
+The 157-test pass above is historical pre-quarter evidence. An older quarter
+run with **159 total, 158 passed, 1 failed** had a conflicting assertion, now
+reconciled against the native-source 27dp label geometry and 400 footer weight;
+it was not a full-suite pass. The settled 159/159 run supersedes those results
+for its snapshot only, not the visual release gate.
+
+This is **AUTOMATED ONLY**, not 1:1 Android/web visual parity or switch approval.
+No actual-device/deployment verification, Python suite rerun or native build was
+performed for this update. The previously recorded Python failures remain
+unverified, not newly passing. Visual residuals and the device checklist above
+remain open; issue #44 stays open. No GitHub comment, issue closure or commit
+is part of this documentation update.

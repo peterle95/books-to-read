@@ -14,8 +14,9 @@
   const addYears = (day, years) => {
     const date = new Date(day * DAY_MS);
     const year = date.getUTCFullYear() + years;
+    if (year > 9999) return parseDate('9999-12-31');
     const month = date.getUTCMonth() + 1;
-    return parseDate(`${year}-${month}-${Math.min(date.getUTCDate(), monthDays(year, month))}`);
+    return parseDate(`${String(year).padStart(4, '0')}-${month}-${Math.min(date.getUTCDate(), monthDays(year, month))}`);
   };
 
   const dateLabel = (day, todayYear) => {
@@ -115,7 +116,9 @@
     const lowerAt = (readingDays) => (rangeAvailable ? progressAt(readingDays, -1) : -1);
     const upperAt = (readingDays) => (rangeAvailable ? progressAt(readingDays, 1) : -1);
 
-    // Bound remote forecasts to ten years rather than fabricating finish dates.
+    // Bound remote forecasts to ten years and the supported calendar range.
+    const todayYear = new Date(todayDay * DAY_MS).getUTCFullYear();
+    const horizonLimited = todayYear + HORIZON_YEARS > 9999;
     const horizon = addYears(todayDay, HORIZON_YEARS);
     const finiteLatest = rangeAvailable && pace > criticalValue * Math.sqrt(variance / observationDays);
     let central = completed >= total ? todayDay : null;
@@ -135,10 +138,9 @@
       }
     }
 
-    const todayYear = new Date(todayDay * DAY_MS).getUTCFullYear();
     const label = (day) => dateLabel(day, todayYear);
     const projectionLabel = `Projection · est. end date: ${
-      central == null ? (pace > 0 ? 'beyond 10 years' : '—') : label(central)}`;
+      central == null ? (pace > 0 ? (horizonLimited ? 'beyond supported date range' : 'beyond 10 years') : '—') : label(central)}`;
     let rangeLabel;
     if (completed >= total) {
       rangeLabel = 'Book finished — no future uncertainty';
@@ -147,7 +149,7 @@
     } else if (pace <= 0) {
       rangeLabel = 'Estimated finish range: Not enough reading progress';
     } else if (earliest == null) {
-      rangeLabel = 'Estimated finish range: beyond 10-year forecast horizon';
+      rangeLabel = `Estimated finish range: ${horizonLimited ? 'beyond supported date range' : 'beyond 10-year forecast horizon'}`;
     } else if (latest == null) {
       rangeLabel = `Estimated finish range: ${label(earliest)} onward; latest finish uncertain`;
     } else {

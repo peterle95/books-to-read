@@ -3,15 +3,16 @@
   const DAY_MS = 86400000;
   const AUDIOBOOKS = 'Audiobooks';
 
-  const monthDays = (year, month) => [31, year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1];
-
   const parse = (value) => {
     // The desktop bundle accepts non-padded month and day numbers.
     const match = typeof value === 'string' && /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(value);
     if (!match) throw new Error(`Invalid date: ${value}`);
     const year = Number(match[1]), month = Number(match[2]), day = Number(match[3]);
-    if (month < 1 || month > 12 || day < 1 || day > monthDays(year, month)) throw new Error(`Invalid date: ${value}`);
-    return Math.round(Date.UTC(year, month - 1, day) / DAY_MS);
+    const date = new Date(0);
+    // Unlike Date.UTC, this preserves bundle years 0001–0099.
+    date.setUTCFullYear(year, month - 1, day);
+    if (year < 1 || date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) throw new Error(`Invalid date: ${value}`);
+    return date.getTime() / DAY_MS;
   };
   const iso = (day) => new Date(day * DAY_MS).toISOString().slice(0, 10);
   const total = (items) => items.reduce((sum, item) => sum + item, 0);
@@ -116,7 +117,7 @@
       cumulativeWork += groupWork;
       const cumulativeDays = dailyPace <= 0 || cumulativeWork === 0 ? previousDays : Math.max(1, Math.ceil(cumulativeWork / dailyPace - 1e-9));
       const allocated = cumulativeDays - previousDays;
-      const deadline = readingDays.length ? readingDays[Math.min(cumulativeDays, readingDays.length) - 1] : end;
+      const deadline = readingDays.length ? readingDays[Math.max(0, Math.min(cumulativeDays, readingDays.length) - 1)] : end;
       const groupStart = readingDays.length ? (allocated === 0 ? deadline : readingDays[previousDays]) : end;
       for (const member of groupBooks) {
         const work = workOf(member);
@@ -321,7 +322,77 @@
     };
   };
 
+  // Session targets use the live required pace, not the saved baseline daily target.
+  const sessionTarget = (planFile, booksFile, sectionLabel, bookId, dateIso, todayIso = window.ReadingSchedule.today()) => {
+    const sections = sectionsFromBooksFile(booksFile);
+    const section = sections.find((item) => item.label === sectionLabel.trim());
+    const book = section?.books.find((item) => item.id === bookId);
+    if (!book) throw new Error('No target available.');
+    const rest = planFile.rest_days || [];
+    const state = stateFromBundle(planFile, booksFile);
+    const remainingStart = effectiveRemainingStart(parse(planFile.start_date), parse(planFile.end_date), parse(todayIso), normalizeRestDays(rest));
+    const live = calculateBaselines([section], iso(remainingStart), planFile.end_date, rest, true);
+    const saved = !booksFile.sections.find((item) => item.label.trim() === section.label).baseline_needs_recalculation
+      && section.books.every((item) => state.baselines[item.id]) ? state.baselines[bookId] : null;
+    const baseline = saved || live[bookId];
+    if (!baseline) throw new Error('No target available.');
+    const start = parse(baseline.startDate), deadline = parse(baseline.deadline);
+    const today = parse(todayIso), date = parse(dateIso);
+    const paceStart = effectiveRemainingStart(start, deadline, today, normalizeRestDays(rest));
+    const days = availableDays(paceStart, deadline, normalizeRestDays(rest)).length;
+    const dailyPace = book.remaining && days ? book.remaining / days : 0;
+    let target = book.completed;
+    if (!book.remaining || date > deadline) target = book.total;
+    else if (date >= start && dailyPace > 0) {
+      const from = book.completed && today > start ? today : start;
+      if (date >= from) target = Math.min(book.total, book.completed + Math.ceil(dailyPace * availableDays(from, date, normalizeRestDays(rest)).length - 1e-9));
+    }
+    const raw = booksFile.sections.find((item) => item.label.trim() === section.label).books.find((item) => item.id === bookId);
+    const first = Number(section.audio ? raw.start_time_seconds ?? 0 : raw.start_page ?? 1);
+    return {
+      value: section.audio ? formatDuration(book.total - target) : String(target <= 0 ? first : first + target - 1),
+      dailyPace: section.audio ? formatDuration(dailyPace) : String(Math.max(0, Math.ceil(dailyPace - 1e-9))),
+      units: target,
+      completed: book.completed,
+    };
+  };
+
+  const formatDuration = (value) => {
+    const seconds = Math.max(0, Math.round(value));
+    const hours = Math.floor(seconds / 3600), minutes = Math.floor(seconds / 60) % 60, remainder = seconds % 60;
+    return `${hours}:${String(minutes).padStart(2, '0')}${remainder ? `:${String(remainder).padStart(2, '0')}` : ''}`;
+  };
+
+  // Books view uses a fresh remaining-work plan, independent of saved baselines.
+  const todayReading = (planFile, booksFile, label, todayIso = window.ReadingSchedule.today()) => {
+    const sections = sectionsFromBooksFile(booksFile);
+    const section = sections.find((item) => item.label === label.trim());
+    if (!section) return {};
+    const rest = normalizeRestDays(planFile.rest_days);
+    const today = parse(todayIso), end = parse(planFile.end_date);
+    const start = effectiveRemainingStart(parse(planFile.start_date), end, today, rest);
+    const baselines = calculateBaselines(sections, iso(start), planFile.end_date, planFile.rest_days, true);
+    applyPersistedOverrides(sections, baselines, planFile.end_date, todayIso, planFile.rest_days);
+    const result = {};
+    for (const book of section.books) {
+      const baseline = baselines[book.id];
+      const first = parse(baseline.startDate), last = parse(baseline.deadline);
+      let value = section.audio ? formatDuration(0) : '0';
+      if (today >= first && today <= last && !rest.some((range) => today >= range.start && today <= range.end)) {
+        const pace = baseline.dailyTarget;
+        // Audio targets are cumulative rounded units; today's amount is the difference.
+        const elapsed = availableDays(first, today, rest).length;
+        const audioUnits = Math.max(0, Math.min(book.remaining, Math.ceil(pace * elapsed - 1e-9))
+          - Math.min(book.remaining, Math.ceil(pace * (elapsed - 1) - 1e-9)));
+        value = section.audio ? formatDuration(audioUnits) : String(Math.ceil(pace - 1e-9));
+      }
+      result[book.id] = { value, startDate: baseline.startDate, deadline: baseline.deadline };
+    }
+    return result;
+  };
+
   window.ReadingSchedule = {
+    todayReading,
     applyStartOverride,
     sectionsFromBooksFile,
     units,
@@ -335,6 +406,7 @@
     withLocalSettings,
     requiredPace,
     stateFromBundle,
+    sessionTarget,
     iso,
     parseDate: parse,
     today: () => {

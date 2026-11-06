@@ -217,14 +217,18 @@ test('a due next-quarter plan activates on import, persists and exports to deskt
     const row = (title) => page.locator('#schedule-rows tr').filter({ has: page.getByRole('cell', { name: title, exact: true }) });
 
     await page.goto('./');
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await page.getByLabel('Bundle files').setInputFiles(files);
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: 'Import bundle' }).click();
+    await page.getByRole('button', { name: 'Plan', exact: true }).click();
     await expect(page.getByTestId('quarter-status')).toHaveText(`Next quarter activated: ${dates.due} to ${dates.dueEnd}.`);
 
     // Unfinished books carry forward before the planned books; finished work is gone.
     await expect(page.getByLabel('Plan start')).toHaveValue(dates.due);
-    await expect(page.getByLabel('Next quarter starts')).toHaveValue(dates.future);
+    await page.getByRole('button', { name: 'Edit next-quarter plan' }).click();
+    await expect(page.locator('#quarter-dialog-heading')).toHaveText(`Next quarter — ${dates.future}`);
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click();
     await expect(row('Ongoing')).toHaveCount(1);
     await expect(row('Paired')).toHaveCount(1);
     await expect(row('Audio')).toHaveCount(1);
@@ -244,12 +248,14 @@ test('a due next-quarter plan activates on import, persists and exports to deskt
     expect(sessions.finished).toBeUndefined();
 
     await page.reload();
+    await page.getByRole('button', { name: 'Plan', exact: true }).click();
     await expect(page.getByTestId('quarter-status')).toHaveText('No books are planned for the next quarter yet.');
     await expect(row('Next story')).toHaveCount(1);
     await expect(row('Finished')).toHaveCount(0);
     await expect(page.getByLabel('Plan start')).toHaveValue(dates.due);
 
     const download = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await page.getByRole('button', { name: 'Export bundle ZIP' }).click();
     const zip = path.join(directory, 'bundle.zip');
     await (await download).saveAs(zip);
@@ -282,43 +288,43 @@ test('the next quarter can be planned, inspected, changed and removed before it 
     const files = readFiles(directory);
 
     await page.goto('./');
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await page.getByLabel('Bundle files').setInputFiles(files);
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: 'Import bundle' }).click();
+    await page.getByRole('button', { name: 'Plan', exact: true }).click();
     await expect(page.getByTestId('quarter-status')).toHaveText(
       `Next-quarter plan saved: 2 books. Unfinished current books carry forward first, and the plan activates on ${dates.future}.`,
     );
+    await page.getByRole('button', { name: 'Edit next-quarter plan' }).click();
+    await expect(page.locator('#quarter-dialog-heading')).toHaveText(`Next quarter — ${dates.future}`);
     await expect(page.getByLabel('Next-quarter books').locator('li')).toHaveText([
-      'Physical books: Next story (1 to 80 pages) Edit Remove',
-      'Audiobooks: Next audio (0 to 600 seconds) Edit Remove',
+      'Physical books — Next story', 'Audiobooks — Next audio',
     ]);
 
-    // The next quarter must start on a calendar quarter boundary.
-    await page.getByLabel('Next quarter starts').fill(dates.notBoundary);
-    await page.getByRole('button', { name: 'Save quarter start' }).click();
-    await expect(page.getByTestId('quarter-status')).toHaveText('A next-quarter plan must start on 1 January, 1 April, 1 July or 1 October.');
-
-    await page.getByLabel('Format', { exact: true }).selectOption('Digital books');
-    await page.getByLabel('Book title', { exact: true }).fill('Future read');
-    await page.getByLabel('Start page or time in seconds').fill('1');
-    await page.getByLabel('End page or time in seconds').fill('30');
-    await page.getByRole('button', { name: 'Add planned book' }).click();
-    await expect(page.getByTestId('quarter-status')).toHaveText('Planned Future read for the next quarter.');
+    await page.locator('#quarter-dialog').getByRole('combobox', { name: 'Format', exact: true }).click();
+    await page.getByRole('option', { name: 'Digital books', exact: true }).click();
+    await page.locator('#quarter-title').fill('Future read');
+    await page.getByLabel('Start page/time (audio: HH:MM or HH:MM:SS)').fill('1');
+    await page.getByLabel('End page/time').fill('30');
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
     await expect(page.getByLabel('Next-quarter books').locator('li')).toHaveCount(3);
 
-    await page.getByRole('button', { name: 'Remove planned book Next audio' }).click();
-    await expect(page.getByTestId('quarter-status')).toHaveText('Planned book Next audio removed.');
-    await page.getByLabel('Next quarter starts').fill(dates.beyond);
-    await page.getByRole('button', { name: 'Save quarter start' }).click();
-    await expect(page.getByTestId('quarter-status')).toHaveText(`Next-quarter start date saved: ${dates.beyond}.`);
+    await page.getByRole('button', { name: 'Audiobooks — Next audio', exact: true }).click();
+    await page.getByRole('button', { name: 'Remove selected', exact: true }).click();
+    await page.locator('#save-quarter').click();
+    await expect(page.getByTestId('quarter-status')).toHaveText('Next-quarter plan saved.');
 
     await page.reload();
-    await expect(page.getByLabel('Next quarter starts')).toHaveValue(dates.beyond);
+    await page.getByRole('button', { name: 'Plan', exact: true }).click();
+    await page.getByRole('button', { name: 'Edit next-quarter plan' }).click();
+    await expect(page.locator('#quarter-dialog-heading')).toHaveText(`Next quarter — ${dates.future}`);
     await expect(page.getByLabel('Next-quarter books').locator('li')).toHaveText([
-      'Physical books: Next story (1 to 80 pages) Edit Remove',
-      'Digital books: Future read (1 to 30 pages) Edit Remove',
+      'Physical books — Next story',
+      'Digital books — Future read',
     ]);
-    await expect(page.getByLabel('Plan start')).not.toHaveValue(dates.beyond);
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await expect(page.getByLabel('Plan start')).not.toHaveValue(dates.future);
 
     // The planned books stay readable by the desktop app, with no progress or history.
     const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('reading-plan-bundle-v1')));
@@ -335,7 +341,7 @@ assert [[book.title for book in section.books] for section in planned.sections] 
 assert all(book.current_page is None for section in planned.sections for book in section.books if section.label != 'Physical books')
 assert planned.sections[0].books[0].pages == 80
 assert len(rest) == 1
-`, directory, dates.beyond]);
+`, directory, dates.future]);
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }

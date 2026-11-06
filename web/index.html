@@ -3,19 +3,125 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#244b42">
+  <meta name="theme-color" content="#f1e4d4">
   <meta name="description" content="A private, offline reading plan on this device.">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="apple-touch-icon" href="./icon-192.png">
   <link rel="stylesheet" href="./style.css">
+  <link rel="preload" href="./assets/android/Roboto-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="./android-native.css">
+  <link rel="stylesheet" href="./android-calendar.css">
   <title>Reading Plan</title>
 </head>
 <body>
-  <main>
+  <header class="app-header">
     <h1>Reading Plan</h1>
+    <div class="header-actions">
+      <button id="json-status" type="button" data-loaded="false" aria-label="JSON not loaded. Open Settings" aria-controls="screen-settings" aria-expanded="false">JSON</button>
+      <button id="open-settings" type="button" aria-label="Settings" aria-controls="screen-settings" aria-expanded="false"><span class="native-settings-icon" aria-hidden="true"></span></button>
+    </div>
+  </header>
+  <main>
     <section id="update-notice" class="notice" data-testid="update-notice" aria-live="polite" hidden>
       <p>A new version of the app is ready. Your saved plan stays on this device.</p>
       <button id="reload-update" type="button">Reload to update</button>
+    </section>
+    <div id="screen-session" class="screen" aria-label="Session">
+      <div class="session-heading"><h2>Reading session</h2><button id="open-entries" type="button" aria-haspopup="dialog" aria-controls="entries-dialog">Entries</button></div>
+      <section class="session-card" aria-labelledby="session-format-heading">
+        <h3 id="session-format-heading">Choose a format</h3>
+        <div id="session-formats" class="session-choices" role="group" aria-label="Choose a format"></div>
+      </section>
+      <section class="session-card" aria-labelledby="session-books-heading">
+        <h3 id="session-books-heading">Choose a book</h3>
+        <div id="session-books" class="session-choices" role="group" aria-label="Choose a book"></div>
+      </section>
+      <form id="session-form" hidden>
+        <label for="session-book" hidden aria-hidden="true">Reading session book</label><select id="session-book" hidden aria-hidden="true" tabindex="-1"></select>
+        <label for="session-date">Date</label><input id="session-date" type="text" data-date-mode="text" required>
+        <label for="session-position" id="session-position-label">Current page</label><input id="session-position" required>
+        <button type="submit" id="save-session">Add session</button>
+      </form>
+    </div>
+    <p id="editor-status" data-testid="editor-status" role="status" aria-live="polite"></p>
+    <dialog id="entries-dialog" aria-labelledby="entries-heading">
+      <div class="entries-handle" aria-hidden="true"></div>
+      <div class="entries-heading"><h2 id="entries-heading">Reading history</h2><button id="close-entries" type="button">Close</button></div>
+      <label for="entries-book" class="visually-hidden">Book</label><select id="entries-book" hidden aria-hidden="true" tabindex="-1"></select>
+      <div id="entries-content"><ul id="history-list" aria-label="Reading history"></ul></div>
+    </dialog>
+    <dialog id="session-entry-dialog" aria-labelledby="session-entry-heading">
+      <h2 id="session-entry-heading">Edit session</h2>
+      <form id="session-entry-form">
+        <div id="session-entry-fields">
+          <label for="session-entry-date">Session date</label><input id="session-entry-date" type="text" data-date-mode="text" required>
+          <label for="session-entry-position" id="session-entry-position-label">Session current page</label><input id="session-entry-position" required>
+        </div>
+        <p id="session-entry-delete" hidden>This session will be removed and progress recalculated.</p>
+        <p id="session-entry-status" role="status" aria-live="polite"></p>
+        <div class="session-entry-actions"><button id="session-entry-cancel" type="button">Cancel</button><button id="session-entry-save" type="submit">Save</button></div>
+      </form>
+    </dialog>
+    <div id="screen-books" class="screen" aria-label="Books" hidden>
+    <section aria-labelledby="books-heading">
+      <h2 id="books-heading">Books</h2>
+      <form id="book-form" hidden>
+        <label for="book-format">Format</label>
+        <select id="book-format" hidden aria-hidden="true" tabindex="-1"><option>Physical books</option><option>Digital books</option><option>Audiobooks</option></select>
+        <button id="open-book-picker" type="button" aria-haspopup="dialog" aria-controls="book-picker-dialog">Choose book to edit</button>
+        <label for="book-title">Title</label><input id="book-title">
+        <label for="book-from" id="book-from-label">Start page</label><input id="book-from" value="1" inputmode="numeric">
+        <label for="book-to" id="book-to-label">End page</label><input id="book-to" inputmode="numeric">
+        <label for="book-start-override">Start date override</label><input id="book-start-override" type="text" readonly>
+        <div class="book-actions book-override-actions"><button id="set-book-start" type="button">Set start date</button><button id="clear-book-start" type="button" hidden>Clear start date</button></div>
+        <label for="book-deadline-override">Deadline override</label><input id="book-deadline-override" type="text" readonly>
+        <div class="book-actions book-override-actions"><button id="set-book-deadline" type="button">Set deadline</button><button id="clear-book-deadline" type="button" hidden>Clear deadline</button></div>
+        <div class="book-actions"><button id="add-book" type="button">Add</button><button id="insert-book" type="button">Insert Before</button></div>
+        <div class="book-actions"><button id="replace-book" type="submit">Replace Selected</button><button id="delete-book" type="button">Delete Selected</button></div>
+        <button id="complete-book" type="button">Complete Selected</button>
+        <div class="book-actions"><button id="move-book-up" type="button">Move Up</button><button id="move-book-down" type="button">Move Down</button></div>
+        <button id="cancel-book" type="button">Cancel book edit</button>
+        <h3>Simultaneous groups</h3>
+        <div class="book-actions"><button id="select-book-group" type="button" aria-haspopup="dialog" aria-controls="book-group-dialog">Select simultaneous books</button><button id="clear-book-groups" type="button">Clear groups</button></div>
+      </form>
+      <section aria-labelledby="today-reading-heading"><h3 id="today-reading-heading">Today's reading</h3><div id="today-reading"></div></section>
+    </section>
+    </div>
+    <dialog id="book-picker-dialog" aria-labelledby="book-picker-heading">
+      <h2 id="book-picker-heading">Choose a book to edit</h2>
+      <p id="book-picker-format" class="visually-hidden"></p>
+      <div id="book-picker-choices"></div>
+      <div class="dialog-actions"><button id="cancel-book-picker" type="button">Cancel</button></div>
+    </dialog>
+    <dialog id="book-group-dialog" aria-labelledby="book-group-heading">
+      <h2 id="book-group-heading">Select books to read simultaneously</h2>
+      <form id="book-group-form">
+        <div id="book-group-format" class="visually-hidden"></div><div id="book-group-choices"></div>
+        <p id="book-group-status" role="status" aria-live="polite"></p>
+        <div class="dialog-actions"><button id="cancel-book-group" type="button">Cancel</button><button type="submit">Apply</button></div>
+      </form>
+    </dialog>
+    <div id="screen-plan" class="screen" aria-label="Plan" hidden>
+    <section aria-labelledby="new-plan-heading">
+      <div class="plan-heading"><h2 id="new-plan-heading">Plan</h2><button id="new-plan" type="button">New plan</button></div>
+      <form id="create-plan-form" hidden>
+        <label for="create-plan-start">Start date</label><input id="create-plan-start" type="text" data-date-mode="text" required>
+        <label><input id="create-plan-custom" type="checkbox"> Custom finish date</label>
+        <label for="create-plan-finish">Finish date</label><input id="create-plan-finish" type="text" data-date-mode="text" required>
+        <button type="submit">Create plan</button>
+      </form>
+      <p id="new-plan-status" role="status" aria-live="polite"></p>
+    </section>
+    <section aria-labelledby="rest-heading">
+      <h3 id="rest-heading">Rest-day ranges</h3>
+      <ul id="rest-list" aria-label="Rest days"></ul>
+      <form id="rest-form">
+        <label for="rest-start">Rest day from</label>
+        <input id="rest-start" type="text" readonly required>
+        <label for="rest-end">Rest day to</label>
+        <input id="rest-end" type="text" readonly required>
+        <button type="submit">Add rest days</button>
+      </form>
     </section>
     <p>Write a separate text draft to keep on this device, even when you're offline.</p>
     <form id="plan-form">
@@ -24,55 +130,16 @@
       <button type="submit">Save plan</button>
     </form>
     <p id="status" role="status" aria-live="polite"></p>
-    <section aria-labelledby="books-heading">
-      <h2 id="books-heading">Books and reading history</h2>
-      <p>Import a bundle below to edit its books. Pages are inclusive; audiobook fields accept seconds, HH:MM or HH:MM:SS. Save changes before switching apps. Keep only one active editor, including browser tabs.</p>
-      <form id="book-form" hidden>
-        <label for="book-format">Book format</label>
-        <select id="book-format"><option>Physical books</option><option>Digital books</option><option>Audiobooks</option></select>
-        <label for="book-title">Current book title</label><input id="book-title" required>
-        <label for="book-from">Book start page or seconds</label><input id="book-from" required>
-        <label for="book-to">Book end page or seconds</label><input id="book-to" required>
-        <label for="book-position">Book position (blank to append)</label><input id="book-position" type="number" min="1" step="1">
-        <button type="submit">Save book</button><button id="cancel-book" type="button">Cancel book edit</button>
-      </form>
-      <ul id="book-list" aria-label="Current books"></ul>
-      <form id="session-form" hidden>
-        <label for="session-book">Reading session book</label><select id="session-book"></select>
-        <label for="session-date">Reading date</label><input id="session-date" type="date" required>
-        <label for="session-position">Page reached or audiobook seconds left</label><input id="session-position" required>
-        <button type="submit">Save reading session</button><button id="cancel-session" type="button">Cancel session edit</button>
-      </form>
-      <ul id="history-list" aria-label="Reading history"></ul>
-      <p id="editor-status" data-testid="editor-status" role="status" aria-live="polite"></p>
-    </section>
     <section aria-labelledby="schedule-heading">
       <h2 id="schedule-heading">Reading schedule</h2>
       <p>Set the plan dates and rest days, then calculate the baseline schedule. Rest days reduce the days available for reading, but they do not move the baseline dates. Books in a simultaneous group share a start and finish while their daily targets are split by remaining work. A deadline override gives one book an independent schedule until you clear it. The baseline schedule stays saved until you calculate it again.</p>
       <p id="schedule-empty">Import a bundle to schedule its books.</p>
       <form id="schedule-form">
         <label for="plan-start">Plan start</label>
-        <input id="plan-start" type="date" required>
+        <input id="plan-start" type="text" data-date-mode="text" required>
         <label for="plan-finish">Plan finish</label>
-        <input id="plan-finish" type="date" required>
+        <input id="plan-finish" type="text" data-date-mode="text" required>
         <button type="submit">Save plan dates</button>
-      </form>
-      <form id="rest-form">
-        <label for="rest-start">Rest day from</label>
-        <input id="rest-start" type="date" required>
-        <label for="rest-end">Rest day to</label>
-        <input id="rest-end" type="date" required>
-        <button type="submit">Add rest days</button>
-      </form>
-      <ul id="rest-list" aria-label="Rest days"></ul>
-      <form id="group-form" hidden>
-        <label for="group-section">Read together in</label>
-        <select id="group-section"></select>
-        <fieldset>
-          <legend>Books in the group</legend>
-          <div id="group-books"></div>
-        </fieldset>
-        <button type="submit">Group selected books</button>
       </form>
       <ul id="group-list" aria-label="Simultaneous groups"></ul>
       <button id="calculate-schedule" type="button">Calculate schedule</button>
@@ -97,56 +164,59 @@
         <tbody id="projection-rows"></tbody>
       </table>
     </section>
-    <section aria-labelledby="charts-heading">
-      <h2 id="charts-heading">Charts</h2>
-      <button id="charts-all" type="button" aria-pressed="false">All</button>
-      <button id="metrics-open" type="button">Metrics</button>
-      <p>All is off by default: charts show books with progress that are not finished. Plan and actual use the left axis; read/required per day uses the right axis. Projection ranges are estimates, not guarantees.</p>
-      <div id="charts"></div>
-    </section>
-    <dialog id="metrics-dialog" aria-label="Reading metrics">
-      <button id="metrics-close" type="button">Back to charts</button>
-      <div id="metrics-content"></div>
-    </dialog>
     <section aria-labelledby="quarter-heading">
       <h2 id="quarter-heading">Next quarter</h2>
       <p>Plan the books for the next quarter here. When the quarter starts, unfinished current books carry forward first with their history and stable IDs, completed books leave the plan, and the baseline schedule is recalculated. The plan activates automatically when you open or use the app on or after its start date.</p>
       <p id="quarter-empty">Import a bundle to plan the next quarter.</p>
-      <form id="quarter-form">
-        <label for="quarter-start">Next quarter starts</label>
-        <input id="quarter-start" type="date" required>
-        <button type="submit">Save quarter start</button>
-      </form>
-      <form id="quarter-book-form">
-        <label for="quarter-section">Format</label>
-        <select id="quarter-section"></select>
-        <label for="quarter-title">Book title</label>
-        <input id="quarter-title" type="text" required>
-        <label for="quarter-from">Start page or time in seconds</label>
-        <input id="quarter-from" required>
-        <label for="quarter-to">End page or time in seconds</label>
-        <input id="quarter-to" required>
-        <button type="submit">Add planned book</button>
-        <button id="cancel-planned-edit" type="button">Cancel planned edit</button>
-      </form>
-      <ul id="quarter-list" aria-label="Next-quarter books"></ul>
+      <button id="open-quarter" type="button" aria-haspopup="dialog" aria-controls="quarter-dialog">Edit next-quarter plan</button>
       <p id="quarter-status" data-testid="quarter-status" role="status" aria-live="polite"></p>
     </section>
-    <section aria-labelledby="settings-heading">
-      <h2 id="settings-heading">Summary settings</h2>
-      <form id="settings-form" hidden>
-        <label><input type="checkbox" name="book_counts"> Show book counts</label>
-        <label><input type="checkbox" name="page_share"> Show page share</label>
-        <label><input type="checkbox" name="average_pages"> Show average pages</label>
-        <label><input type="checkbox" name="reading_period"> Show reading period</label>
-        <label><input type="checkbox" name="pace_driver"> Show pace driver</label>
-        <button type="submit">Save summary settings</button>
+    <dialog id="quarter-dialog" aria-labelledby="quarter-dialog-heading">
+      <h2 id="quarter-dialog-heading">Next quarter</h2>
+      <div id="quarter-content">
+      <div id="quarter-content-box">
+      <p>Unfinished current books will continue before these books.</p>
+      <ul id="quarter-list" aria-label="Next-quarter books"></ul>
+      <form id="quarter-book-form">
+        <label for="quarter-section">Format</label>
+        <select id="quarter-section" hidden aria-hidden="true" tabindex="-1"></select>
+        <label for="quarter-title">Title</label>
+        <input id="quarter-title" type="text" required>
+        <label for="quarter-from">Start page/time (audio: HH:MM or HH:MM:SS)</label>
+        <input id="quarter-from" required>
+        <label for="quarter-to">End page/time</label>
+        <input id="quarter-to" required>
+        <button type="submit">Add</button>
+        <button id="update-planned-book" type="button">Update selected</button>
+        <button id="remove-planned-book" type="button">Remove selected</button>
       </form>
-      <p id="settings-status" data-testid="settings-status" role="status"></p>
+      <p id="quarter-draft-status" role="status" aria-live="polite"></p>
+      </div>
+      </div>
+      <div class="quarter-actions"><button id="cancel-quarter" type="button">Cancel</button><button id="save-quarter" type="button">Save plan</button></div>
+    </dialog>
+    </div>
+    <div id="screen-charts" class="screen" aria-label="Charts" hidden>
+    <section aria-labelledby="charts-heading">
+      <div class="charts-heading"><h2 id="charts-heading">Charts</h2><button id="charts-all" type="button" aria-pressed="false">All</button><button id="metrics-open" type="button">Metrics</button></div>
+      <div id="charts"></div>
+      <p>All is off by default: charts show books with progress that are not finished. Plan and actual use the left axis; read/required per day uses the right axis. Projection ranges are estimates, not guarantees.</p>
+    </section>
+    <dialog id="metrics-dialog" aria-label="Reading metrics">
+      <div class="metrics-heading"><h2>Metrics</h2><button id="metrics-close" type="button">Close</button></div>
+      <div id="metrics-content"></div>
+    </dialog>
+    </div>
+    <div id="screen-settings" class="screen" aria-label="Settings" hidden>
+    <div class="settings-heading"><h2 id="settings-heading">Settings</h2><button id="settings-done" type="button">Done</button></div>
+    <section aria-labelledby="source-heading">
+      <h3 id="source-heading">Data source</h3>
+      <p id="source-status" role="status">JSON not loaded in this browser.</p>
+      <p>Your plan is stored locally in this browser, not in a shared folder. It does not automatically sync with desktop or Android. Clearing browser data can delete it.</p>
     </section>
     <section aria-labelledby="bundle-heading">
       <h2 id="bundle-heading">Transfer desktop bundle</h2>
-      <p>Select all four JSON files to validate and replace the stored bundle. This does not change the text draft, and importing a bundle replaces the reading schedule saved for the previous bundle. Export a ZIP to transfer the bundle back to desktop.</p>
+      <p>Manual transfer is the browser exception: select all four JSON files (plan.json, books.json, sessions.json and manifest.json) to validate and replace the stored bundle. ZIP import is not supported here; extract the four files first. This does not change the text draft, and importing a bundle replaces the reading schedule saved for the previous bundle. Export a ZIP to transfer the bundle back to desktop. Keep only one active editor, including browser tabs.</p>
       <form id="bundle-form">
         <label for="bundle-files">Bundle files</label>
         <input id="bundle-files" type="file" accept=".json,application/json" multiple required>
@@ -169,13 +239,22 @@
       <p id="csv-status" data-testid="csv-status" role="status"></p>
     </section>
     <p class="note">Your plan stays in this browser. It does not sync with the desktop or Android app. Clearing browser data can delete it.</p>
+    </div>
   </main>
+  <nav class="tab-bar" aria-label="Main navigation">
+    <button type="button" data-screen="session" aria-controls="screen-session" aria-current="page">Session</button>
+    <button type="button" data-screen="plan" aria-controls="screen-plan">Plan</button>
+    <button type="button" data-screen="books" aria-controls="screen-books">Books</button>
+    <button type="button" data-screen="charts" aria-controls="screen-charts">Charts</button>
+  </nav>
   <script src="./schedule.js" defer></script>
   <script src="./projection.js" defer></script>
   <script src="./quarter.js" defer></script>
   <script src="./bundle-validator.js" defer></script>
   <script src="./bundle-export.js" defer></script>
   <script src="./history.js" defer></script>
+  <script src="./android-controls.js" defer></script>
+  <script src="./android-calendar.js" defer></script>
   <script src="./app.js" defer></script>
   <script src="./editor.js" defer></script>
   <script src="./csv.js" defer></script>

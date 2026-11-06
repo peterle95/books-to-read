@@ -10,5 +10,18 @@
     "reading_period": true,
     "pace_driver": true
   },
-  "rest_days": []
+  "rest_days": [
+    {
+      "start_date": "2026-12-19",
+      "end_date": "2026-12-19"
+    },
+    {
+      "start_date": "2026-12-24",
+      "end_date": "2026-12-26"
+    },
+    {
+      "start_date": "2026-12-31",
+      "end_date": "2026-12-31"
+    }
+  ]
 }

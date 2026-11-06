@@ -61,3 +61,14 @@ window.recalculateReadingHistory = (book, sessions, label, sort = true) => {
   }
   return changed;
 };
+
+window.clearReadingTargetCompletion = (plan, books, label, book, today = window.ReadingSchedule.today()) => {
+  if (book.target_completed_date !== today) return;
+  const audio = label.trim() === 'Audiobooks';
+  if ((audio ? book.current_time_seconds : book.current_page) == null) {
+    book.target_completed_date = null;
+    return;
+  }
+  const target = window.ReadingSchedule.sessionTarget(plan, books, label, book.id, today, today);
+  if (target.completed < target.units) book.target_completed_date = null;
+};

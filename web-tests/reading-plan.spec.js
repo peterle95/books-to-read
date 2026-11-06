@@ -7,20 +7,24 @@ const { execFileSync, spawnSync } = require('node:child_process');
 
 test('a reading plan survives reload and an offline reopening', async ({ page, context }) => {
   await page.goto('./');
+  await page.getByRole('button', { name: 'Plan', exact: true }).click();
   await page.getByLabel('Reading plan').fill('Read The Hobbit');
   await page.getByRole('button', { name: 'Save plan' }).click();
   await expect(page.getByText('Plan saved on this device.')).toBeVisible();
   await page.reload();
+  await page.getByRole('button', { name: 'Plan', exact: true }).click();
   await expect(page.getByLabel('Reading plan')).toHaveValue('Read The Hobbit');
   await page.evaluate(() => navigator.serviceWorker.ready);
   await context.setOffline(true);
   await page.close();
   const reopened = await context.newPage();
   await reopened.goto('./');
+  await reopened.getByRole('button', { name: 'Plan', exact: true }).click();
   await expect(reopened.getByLabel('Reading plan')).toHaveValue('Read The Hobbit');
   await reopened.getByLabel('Reading plan').fill('Read Dune');
   await reopened.getByRole('button', { name: 'Save plan' }).click();
   await reopened.reload();
+  await reopened.getByRole('button', { name: 'Plan', exact: true }).click();
   await expect(reopened.getByLabel('Reading plan')).toHaveValue('Read Dune');
 });
 
@@ -35,17 +39,22 @@ test('rejects an incomplete bundle without changing the saved plan', async ({ pa
     schema_version: 2, revision: 1, last_modified: '2026-01-01', modified_by: 'test', files: hashes
   })) });
   await page.goto('./');
+  await page.getByRole('button', { name: 'Plan', exact: true }).click();
   await page.getByLabel('Reading plan').fill('My existing plan');
   await page.getByRole('button', { name: 'Save plan' }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByLabel('Bundle files').setInputFiles(files);
   await page.getByRole('button', { name: 'Import bundle' }).click();
   await expect(page.getByTestId('bundle-status')).toHaveText(/could not be imported/i);
   await page.reload();
+  await page.getByRole('button', { name: 'Plan', exact: true }).click();
   await expect(page.getByLabel('Reading plan')).toHaveValue('My existing plan');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   files[0].buffer = Buffer.from('corrupted');
   await page.getByLabel('Bundle files').setInputFiles(files);
   await page.getByRole('button', { name: 'Import bundle' }).click();
   await expect(page.getByTestId('bundle-status')).toHaveText(/could not be imported/i);
+  await page.getByRole('button', { name: 'Plan', exact: true }).click();
   await expect(page.getByLabel('Reading plan')).toHaveValue('My existing plan');
 });
 
@@ -61,12 +70,15 @@ test('rejects checksum-valid bundles with invalid plan dates', async ({ page }) 
     schema_version: 2, revision: 1, last_modified: '2026-01-01', modified_by: 'test', files: hashes
   })) });
   await page.goto('./');
+  await page.getByRole('button', { name: 'Plan', exact: true }).click();
   await page.getByLabel('Reading plan').fill('Existing draft');
   await page.getByRole('button', { name: 'Save plan' }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByLabel('Bundle files').setInputFiles(files);
   await page.getByRole('button', { name: 'Import bundle' }).click();
   await expect(page.getByTestId('bundle-status')).toHaveText(/invalid date/i);
   await page.reload();
+  await page.getByRole('button', { name: 'Plan', exact: true }).click();
   await expect(page.getByLabel('Reading plan')).toHaveValue('Existing draft');
 });
 
@@ -91,8 +103,10 @@ write_json_bundle(sys.argv[1], [BookSection('Physical books', [book], []), BookS
 `, directory]);
     const files = names.map((name) => ({ name, mimeType: 'application/json', buffer: fs.readFileSync(path.join(directory, name)) }));
     await page.goto('./');
+    await page.getByRole('button', { name: 'Plan', exact: true }).click();
     await page.getByLabel('Reading plan').fill('Separate draft');
     await page.getByRole('button', { name: 'Save plan' }).click();
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await page.getByLabel('Bundle files').setInputFiles(files);
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: 'Import bundle' }).click();
@@ -121,7 +135,9 @@ write_json_bundle(sys.argv[1], [BookSection('Physical books', [book], []), BookS
     await page.evaluate(() => navigator.serviceWorker.ready);
     await context.setOffline(true);
     await page.reload();
+    await page.getByRole('button', { name: 'Plan', exact: true }).click();
     await expect(page.getByLabel('Reading plan')).toHaveValue('Separate draft');
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
     const download = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Export bundle ZIP' }).click();
     const saved = await download;
@@ -194,6 +210,7 @@ write_json_bundle(sys.argv[1], [BookSection('Physical books', [Book(1, 'Title', 
       JSON.parse = (text, reviver) => parse(text, reviver && function (key, value) { return reviver.call(this, key, value); });
     });
     await page.goto('./');
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
     let stored = null;
     for (const [label, mutate, accepted] of cases) {
       const values = { ...original };

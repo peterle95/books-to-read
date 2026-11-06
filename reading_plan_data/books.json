@@ -13,12 +13,12 @@
           "baseline_schedule": null,
           "deadline_override": null,
           "start_date_override": null,
-          "target_completed_date": "2026-11-01",
+          "target_completed_date": "2026-11-06",
           "start_page": 235,
           "end_page": 288,
-          "current_page": 242,
+          "current_page": 276,
           "pages": 54,
-          "pages_read": 8
+          "pages_read": 42
         },
         {
           "id": "b426b299-cd4c-45b4-b518-155a79807854",
@@ -76,12 +76,12 @@
           "baseline_schedule": null,
           "deadline_override": null,
           "start_date_override": null,
-          "target_completed_date": null,
+          "target_completed_date": "2026-11-05",
           "start_page": 283,
           "end_page": 759,
-          "current_page": 286,
+          "current_page": 348,
           "pages": 477,
-          "pages_read": 4
+          "pages_read": 66
         }
       ]
     },

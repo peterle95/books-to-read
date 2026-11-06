@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const { chooseDate } = require('./calendar-helper');
 const { createHash } = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -128,6 +129,31 @@ test('web scheduling agrees with the desktop calculation model', async ({ page }
   }
 });
 
+test('schedule date domain and UTC day numbers agree with Python for early and boundary years', async ({ page }) => {
+  await page.goto('./');
+  const dates = ['0001-01-01', '0004-02-29', '0096-02-29', '0099-12-31', '0100-03-01', '9999-12-31', '0000-02-29', '0100-02-29'];
+  const expected = JSON.parse(execFileSync('python', ['-c', `
+import json, sys
+from datetime import date
+from reading_plan import parse_date
+out = []
+for value in json.loads(sys.stdin.read()):
+    try:
+        parsed = parse_date(value)
+        out.append({'iso': parsed.isoformat(), 'day': (parsed - date(1970, 1, 1)).days})
+    except ValueError:
+        out.append(None)
+print(json.dumps(out))
+`], { input: JSON.stringify(dates) }).toString());
+  const actual = await page.evaluate((dates) => dates.map((value) => {
+    try { const day = ReadingSchedule.parseDate(value); return { iso: ReadingSchedule.iso(day), day }; }
+    catch { return null; }
+  }), dates);
+  expect(actual).toEqual(expected);
+  expect(await page.evaluate(() => ReadingSchedule.availableReadingDays('0099-12-31', '0100-01-01', [])))
+    .toEqual(['0099-12-31', '0100-01-01']);
+});
+
 test('plan dates, rest days and baselines persist and are only rewritten on request', async ({ page }) => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'reading-schedule-'));
   const names = ['plan.json', 'books.json', 'sessions.json', 'manifest.json'];
@@ -146,9 +172,11 @@ write_json_bundle(sys.argv[1], [
     const row = (title) => page.locator('#schedule-rows tr').filter({ has: page.getByRole('cell', { name: title, exact: true }) });
 
     await page.goto('./');
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await page.getByLabel('Bundle files').setInputFiles(files);
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: 'Import bundle' }).click();
+    await page.getByRole('button', { name: 'Plan', exact: true }).click();
     await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
     await expect(page.getByTestId('schedule-status')).toHaveText('Baseline schedule saved. Required pace reflects today.');
     const storedBundle = await page.evaluate(() => localStorage.getItem('reading-plan-bundle-v1'));
@@ -167,8 +195,8 @@ write_json_bundle(sys.argv[1], [
     await expect(page.getByTestId('schedule-status')).toHaveText(/baseline stays unchanged/);
     await expect(row('Second').locator('td').nth(3)).toHaveText('2026-03-31');
 
-    await page.getByLabel('Rest day from').fill('2026-02-01');
-    await page.getByLabel('Rest day to').fill('2026-02-02');
+    await chooseDate(page, page.getByLabel('Rest day from'), '2026-02-01');
+    await chooseDate(page, page.getByLabel('Rest day to'), '2026-02-02');
     await page.getByRole('button', { name: 'Add rest days' }).click();
     await expect(page.getByTestId('schedule-status')).toHaveText(/baseline stays unchanged/);
     await expect(row('First').locator('td').nth(3)).toHaveText('2026-02-14');
@@ -178,6 +206,7 @@ write_json_bundle(sys.argv[1], [
       .toEqual(JSON.parse(Buffer.from(JSON.parse(storedBundle)['books.json'], 'base64')).sections[0].books[0].baseline_schedule);
 
     await page.reload();
+    await page.getByRole('button', { name: 'Plan', exact: true }).click();
     await expect(page.getByLabel('Plan finish')).toHaveValue('2026-03-30');
     await expect(page.getByLabel('Rest days').locator('li')).toHaveText('2026-02-01 to 2026-02-02 Remove');
     await expect(page.getByTestId('schedule-status')).toHaveText(/baseline stays unchanged/);
@@ -196,6 +225,7 @@ write_json_bundle(sys.argv[1], [
     const manifest = JSON.parse(files[3].buffer.toString());
     const cleared = Buffer.from(JSON.stringify(books));
     manifest.files['books.json'] = createHash('sha256').update(cleared).digest('hex');
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await page.getByLabel('Bundle files').setInputFiles([
       files[0],
       { ...files[1], buffer: cleared },
@@ -204,6 +234,7 @@ write_json_bundle(sys.argv[1], [
     ]);
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: 'Import bundle' }).click();
+    await page.getByRole('button', { name: 'Plan', exact: true }).click();
     await expect(page.getByTestId('schedule-status')).toHaveText(/No baseline schedule/);
     await page.getByRole('button', { name: 'Calculate schedule' }).click();
     await expect(page.getByTestId('schedule-status')).toHaveText('Baseline schedule calculated on this device.');
@@ -334,24 +365,29 @@ write_json_bundle(sys.argv[1], [
     const row = (title) => page.locator('#schedule-rows tr').filter({ has: page.getByRole('cell', { name: title, exact: true }) });
 
     await page.goto('./');
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await page.getByLabel('Bundle files').setInputFiles(files);
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: 'Import bundle' }).click();
+    await page.getByRole('button', { name: 'Plan', exact: true }).click();
     await expect(page.getByTestId('schedule-status')).toHaveText('Baseline schedule saved. Required pace reflects today.');
     await expect(row('First').locator('td').nth(3)).toHaveText('2030-01-26');
 
     // Only adjacent books can share one shared schedule.
-    await page.getByLabel('Read together in').selectOption('Physical books');
+    await page.getByRole('button', { name: 'Books', exact: true }).click();
+    await page.getByRole('button', { name: 'Select simultaneous books', exact: true }).click();
     await page.getByRole('checkbox', { name: 'First' }).check();
     await page.getByRole('checkbox', { name: 'Third' }).check();
-    await page.getByRole('button', { name: 'Group selected books' }).click();
-    await expect(page.getByTestId('schedule-status')).toHaveText('Books read together must be consecutive in the section.');
+    await page.locator('#book-group-dialog').getByRole('button', { name: 'Apply', exact: true }).click();
+    await expect(page.locator('#book-group-status')).toHaveText('Books read together must be consecutive in the section.');
     await expect(page.getByLabel('Simultaneous groups').locator('li')).toHaveCount(0);
 
     await page.getByRole('checkbox', { name: 'Third' }).uncheck();
     await page.getByRole('checkbox', { name: 'Second' }).check();
-    await page.getByRole('button', { name: 'Group selected books' }).click();
-    await expect(page.getByLabel('Simultaneous groups').locator('li')).toHaveText('Physical books: First, Second Remove');
+    await page.locator('#book-group-dialog').getByRole('button', { name: 'Apply', exact: true }).click();
+    await expect(page.locator('#book-group-dialog')).not.toBeVisible();
+    await page.getByRole('button', { name: 'Plan', exact: true }).click();
+    await expect(page.getByLabel('Simultaneous groups').locator('li')).toHaveText('Physical books: First, Second');
     await expect(page.getByTestId('schedule-status')).toHaveText(/baseline stays unchanged/);
     await expect(row('First').locator('td').nth(3)).toHaveText('2030-01-26');
 
@@ -366,10 +402,10 @@ write_json_bundle(sys.argv[1], [
     await expect(row('Third').locator('td').nth(4)).toHaveText('0.8');
 
     // A deadline override gives one book an independent schedule.
-    await page.getByLabel('Deadline override for First').fill('2030-04-05');
+    await chooseDate(page, page.getByLabel('Deadline override for First'), '2030-04-05');
     await page.getByRole('button', { name: 'Save the deadline for First' }).click();
     await expect(page.getByTestId('schedule-status')).toHaveText('A deadline override cannot be after the plan finish date.');
-    await page.getByLabel('Deadline override for First').fill('2030-02-14');
+    await chooseDate(page, page.getByLabel('Deadline override for First'), '2030-02-14');
     await page.getByRole('button', { name: 'Save the deadline for First' }).click();
     await expect(page.getByTestId('schedule-status')).toHaveText('Deadline override saved for First.');
     await expect(row('First').locator('td').nth(3)).toHaveText('2030-02-14');
@@ -378,8 +414,9 @@ write_json_bundle(sys.argv[1], [
     await expect(row('Third').locator('td').nth(3)).toHaveText('2030-03-31');
 
     await page.reload();
+    await page.getByRole('button', { name: 'Plan', exact: true }).click();
     await expect(page.getByLabel('Deadline override for First')).toHaveValue('2030-02-14');
-    await expect(page.getByLabel('Simultaneous groups').locator('li')).toHaveText('Physical books: First, Second Remove');
+    await expect(page.getByLabel('Simultaneous groups').locator('li')).toHaveText('Physical books: First, Second');
     await expect(row('First').locator('td').nth(3)).toHaveText('2030-02-14');
 
     // Clearing returns the book to the remaining group and leaves the rest alone.

@@ -1,0 +1,61 @@
+/* Android API 35 Theme.Material.Light DatePickerDialog, not Material 3. */
+/* SimpleMonthView centers Paint ascent/descent, without TextView font padding.
+   Shipped Roboto hhea metrics: ascent 1900, descent 500, unitsPerEm 2048. */
+@font-face {
+  font-family: AndroidCalendarRoboto;
+  src: url("./assets/android/Roboto-Regular.woff2") format("woff2");
+  font-weight: 100 900;
+  ascent-override: 92.7734375%; descent-override: 24.4140625%; line-gap-override: 0%;
+}
+dialog#reading-calendar:not(#entries-dialog):not(#metrics-dialog) {
+  box-sizing: border-box; position: fixed; inset: 0; margin: auto; padding: 0;
+  width: 288px; max-width: calc(100vw - 32px); height: 493px; max-height: calc(100dvh - 24px);
+  border: 0; border-radius: 2px; background: #fff; color: #212121;
+  box-shadow: 0 16px 24px rgb(0 0 0 / 25%); overflow: auto;
+  font-family: AndroidRoboto, Roboto, Arial, sans-serif; font-size: 14px; line-height: normal;
+}
+.reading-calendar::backdrop { background: rgb(0 0 0 / 60%); }
+.reading-calendar-announcement { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.reading-calendar button {
+  box-sizing: border-box; display: block; margin: 0; padding: 0; min-width: 0; min-height: 0;
+  border: 0; border-radius: 0; background: transparent; color: inherit; box-shadow: none;
+  font: inherit; text-transform: none; cursor: pointer; touch-action: manipulation;
+}
+.reading-calendar button:focus-visible { outline: 2px solid #212121; outline-offset: -2px; }
+.reading-calendar button:active { transform: none; background: transparent; }
+.reading-calendar-header { box-sizing: border-box; height: 93px; padding: 8px 24px 16px; background: #b56b3c; color: #fff; }
+/* Preserve the framework header's overlapping year/date font line boxes. */
+.reading-calendar .reading-calendar-year { height: 32px; margin-bottom: -7px; font-size: 16px; color: rgb(255 255 255 / 70%); text-align: left; }
+.reading-calendar .reading-calendar-date { height: 40px; line-height: 40px; font-size: 34px; font-weight: 400; white-space: nowrap; text-align: left; }
+.reading-calendar-header button[aria-pressed="false"] { color: rgb(255 255 255 / 70%); }
+.reading-calendar-header button[aria-pressed="true"] { color: #fff; }
+.reading-calendar-body { box-sizing: border-box; height: 338px; overflow: hidden; position: relative; }
+.reading-calendar-body:not(.reading-calendar-years) { font-family: AndroidCalendarRoboto, AndroidRoboto, sans-serif; }
+/* API35 SimpleMonthView: 6dp top inset, 56dp month, 36dp weekdays. */
+.reading-calendar-navigation { height: 56px; margin-top: 6px; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; }
+.reading-calendar-navigation span { font-size: 14px; font-weight: 500; }
+.reading-calendar-navigation button { width: 36px; height: 48px; position: relative; }
+.reading-calendar-navigation button::before { content: ''; position: absolute; width: 6px; height: 6px; top: 20px; left: 14px; border-top: 2px solid currentColor; border-right: 2px solid currentColor; transform: rotate(45deg); }
+.reading-calendar-navigation button[aria-label="Previous month"]::before { transform: rotate(-135deg); }
+.reading-calendar-navigation button:disabled { opacity: .3; cursor: default; }
+.reading-calendar-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); height: 36px; margin: 0 20px; align-items: center; text-align: center; color: #757575; font-size: 12px; }
+.reading-calendar-grid { margin: 0 20px; }
+.reading-calendar-grid [role="row"] { display: grid; grid-template-columns: repeat(7, 1fr); height: 40px; }
+.reading-calendar-grid button { position: relative; isolation: isolate; width: 100%; height: 40px; font-size: 12px; }
+.reading-calendar-grid button[aria-current="date"] { color: #b56b3c; }
+.reading-calendar-grid button[aria-selected="true"] { color: #fff; }
+.reading-calendar-grid button[aria-selected="true"]::before { content: ''; position: absolute; z-index: -1; width: 40px; height: 40px; border-radius: 50%; background: #b56b3c; top: 0; left: 50%; transform: translateX(-50%); }
+.reading-calendar-actions { box-sizing: border-box; height: 62px; display: flex; justify-content: flex-end; padding: 4px 12px; }
+.reading-calendar-actions button { height: 54px; padding: 0 12px; min-width: 64px; font-size: 14px; font-weight: 400; color: #b56b3c; }
+.reading-calendar-years { overflow-y: auto; overflow-x: hidden; scrollbar-gutter: stable; border-bottom: 1px solid #ddd; }
+/* API35 config_scrollbarSize; gray sampled from the accepted year reference.
+   Thumb position/length follow the web year window, not Android's year range. */
+.reading-calendar-years::-webkit-scrollbar { width: 4px; }
+.reading-calendar-years::-webkit-scrollbar-track { background: transparent; }
+.reading-calendar-years::-webkit-scrollbar-thumb { background: #b0b0b0; border-radius: 0; }
+.reading-calendar-years button { width: 100%; height: 48px; font-size: 16px; flex-shrink: 0; }
+@supports selector(::-webkit-scrollbar) {
+  /* Keep Android's full-width, centered rows despite the browser scrollbar gutter. */
+  .reading-calendar-years button { width: calc(100% + 4px); }
+}
+.reading-calendar-years button[aria-pressed="true"] { height: 59px; color: #b56b3c; font-size: 26px; font-weight: 500; }

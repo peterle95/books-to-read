@@ -1,5 +1,5 @@
-const CACHE = 'reading-plan-__VERSION__';
-const ASSETS = ['./', './index.html', './style.css', './schedule.js', './projection.js', './quarter.js', './bundle-validator.js', './bundle-export.js', './history.js', './app.js', './editor.js', './csv.js', './charts.js', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
+const CACHE = 'reading-plan-__VERSION__-android-calendar-v1';
+const ASSETS = ['./', './index.html', './style.css', './android-native.css', './android-calendar.css', './assets/android/Roboto-Regular.woff2', './assets/android/ic-menu-manage-api35-xxhdpi.png', './assets/android/LICENSE-Apache-2.0.txt', './assets/android/THIRD-PARTY-NOTICES.md', './schedule.js', './projection.js', './quarter.js', './bundle-validator.js', './bundle-export.js', './history.js', './android-controls.js', './android-calendar.js', './app.js', './editor.js', './csv.js', './charts.js', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(ASSETS)));

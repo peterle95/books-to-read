@@ -4,25 +4,36 @@
   const AUDIOBOOKS = LABELS[2];
   const { parseDate, iso } = window.ReadingSchedule;
 
+  const utcDay = (year, month, day) => {
+    const date = new Date(0);
+    date.setUTCFullYear(year, month, day);
+    return date.getTime() / 86400000;
+  };
+  const quarterIso = (day) => {
+    const year = new Date(day * 86400000).getUTCFullYear();
+    if (year < 1 || year > 9999) throw new RangeError('Quarter date must be within years 0001–9999.');
+    return iso(day);
+  };
+
   const nextQuarterStart = (afterIso) => {
     const after = parseDate(afterIso);
     const date = new Date(after * 86400000);
     const year = date.getUTCFullYear();
     for (const month of [1, 4, 7, 10]) {
-      const candidate = Date.UTC(year, month - 1, 1) / 86400000;
-      if (candidate > after) return iso(candidate);
+      const candidate = utcDay(year, month - 1, 1);
+      if (candidate > after) return quarterIso(candidate);
     }
-    return iso(Date.UTC(year + 1, 0, 1) / 86400000);
+    return quarterIso(utcDay(year + 1, 0, 1));
   };
 
   const quarterStart = (dayIso) => {
     const date = new Date(parseDate(dayIso) * 86400000);
-    return iso(Date.UTC(date.getUTCFullYear(), Math.floor(date.getUTCMonth() / 3) * 3, 1) / 86400000);
+    return quarterIso(utcDay(date.getUTCFullYear(), Math.floor(date.getUTCMonth() / 3) * 3, 1));
   };
 
   const periodEnd = (startIso) => {
     const date = new Date(parseDate(startIso) * 86400000);
-    return iso(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 3, 1) / 86400000 - 1);
+    return quarterIso(utcDay(date.getUTCFullYear(), date.getUTCMonth() + 3, 1) - 1);
   };
 
   const isQuarterStart = (value) => {
