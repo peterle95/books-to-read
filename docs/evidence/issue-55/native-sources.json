@@ -1,0 +1,258 @@
+[
+  {
+    "path": "reading-plan-android/app/src/androidTest/assets/desktop-session-contract/books.json",
+    "sha256": "d6421c8fd299a9c018b2e25d0d527fe105496959c1a5490f3208c6f34dc061db"
+  },
+  {
+    "path": "reading-plan-android/app/src/androidTest/assets/desktop-session-contract/manifest.json",
+    "sha256": "ad5ff8baa4a85a826f1563c035b90b3513eab1e93be6579ac5b218c3ed186dc3"
+  },
+  {
+    "path": "reading-plan-android/app/src/androidTest/assets/desktop-session-contract/plan.json",
+    "sha256": "5f7dc9cef5ae068c1caed1278fbfd870f5618ec4583090588bf14c210b95ef0c"
+  },
+  {
+    "path": "reading-plan-android/app/src/androidTest/assets/desktop-session-contract/sessions.json",
+    "sha256": "9511c8674b333eec0790484d6a5b179bb17ec0fbbd0ede5be86b340f49921b0e"
+  },
+  {
+    "path": "reading-plan-android/app/src/androidTest/java/com/petermolnar/readingplan/ReadingPlanChartDeviceCheck.java",
+    "sha256": "9c62c2b3841a1d4957ba222772ef49d2c0aeb814e9e93d5227fcd543b768a63a"
+  },
+  {
+    "path": "reading-plan-android/app/src/androidTest/java/com/petermolnar/readingplan/ReadingPlanSessionDeviceCheck.java",
+    "sha256": "a9b8326be51c527d73199ee40fb6236e1b03e11bf26c5728bba5249e65731636"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/AndroidManifest.xml",
+    "sha256": "731f362ff6a438c2993a7737efae2738e9a143790fab1620b7ae231c60d7f446"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/java/com/petermolnar/readingplan/BookCollections.java",
+    "sha256": "b0ee9cabf56b4eebc6a5365fbc05006d5968fac7cbda619c2b488ecbac23d6df"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/java/com/petermolnar/readingplan/BookModels.java",
+    "sha256": "88a5cc8c4431fc546a22f9b38ebc6229d65e5ba10d30dd5018cc6d7748beb405"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/java/com/petermolnar/readingplan/CsvSupport.java",
+    "sha256": "5c45b71a9fe13946a8b46f2319c4715f31ed427e95fcfaab3e2a71005f459076"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/java/com/petermolnar/readingplan/MainActivity.java",
+    "sha256": "2dac9db2a92ae0deb83aed2288bc595cae8cedd046ff3a3b45b41cf30dc62c3a"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/java/com/petermolnar/readingplan/PlanPrimitives.java",
+    "sha256": "34008e23845a12c13afb0cb46fb614c2c91b0fdfe1a8897f49b1ca4594e3d574"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/java/com/petermolnar/readingplan/PlanValues.java",
+    "sha256": "96dba613882412d21c31033fef88db2aac099e55a826965e930c80a5b1ae6f8f"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/java/com/petermolnar/readingplan/PlannedQuarter.java",
+    "sha256": "e4103f32ff6bafd6869d426891d1dad37d9f438b93d8268d759b8f57c90a508d"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/java/com/petermolnar/readingplan/PlannedQuarterEditor.java",
+    "sha256": "9b9d8880363a5a921588f7ff754e9183a538d895bebf1765e1bbebfe4ef80099"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/java/com/petermolnar/readingplan/ReadingPlanBookProgress.java",
+    "sha256": "cb7e8151811b61e73b60fe898c0f73d4f2870e891ed089f5517602b201bc0847"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/java/com/petermolnar/readingplan/ReadingPlanBooksView.java",
+    "sha256": "cde1f6728e8c48d51eb07aee94a23341c9d64a81e92f9c2581313d1549a7f2e9"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/java/com/petermolnar/readingplan/ReadingPlanBundleCodec.java",
+    "sha256": "23616f43d5fafa5fdece374ba1120a580aaae304c5db115d1c6df44da76543d4"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/java/com/petermolnar/readingplan/ReadingPlanCalendar.java",
+    "sha256": "81ab41f7b4bdac60fec0aab355d8afae96c48e08b2af5fb91545495f3d95c195"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/java/com/petermolnar/readingplan/ReadingPlanChartData.java",
+    "sha256": "64f1030ae70df501fa629b8ae653a4d838b30eb477f31e2ead21bb1d52438c7c"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/java/com/petermolnar/readingplan/ReadingPlanChartView.java",
+    "sha256": "aa232310dbf58d70e58ca3ae42421c7c5e0b86769a0a8c612c35e71e36705b97"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/java/com/petermolnar/readingplan/ReadingPlanChartsView.java",
+    "sha256": "abaab6710b3629712bee104f65e16bc366400b6205c52ce20ff9506582adc0ed"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/java/com/petermolnar/readingplan/ReadingPlanCsvReport.java",
+    "sha256": "40df2b85b8ab45d6ddd144dc8947d98bc592003bd260c1c90ec399fc9dc57666"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/java/com/petermolnar/readingplan/ReadingPlanDataStore.java",
+    "sha256": "f9f8f4350ca2f5f48d23eb77f4fef2c66f8690b8b2e3b0e42cc1ecfe0aa10888"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/java/com/petermolnar/readingplan/ReadingPlanMetricsView.java",
+    "sha256": "013bc2e4714d219db06393742cd144db1ed8b1fb9234babcf35f4979f1c980bb"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/java/com/petermolnar/readingplan/ReadingPlanPlanView.java",
+    "sha256": "0f3f3ef3ea4a4cad3ae8c656640a17a6af6f91b3cc9a575c63751e2ad03ee70b"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/java/com/petermolnar/readingplan/ReadingPlanScheduler.java",
+    "sha256": "94f540dc85f179e057dfafafe032ad5eacffa1b4d36db5d61d1e9bc31669d34c"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/java/com/petermolnar/readingplan/ReadingPlanSessionView.java",
+    "sha256": "9dd4c5ccc228b23a68c1d36b25af98d544b25fd87382f278a4ecf3603f0e3b2e"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/java/com/petermolnar/readingplan/ReadingPlanTables.java",
+    "sha256": "0f02e52a7dc15298ac5812861677e562e00023ae7423d2c48302a6b1c7b93583"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/java/com/petermolnar/readingplan/ReadingPlanTargets.java",
+    "sha256": "01587183f085178a9a7c0585fa128c4f230245b9c38971bc878eee96ea05e879"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/java/com/petermolnar/readingplan/ReadingPlanUi.java",
+    "sha256": "c3db7804f633886ecda09e80801673d8107c691e26859a4383d5c84aa17c12ca"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/java/com/petermolnar/readingplan/ReadingProjection.java",
+    "sha256": "96d685ffaef9fdc236ba36da4295a79ec5657887ebfd97ec126436a1f8a281f7"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/java/com/petermolnar/readingplan/ReadingSessionEntries.java",
+    "sha256": "7d2f23352cb8e63b10a7cd2f32f6b5bf3efd37d7c9b3290fcf58123cccc7b5bf"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/res/drawable-nodpi/app_cover.png",
+    "sha256": "f6b01d61a6d187ef016a14f1e811f557fab07ed679fb38589caed639591b2949"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/res/drawable/books_cover.png",
+    "sha256": "f6b01d61a6d187ef016a14f1e811f557fab07ed679fb38589caed639591b2949"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml",
+    "sha256": "5056b7226b3f58e65a61739e8ab6f5c52099fccee3ae9aad0e8856f31709e3fa"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml",
+    "sha256": "5056b7226b3f58e65a61739e8ab6f5c52099fccee3ae9aad0e8856f31709e3fa"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/res/mipmap-hdpi/ic_launcher.png",
+    "sha256": "3fb926edc0250047aff9ea410cf8f8c2662e9f3385339754535a6bbc7aac7e12"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/res/mipmap-hdpi/ic_launcher_foreground.png",
+    "sha256": "b0b43b785312bd7ae65e7cec6a8af6b4003fae4d8fedf4ffedbb397386f673bd"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png",
+    "sha256": "3fb926edc0250047aff9ea410cf8f8c2662e9f3385339754535a6bbc7aac7e12"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/res/mipmap-mdpi/ic_launcher.png",
+    "sha256": "baf638ed6f1c26479ad342e6bf7f7394b853871689a981b1ebe7d0a184202d69"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/res/mipmap-mdpi/ic_launcher_foreground.png",
+    "sha256": "a6faea7428557e231baceb9421829b811284830856d8fe0a2bb0949dfd701348"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png",
+    "sha256": "baf638ed6f1c26479ad342e6bf7f7394b853871689a981b1ebe7d0a184202d69"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/res/mipmap-xhdpi/ic_launcher.png",
+    "sha256": "4463e05acc1139d888f2c06e078d6d8596efe749763fa5ff09a68908e37618ce"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/res/mipmap-xhdpi/ic_launcher_foreground.png",
+    "sha256": "6b8c9210cc1c6230d614025332d2a0901e6fa0cd6a4b27f4d36c9b5f27632277"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png",
+    "sha256": "4463e05acc1139d888f2c06e078d6d8596efe749763fa5ff09a68908e37618ce"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png",
+    "sha256": "605289d75ebdaa2f21a4ff7f1fb927998ee021df830b1e747332d7a201b92726"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/res/mipmap-xxhdpi/ic_launcher_foreground.png",
+    "sha256": "29ea409d4be5a35c40e4736ce9b91d1c7087d57e4a063d47b5d90422ed4f0cef"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png",
+    "sha256": "605289d75ebdaa2f21a4ff7f1fb927998ee021df830b1e747332d7a201b92726"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png",
+    "sha256": "49d6efc0411e8265b9dc69cac5b34bd7d96b9bcf8e2b10915573b61b514a4a26"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png",
+    "sha256": "fcbd8936ecc3561844881939f85015fc1c26a7c4bb4d68c8999104852ef72203"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png",
+    "sha256": "49d6efc0411e8265b9dc69cac5b34bd7d96b9bcf8e2b10915573b61b514a4a26"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/res/values/colors.xml",
+    "sha256": "8d1557b2cc9f9f791de6ca28887fe15e2858d25f81dd89535c6e0380c1cba0ab"
+  },
+  {
+    "path": "reading-plan-android/app/src/main/res/values/styles.xml",
+    "sha256": "a33ade7c2ccb026cde2c17b9e5a58ec2fc0b8a1460b11534ff9c70a6de8af8c3"
+  },
+  {
+    "path": "reading-plan-android/app/src/test/java/com/petermolnar/readingplan/PlannedQuarterCheck.java",
+    "sha256": "b0a13d53bb3759ffa760b1de6bb5f833309e6194d72998cbeef4fdb55bfa5f06"
+  },
+  {
+    "path": "reading-plan-android/app/src/test/java/com/petermolnar/readingplan/ReadingPlanChartCheck.java",
+    "sha256": "a418b300acb2070010357c1533fd23e234015b82ce820d07b9aa1f6a64a5f1ca"
+  },
+  {
+    "path": "reading-plan-android/app/src/test/java/com/petermolnar/readingplan/ReadingSessionsCheck.java",
+    "sha256": "2945111ff5089deb725db0a6002e06197035f27f5e06cee4f01dff14a5dd2d21"
+  },
+  {
+    "path": "reading-plan-android/build.gradle",
+    "sha256": "f78edf2ebd737daf5b89c3c864416d2e09d898ebe916c53152f1ab93754648b5"
+  },
+  {
+    "path": "reading-plan-android/gradle.properties",
+    "sha256": "35b2b62ba251966cb0d75bda383346775c7b92ccf1e3e0f11939bc6ed44fef6e"
+  },
+  {
+    "path": "reading-plan-android/gradle/wrapper/gradle-wrapper.jar",
+    "sha256": "76805e32c009c0cf0dd5d206bddc9fb22ea42e84db904b764f3047de095493f3"
+  },
+  {
+    "path": "reading-plan-android/gradle/wrapper/gradle-wrapper.properties",
+    "sha256": "515035ad3c791872cac76d622c876356994e0b8c881bdcfa90006e3fe63e8eea"
+  },
+  {
+    "path": "reading-plan-android/gradlew",
+    "sha256": "3238afb2aed5cb16eb7d6718077e7138059108f007b54179e9cc157c5a6e0e89"
+  },
+  {
+    "path": "reading-plan-android/gradlew.bat",
+    "sha256": "1d297e00bd21de3ace22b4d7f2de1f9dfa858883d66bbf7c1ccbecccec8f4f3b"
+  },
+  {
+    "path": "reading-plan-android/settings.gradle",
+    "sha256": "6ce325ee0b0de320526b749e4dbbee8db2d5d50e0c1fd6c4d547499575a98520"
+  }
+]

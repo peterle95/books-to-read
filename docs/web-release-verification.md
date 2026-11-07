@@ -218,6 +218,20 @@ source manifest and complete logs are in `docs/evidence/issue-54/`. Focused
 web/Python date, schedule and bundle checks passed **15/15**; this is not a
 fresh full web-suite pass or actual-device release approval.
 
+Issue #55 built the preserved Android app from the committed source with the
+repository's Gradle 9.4.1 / AGP 9.2.1 / JDK 21 toolchain: **BUILD SUCCESSFUL**,
+exit 0, plus the three native JVM checks (`checkChartProjection`,
+`checkQuarterPlanning`, `checkReadingSessions`) passing. Native source is
+unchanged since `b91e312`, so the parity reference source is unchanged and the
+#45–#51 comparisons do not need regeneration. The debug APK is **not
+byte-reproducible** (clean rebuild `88c6e7e6…` vs the pre-existing
+`cc26c206…`), so APK hashes identify artifacts, not source revisions. The
+issue-48 `ca7d6a15…` prefix is reconciled as a transcription error; the full
+hash in its `measurement.json` stands. `:app:testDebugUnitTest` fails because
+the project has no JUnit tests, and no emulator or device was online, so
+instrumentation, install and offline checks remain #56. Details:
+`docs/evidence/issue-55/verification.md`.
+
 Historical supplied automated evidence (2026-11-06): full `npm run test:web` —
 **103 passed**, one worker, zero retries, terminal exit code **0**, in **5.5
 minutes**. Syntax checks (`node --check`) passed for all **11** `web/*.js`

@@ -10,7 +10,10 @@ pixel-comparison approval or final Android sign-off (#44/#51).
   viewport used by `web-tests/quarter-visual-parity.spec.js`. Disposable and
   deleted after capture.
 - Installed `reading-plan-android/app/build/outputs/apk/debug/app-debug.apk`
-  (sha256 `ca7d6a15…`, full hash in `measurement.json`); imported only
+  (sha256 `cc26c206c0a954e76af7af9674c10c87b44d9048dbbcee6e835bfc2400807bb2`,
+  as in `measurement.json`; the earlier `ca7d6a15…` prefix here was a
+  transcription error, reconciled in `docs/evidence/issue-55/verification.md`);
+  imported only
   `fixtures/issue-45-populated` through Android SAF.
 - Opened Plan → "Edit next quarter — 2027-01-01", then scrolled the AlertDialog
   `ScrollView` to its maximum and captured with `adb exec-out screencap`.
