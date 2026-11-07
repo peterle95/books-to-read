@@ -1,0 +1,181 @@
+{
+ "source": "android15-release DatePicker defaults 1900..2100; YearPickerView.setSelectionCentered offset (226dp/2 - 64dp/2 = 81dp); ScrollBarUtils length=max(2*thickness, round(size*extent/range)), offset=round((size-length)*offset/(range-extent)); config_scrollbarSize 4dp.",
+ "native": {
+  "device": "issue47-parity AVD, API35 google_apis_tablet x86_64, 1080x2340, density 480, font scale 1.0, Europe/Berlin, en-US",
+  "range": [
+   1900,
+   2100
+  ],
+  "listBoundsPhysical": [
+   108,
+   745,
+   972,
+   1759
+  ],
+  "trackPhysical": {
+   "width": 12,
+   "height": 1014
+  },
+  "contentPhysical": 28977,
+  "initialScrollOffsetDp": 81,
+  "thumbColorSample": [
+   175,
+   175,
+   175
+  ],
+  "capture": "screenrecord 10 fps; Android fades scrollbars after about 1s, static screencap shows none",
+  "states": {
+   "initial2026": {
+    "run": [
+     1372,
+     1405
+    ],
+    "topFromBody": 209.0,
+    "heightCss": 11.0
+   },
+   "scrolled": {
+    "run": [
+     1028,
+     1063
+    ],
+    "topFromBody": 94.33333333333333,
+    "heightCss": 11.666666666666666
+   },
+   "selected2028": {
+    "run": [
+     1382,
+     1415
+    ],
+    "topFromBody": 212.33333333333334,
+    "heightCss": 11.0
+   }
+  }
+ },
+ "web": {
+  "deviceScaleFactor": 3,
+  "initial": {
+   "first": "1900",
+   "last": "2100",
+   "scrollTop": 5967,
+   "scrollHeight": 9659,
+   "clientHeight": 337,
+   "list": {
+    "x": 36,
+    "y": 212.5,
+    "width": 288,
+    "height": 338
+   },
+   "rowWidth": 288,
+   "thumb": {
+    "x": 320,
+    "topFromBody": 209,
+    "width": 4,
+    "height": 11.6563
+   },
+   "nativeScrollbar": "none"
+  },
+  "scrolled": {
+   "first": "1900",
+   "last": "2100",
+   "scrollTop": 2000,
+   "scrollHeight": 9659,
+   "clientHeight": 337,
+   "list": {
+    "x": 36,
+    "y": 212.5,
+    "width": 288,
+    "height": 338
+   },
+   "rowWidth": 288,
+   "thumb": {
+    "x": 320,
+    "topFromBody": 70,
+    "width": 4,
+    "height": 11.6563
+   },
+   "nativeScrollbar": "none"
+  },
+  "selected2028": {
+   "first": "1900",
+   "last": "2100",
+   "scrollTop": 6063,
+   "scrollHeight": 9659,
+   "clientHeight": 337,
+   "list": {
+    "x": 36,
+    "y": 212.5,
+    "width": 288,
+    "height": 338
+   },
+   "rowWidth": 288,
+   "thumb": {
+    "x": 320,
+    "topFromBody": 212.3281,
+    "width": 4,
+    "height": 11.6563
+   },
+   "nativeScrollbar": "none"
+  },
+  "early0001": {
+   "first": "1",
+   "last": "201",
+   "scrollTop": 0,
+   "scrollHeight": 9659,
+   "clientHeight": 337,
+   "list": {
+    "x": 36,
+    "y": 212.5,
+    "width": 288,
+    "height": 338
+   },
+   "rowWidth": 288,
+   "thumb": {
+    "x": 320,
+    "topFromBody": 0,
+    "width": 4,
+    "height": 11.6563
+   },
+   "nativeScrollbar": "none"
+  },
+  "late9999": {
+   "first": "9799",
+   "last": "9999",
+   "scrollTop": 9311,
+   "scrollHeight": 9648,
+   "clientHeight": 337,
+   "list": {
+    "x": 36,
+    "y": 212.5,
+    "width": 288,
+    "height": 338
+   },
+   "rowWidth": 288,
+   "thumb": {
+    "x": 320,
+    "topFromBody": 326,
+    "width": 4,
+    "height": 12
+   },
+   "nativeScrollbar": "none"
+  }
+ },
+ "residualsCss": {
+  "initial": {
+   "nativeTop": 209.0,
+   "webTop": 209,
+   "nativeHeight": 11.0,
+   "webHeight": 11.6563
+  },
+  "selected2028": {
+   "nativeTop": 212.33333333333334,
+   "webTop": 212.3281,
+   "nativeHeight": 11.0,
+   "webHeight": 11.6563
+  },
+  "scrolled": {
+   "nativeTop": 94.33333333333333,
+   "webTop": 70,
+   "note": "different scroll offsets; native frame is a scroll-state capture, not the same scrollTop"
+  }
+ }
+}

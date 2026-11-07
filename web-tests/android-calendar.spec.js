@@ -1,6 +1,9 @@
 const { test, expect } = require('@playwright/test');
 const path = require('node:path');
 
+// API 35 reference captures are 1080x2340 at density 3; keep the same raster.
+test.use({ deviceScaleFactor: 3 });
+
 const load = async (page, value = '2026-11-06', nested = false) => {
   await page.goto('./');
   await page.addStyleTag({ path: path.join(__dirname, '../web/android-calendar.css') });
@@ -282,4 +285,78 @@ test('API35 SimpleMonthView typography and source baselines hold at 360x732', as
   expect(metrics.day.weight).toBe('400');
   expect(metrics.day.height).toBe(40);
   close(metrics.day.baseline, sourceBaseline(metrics.day.height, 12));
+});
+
+test('API35 year scrollbar matches native range, thumb length and position', async ({ page }, testInfo) => {
+  // DatePicker defaults to 1900..2100 and setSelectionCentered puts the selected
+  // row 81px down (datepicker_view_animator_height 226dp / 2 - year_label 64dp / 2).
+  // The thumb uses ScrollBarUtils: max(2x width, round(size^2/range)) in device px.
+  await page.setViewportSize({ width: 360, height: 732 });
+  await load(page, '2026-11-07');
+  const before = await bundle(page);
+  const state = () => page.evaluate(() => {
+    const list = document.querySelector('.reading-calendar-years');
+    const thumb = document.querySelector('.reading-calendar-scrollbar > div');
+    const body = document.querySelector('.reading-calendar-body').getBoundingClientRect();
+    const box = thumb.getBoundingClientRect();
+    return {
+      first: list.firstElementChild.textContent, last: list.lastElementChild.textContent,
+      scrollTop: list.scrollTop, rowWidth: list.firstElementChild.getBoundingClientRect().width,
+      top: box.top - body.top, height: box.height, width: box.width,
+      nativeScrollbar: getComputedStyle(list).scrollbarWidth,
+    };
+  });
+  await field(page).click();
+  await calendar(page).getByRole('button', { name: 'Choose year' }).click();
+  let value = await state();
+  expect(value.first).toBe('1900');
+  expect(value.last).toBe('2100');
+  expect(value.scrollTop).toBe(5967);
+  expect(value.rowWidth).toBe(288);
+  expect(value.nativeScrollbar).toBe('none');
+  expect(value.width).toBe(4);
+  // 338x338/9659 -> 11.67px tall, offset 979*5967/9321 -> 209px.
+  expect(Math.abs(value.height - 11.667)).toBeLessThan(0.2);
+  expect(Math.abs(value.top - 209)).toBeLessThan(1);
+  await page.screenshot({ path: testInfo.outputPath('year-thumb-1900-2100.png') });
+
+  await page.locator('.reading-calendar-years').evaluate((list) => { list.scrollTop = 2000; });
+  await expect.poll(async () => (await state()).top).toBeLessThan(100);
+  value = await state();
+  expect(Math.abs(value.top - 70)).toBeLessThan(1);
+  await page.screenshot({ path: testInfo.outputPath('year-thumb-scrolled.png') });
+
+  await calendar(page).getByRole('button', { name: '2028', exact: true }).click();
+  await calendar(page).getByRole('button', { name: 'Choose year' }).click();
+  value = await state();
+  expect(value.first).toBe('1900');
+  expect(value.last).toBe('2100');
+  // 2028 is row 128: scrollTop 6063 -> offset 637/3 = 212.33px.
+  expect(Math.abs(value.top - 212.333)).toBeLessThan(1);
+  await page.screenshot({ path: testInfo.outputPath('year-thumb-selected-2028.png') });
+
+  // Both accepted ISO boundaries stay reachable; the thumb pins to each end.
+  await page.keyboard.press('Escape');
+  await field(page).evaluate((input) => { input.value = '0001-01-01'; });
+  await field(page).click();
+  await calendar(page).getByRole('button', { name: 'Choose year' }).click();
+  value = await state();
+  expect(value.first).toBe('1');
+  expect(value.last).toBe('201');
+  expect(value.scrollTop).toBe(0);
+  expect(value.top).toBe(0);
+  await page.keyboard.press('End');
+  await expect(calendar(page).getByRole('button', { name: '9999', exact: true })).toBeFocused();
+  value = await state();
+  expect(value.first).toBe('9799');
+  expect(value.last).toBe('9999');
+  expect(Math.abs(value.top - 326.333)).toBeLessThan(1);
+  await page.screenshot({ path: testInfo.outputPath('year-thumb-9999.png') });
+  await page.keyboard.press('Home');
+  await expect(calendar(page).getByRole('button', { name: '1', exact: true })).toBeFocused();
+  expect((await state()).top).toBe(0);
+  await page.keyboard.press('Escape');
+  await expect(field(page)).toHaveValue('0001-01-01');
+  expect(await events(page)).toEqual([]);
+  expect(await bundle(page)).toBe(before);
 });

@@ -68,8 +68,13 @@ history, charts and open dialogs/sheets.
 The History origin mismatch has a bounded automated correction and comparison
 in `docs/evidence/issue-45/verification.md`; actual-device confirmation remains
 pending. Known visual residuals remain:
-shadows still differ, and quarter footer text remains **2 physical px lower**
-than native. Calendar ink alignment was re-measured in
+shadows still differ, quarter footer text remains **2 physical px lower** than
+native, and Android fades the year scrollbar after about a second while the web
+overlay thumb stays painted. The year list now uses Android's 1900–2100 window
+and a `ScrollBarUtils`-sized overlay thumb; paired captures in
+`docs/evidence/issue-47/verification.md` put the initial and selected-year thumb
+offsets at 209 and 212.33 px with a 4 px width and at most one physical pixel of
+height difference. Calendar ink alignment was re-measured in
 `docs/evidence/issue-46/verification.md` against a fresh API 35 capture: month,
 weekday and day ink centres are within 0.5 CSS px (1.5 physical px), and the
 header/date and year-list geometry match. The remainder is Chromium/Skia glyph

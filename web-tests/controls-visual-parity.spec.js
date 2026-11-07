@@ -181,14 +181,20 @@ test('calendar preserves framework month boxes and a styled scrollable year list
   await calendar.getByRole('button', { name: 'Choose year', exact: true }).click();
   const years = page.locator('.reading-calendar-years');
   await expect(years).toHaveCSS('overflow-y', 'auto');
-  await expect(years).toHaveCSS('scrollbar-width', 'auto');
+  await expect(years).toHaveCSS('scrollbar-width', 'none');
+  // A DOM overlay paints the API35 ScrollBarUtils thumb; the browser scrollbar
+  // cannot go below its own minimum length, so it is hidden instead.
   const scrollbar = await years.evaluate((element) => {
-    const bar = getComputedStyle(element, '::-webkit-scrollbar');
-    const thumb = getComputedStyle(element, '::-webkit-scrollbar-thumb');
-    const track = getComputedStyle(element, '::-webkit-scrollbar-track');
-    return { width: bar.width, display: bar.display, color: thumb.backgroundColor, radius: thumb.borderRadius, track: track.backgroundColor, gutter: element.offsetWidth - element.clientWidth };
+    const thumb = element.parentElement.querySelector('.reading-calendar-scrollbar').firstElementChild;
+    const style = getComputedStyle(thumb);
+    const box = thumb.getBoundingClientRect();
+    return { width: style.width, color: style.backgroundColor, gutter: element.offsetWidth - element.clientWidth, height: box.height, top: box.top - element.getBoundingClientRect().top };
   });
-  expect(scrollbar).toEqual({ width: '4px', display: 'inline', color: 'rgb(176, 176, 176)', radius: '0px', track: 'rgba(0, 0, 0, 0)', gutter: 4 });
+  expect(scrollbar.width).toBe('4px');
+  expect(scrollbar.color).toBe('rgb(176, 176, 176)');
+  expect(scrollbar.gutter).toBe(0);
+  near(scrollbar.height, 11.67);
+  near(scrollbar.top, 209);
   const selectedYear = await years.locator('[aria-pressed="true"]').boundingBox();
   near(selectedYear.y, 293.5); near(selectedYear.height, 59);
   near(selectedYear.x, box.x); near(selectedYear.width, box.width);

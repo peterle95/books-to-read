@@ -1,6 +1,10 @@
 // Shared framework-Material calendar. Only OK updates the original field.
 (() => {
   const DAY = 86400000, attached = new WeakSet();
+  // API35 DatePicker's default range (DatePicker.java) is 1900..2100; the list also
+  // has to reach the accepted ISO bounds through edge scrolling.
+  const FIRST_YEAR = 1, LAST_YEAR = 9999, NATIVE_FIRST_YEAR = 1900, NATIVE_LAST_YEAR = 2100;
+  const YEAR_COUNT = NATIVE_LAST_YEAR - NATIVE_FIRST_YEAR + 1;
   const utc = (year, month, day) => {
     const date = new Date(0);
     date.setUTCFullYear(year, month, day);
@@ -42,7 +46,27 @@
     next.setUTCDate(Math.min(date.getUTCDate(), utc(next.getUTCFullYear(), next.getUTCMonth() + 1, 0).getUTCDate()));
     return next;
   };
-  const bounded = (date) => date.getUTCFullYear() >= 1 && date.getUTCFullYear() <= 9999;
+  const bounded = (date) => date.getUTCFullYear() >= FIRST_YEAR && date.getUTCFullYear() <= LAST_YEAR;
+  // Use Android's native range whenever the year is inside it, so the scrollbar has
+  // the same thumb length and position; otherwise a same-size window follows the edges.
+  const yearWindow = (year) => {
+    const start = year >= NATIVE_FIRST_YEAR && year <= NATIVE_LAST_YEAR ? NATIVE_FIRST_YEAR
+      : year < NATIVE_FIRST_YEAR ? Math.max(FIRST_YEAR, year - 100)
+      : Math.min(LAST_YEAR - YEAR_COUNT + 1, year - 100);
+    return [start, start + YEAR_COUNT - 1];
+  };
+  // API35 com.android.internal.widget.ScrollBarUtils: min 2x thickness, rounded in
+  // device pixels, offset against the range minus the visible extent.
+  const paintScrollbar = (list, bar) => {
+    const scale = window.devicePixelRatio || 1;
+    const size = Math.round(list.getBoundingClientRect().height) * scale, range = list.scrollHeight * scale;
+    const length = Math.max(8 * scale, Math.round(size * size / range));
+    const maxOffset = size - length;
+    const offset = Math.min(maxOffset, Math.round(maxOffset * (list.scrollTop * scale) / (range - size)));
+    const thumb = bar.firstElementChild;
+    thumb.style.height = `${length / scale}px`;
+    thumb.style.top = `${Math.max(0, offset) / scale}px`;
+  };
   const render = (focus = false) => {
     dialog.querySelector('.reading-calendar-announcement').textContent = format(month, { month: 'long', year: 'numeric' });
     const header = dialog.querySelector('.reading-calendar-header');
@@ -55,12 +79,16 @@
     date.setAttribute('aria-pressed', String(!years));
     header.append(year, date);
     const body = dialog.querySelector('.reading-calendar-body');
-    body.onscroll = null;
     body.replaceChildren();
-    body.classList.toggle('reading-calendar-years', years);
     if (years) {
       // Bounded DOM window; keyboard and scroll edges can advance through all ISO years.
-      const selected = draft.getUTCFullYear(), start = Math.max(1, yearCursor - 100), end = Math.min(9999, yearCursor + 100);
+      const selected = draft.getUTCFullYear(), [start, end] = yearWindow(yearCursor);
+      const list = document.createElement('div');
+      list.className = 'reading-calendar-years';
+      const bar = document.createElement('div');
+      bar.className = 'reading-calendar-scrollbar';
+      bar.setAttribute('aria-hidden', 'true');
+      bar.append(document.createElement('div'));
       for (let value = start; value <= end; value++) {
         const row = button(String(value), null, () => {
           const next = utc(value, draft.getUTCMonth(), 1);
@@ -75,27 +103,31 @@
           else if (event.key === 'ArrowUp') next--;
           else if (event.key === 'PageDown') next += 10;
           else if (event.key === 'PageUp') next -= 10;
-          else if (event.key === 'Home') next = 1;
-          else if (event.key === 'End') next = 9999;
+          else if (event.key === 'Home') next = FIRST_YEAR;
+          else if (event.key === 'End') next = LAST_YEAR;
           else return;
           event.preventDefault();
-          next = Math.max(1, Math.min(9999, next));
-          const target = [...body.children].find((item) => item.textContent === String(next));
+          next = Math.max(FIRST_YEAR, Math.min(LAST_YEAR, next));
+          const target = [...list.children].find((item) => item.textContent === String(next));
           if (target) { row.tabIndex = -1; target.tabIndex = 0; target.focus(); }
           else { yearCursor = next; render(true); }
         });
-        body.append(row);
+        list.append(row);
       }
-      const active = body.querySelector('[tabindex="0"]');
-      body.scrollTop = active.offsetTop - 81;
-      body.onscroll = () => {
+      body.append(list, bar);
+      const active = list.querySelector('[tabindex="0"]');
+      list.scrollTop = active.offsetTop - 81;
+      const paint = () => paintScrollbar(list, bar);
+      list.onscroll = () => {
+        paint();
         let anchor;
-        if (body.scrollTop <= 0 && start > 1) anchor = start;
-        else if (body.scrollTop + body.clientHeight >= body.scrollHeight - 1 && end < 9999) anchor = end;
+        if (list.scrollTop <= 0 && start > FIRST_YEAR) anchor = start - 1;
+        else if (list.scrollTop + list.clientHeight >= list.scrollHeight - 1 && end < LAST_YEAR) anchor = end + 1;
         else return;
         yearCursor = anchor;
         render(false);
       };
+      paint();
       if (focus) active.focus({ preventScroll: true });
       return;
     }

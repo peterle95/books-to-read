@@ -47,15 +47,15 @@ dialog#reading-calendar:not(#entries-dialog):not(#metrics-dialog) {
 .reading-calendar-grid button[aria-selected="true"]::before { content: ''; position: absolute; z-index: -1; width: 40px; height: 40px; border-radius: 50%; background: #b56b3c; top: 0; left: 50%; transform: translateX(-50%); }
 .reading-calendar-actions { box-sizing: border-box; height: 62px; display: flex; justify-content: flex-end; padding: 4px 12px; }
 .reading-calendar-actions button { height: 54px; padding: 0 12px; min-width: 64px; font-size: 14px; font-weight: 400; color: #b56b3c; }
-.reading-calendar-years { overflow-y: auto; overflow-x: hidden; scrollbar-gutter: stable; border-bottom: 1px solid #ddd; }
-/* API35 config_scrollbarSize; gray sampled from the accepted year reference.
-   Thumb position/length follow the web year window, not Android's year range. */
-.reading-calendar-years::-webkit-scrollbar { width: 4px; }
-.reading-calendar-years::-webkit-scrollbar-track { background: transparent; }
-.reading-calendar-years::-webkit-scrollbar-thumb { background: #b0b0b0; border-radius: 0; }
-.reading-calendar-years button { width: 100%; height: 48px; font-size: 16px; flex-shrink: 0; }
-@supports selector(::-webkit-scrollbar) {
-  /* Keep Android's full-width, centered rows despite the browser scrollbar gutter. */
-  .reading-calendar-years button { width: calc(100% + 4px); }
+.reading-calendar-years {
+  position: absolute; inset: 0; box-sizing: border-box;
+  overflow-y: auto; overflow-x: hidden; border-bottom: 1px solid #ddd;
+  scrollbar-width: none; font-family: AndroidRoboto, Roboto, Arial, sans-serif;
 }
+.reading-calendar-years::-webkit-scrollbar { width: 0; height: 0; }
+/* Android draws an overlay scrollbar; paint the API35 ScrollBarUtils thumb (4dp,
+   minimum 8dp) over the list so it matches the native range and does not take layout. */
+.reading-calendar-scrollbar { position: absolute; inset: 0 0 0 auto; width: 4px; pointer-events: none; }
+.reading-calendar-scrollbar > div { position: absolute; left: 0; width: 4px; background: #b0b0b0; }
+.reading-calendar-years button { width: 100%; height: 48px; font-size: 16px; flex-shrink: 0; }
 .reading-calendar-years button[aria-pressed="true"] { height: 59px; color: #b56b3c; font-size: 26px; font-weight: 500; }
