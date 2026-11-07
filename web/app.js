@@ -862,7 +862,18 @@ const renderQuarter = (message = '') => {
     quarterStatus.textContent = message;
     return;
   }
-  const planned = plannedDraft();
+  let planned;
+  try {
+    planned = plannedDraft();
+    quarterOpen.disabled = false;
+    quarterShortcut.disabled = false;
+  } catch (error) {
+    if (!(error instanceof RangeError)) throw error;
+    quarterOpen.disabled = true;
+    quarterShortcut.disabled = true;
+    quarterStatus.textContent = error.message;
+    return;
+  }
   const count = planned.sections.reduce((total, section) => total + section.books.length, 0);
   quarterStatus.textContent = message || (count
     ? `Next-quarter plan saved: ${count} ${count === 1 ? 'book' : 'books'}. Unfinished current books carry forward first, and the plan activates on ${planned.startDate}.`

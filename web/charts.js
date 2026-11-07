@@ -43,8 +43,9 @@
     const baseline = state.baselines[String(book.id).trim()];
     const scheduledStart = parseDate(baseline?.startDate || state.startDate);
     const deadline = parseDate(baseline?.deadline || state.endDate);
-    const start = Math.max(day - 3660, Math.min(scheduledStart, day));
     const horizon = parseDate(forecast.horizon);
+    // Reserve one supported day for the chart's nonzero-width x axis.
+    const start = Math.max(day - 3660, Math.min(scheduledStart, day, horizon - 1));
     const end = Math.max(start + 1, Math.min(horizon, Math.max(deadline, day,
       forecast.projectedDeadline ? parseDate(forecast.projectedDeadline) : forecast.pace > 0 ? horizon : day,
       forecast.latestDeadline ? parseDate(forecast.latestDeadline) : day)));
