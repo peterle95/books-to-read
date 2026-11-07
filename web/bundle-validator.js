@@ -42,7 +42,7 @@ window.validateBundleContents = (values, nonIntegers) => {
   const labels = ['Physical books', 'Digital books', 'Audiobooks'];
   const parseSections = (payload, prefix) => {
     if (!Array.isArray(payload.sections)) fail(prefix, 'sections must be a list');
-    const seenLabels = new Set(), rawIds = new Set(), books = new Map();
+    const seenLabels = new Set(), ids = new Set(), books = new Map();
     for (const section of payload.sections) {
       if (!object(section) || typeof section.label !== 'string' || !labels.includes(section.label.trim())) fail(prefix, 'unknown section');
       const label = section.label.trim(), audio = label === 'Audiobooks';
@@ -54,10 +54,11 @@ window.validateBundleContents = (values, nonIntegers) => {
       for (const [index, raw] of list.entries()) {
         const path = `${prefix} ${label} book ${index + 1}`;
         if (!object(raw) || typeof raw.id !== 'string' || !raw.id.trim()) fail(path, 'stable book ID is required');
-        if (rawIds.has(raw.id)) fail(path, 'duplicate book ID');
-        rawIds.add(raw.id);
-        if ('reading_sessions' in raw) fail(path, 'reading history belongs in sessions.json');
+        // Every reader keys books by the trimmed ID, so reject collisions after trimming.
         const id = raw.id.trim();
+        if (ids.has(id)) fail(path, 'duplicate book ID');
+        ids.add(id);
+        if ('reading_sessions' in raw) fail(path, 'reading history belongs in sessions.json');
         if (raw.title === undefined || (typeof raw.title === 'string' && !raw.title.trim())) fail(path, 'title is required');
         let start, end;
         if (audio) {
