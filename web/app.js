@@ -471,7 +471,8 @@ const renderSchedule = (message = '') => {
   window.AndroidControls.sync(finishInput, scheduleState.endDate);
   restList.replaceChildren(...scheduleState.restDays.map((range, index) => {
     const item = document.createElement('li');
-    const label = range.start === range.end ? range.start : `${range.start} to ${range.end}`;
+    // ReadingPlanPlanView renders every range as "start ? end", including single days.
+    const label = `${range.start} ? ${range.end}`;
     const remove = document.createElement('button');
     item.append(`${label} `);
     remove.type = 'button';
@@ -684,6 +685,7 @@ const activePlanHint = document.createElement('p');
 activePlanHint.textContent = 'Your current plan is active. Press New plan to choose start and finish dates.';
 const recalculatePlan = document.createElement('button');
 recalculatePlan.type = 'button';
+recalculatePlan.id = 'recalculate-plan';
 recalculatePlan.textContent = 'Recalculate current plan';
 recalculatePlan.addEventListener('click', () => calculateButton.click());
 newPlanSection.insertBefore(quarterShortcut, newPlanForm);

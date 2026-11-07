@@ -65,10 +65,15 @@ plan fixtures. Populated synthetic fixtures now cover first-fold layout at
 with automated coverage, **not visual approval**. A fresh same-data Android/web
 comparison is actively pending, including populated books, groups, overrides,
 history, charts and open dialogs/sheets.
-The partial same-fixture first-fold comparison in
-`docs/evidence/issue-51/verification.md` preserves native and web images
-and records unresolved differences; its native clock was not frozen, and it does
-not establish complete parity.
+The comparisons in `docs/evidence/issue-51/verification.md` preserve native and
+web images and record unresolved differences; the native clock was not frozen and
+the native bundle bytes are unknown, so they do not establish complete parity.
+A 2026-11-07 round against supplied current-build references resolved the
+rest-day separator and label text, blank date fields (no `YYYY-MM-DD`
+placeholder), colon-free Session targets, the equal-width All/Metrics header and
+the 48 px Session control row; see `docs/evidence/issue-51/round2/capture.json`
+for measured geometry. The web-only text draft, the Settings presentation and
+all actual-device checks remain unresolved.
 The History origin mismatch has a bounded automated correction and comparison
 in `docs/evidence/issue-45/verification.md`; actual-device confirmation remains
 pending. Known visual residuals remain:

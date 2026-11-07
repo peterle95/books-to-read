@@ -208,7 +208,7 @@ write_json_bundle(sys.argv[1], [
     await page.reload();
     await page.getByRole('button', { name: 'Plan', exact: true }).click();
     await expect(page.getByLabel('Plan finish')).toHaveValue('2026-03-30');
-    await expect(page.getByLabel('Rest days').locator('li')).toHaveText('2026-02-01 to 2026-02-02 Remove');
+    await expect(page.getByLabel('Rest days').locator('li')).toHaveText('2026-02-01 ? 2026-02-02 Remove');
     await expect(page.getByTestId('schedule-status')).toHaveText(/baseline stays unchanged/);
     await expect(row('Second').locator('td').nth(3)).toHaveText('2026-03-31');
 

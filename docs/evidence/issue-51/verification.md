@@ -106,3 +106,68 @@ fixture limitations must not be silently treated as this run's evidence. A
 complete run must freeze native time as well as web time, record actual scroll
 offsets and interaction state, test cancellation, compare each requested state,
 and resolve every discrepancy before parity can be approved.
+
+## 2026-11-07 round 2 — supplied current-build references
+
+Status: **still not same-bundle, same-instant parity approval.** Six references
+supplied on 2026-11-07 (Session, Plan, Books, Charts, Reading history, history
+book chooser) show a real plan on a 360 dp wide device at 09:28–09:33 local,
+Europe/Berlin. Web captures use the same 360 dp width (360 × 884 CSS plus the
+required 360 × 732 set), DPR 3, service workers blocked, frozen
+`2026-11-07T08:28:00Z`, with a six-book bundle reconstructed from the visible
+Plan, Books, Charts and history states.
+
+The native bundle files were not supplied, the native clock was not frozen, and
+the reference is a JPEG re-encode, so this round establishes label, structure and
+measured geometry parity for the shown states, not bundle-byte identity.
+
+Files: `round2/paired-*.png` place native and web at the same 360 dp width;
+`round2/web-*.png` are the full 1080 px-wide captures; `round2/native-*.jpg` are
+the supplied references; `round2/capture.json` records browser, viewports,
+timezone/instant, source and fixture hashes, image hashes and DOM measurements.
+
+### Dispositions
+
+1. **Session format label** — the current reference shows “Audiobooks” on one
+   unclipped line, matching web. Not reproducible.
+2. **Plan rest-day labels** — labels match; every range now renders
+   `start ? end`, one-day ranges included, and empty date fields no longer show
+   `YYYY-MM-DD`. Resolved.
+3. **Plan first fold** — web still has the separate text-draft section below the
+   rest-day form; the native screen has no equivalent. Unresolved product
+   difference, not removed by this comparison.
+4. **Books date fields** — override fields are blank like native. Resolved.
+5. **Charts header** — All and Metrics are both 88 × 44 CSS px, 2 px apart, with
+   14 px text, matching `secondaryButton` and Android's 88 dp default minimum
+   width. Resolved.
+6. **Settings presentation** — unchanged; manual four-file transfer remains the
+   only approved exception, so the remaining data-source/manual-transfer
+   presentation differences are unresolved.
+7. **Session spacing and Entries** — the new reference shows a fully painted,
+   rounded Entries button and cards, so the earlier clipping was the capture's
+   scroll position rather than layout. Format buttons are now a fixed 48 px row,
+   book buttons and Entries are at least 48 px, and Add session uses 15 px text.
+   Resolved for the shown states.
+
+### Measurements (web DOM, 360 CSS px)
+
+- Charts: All `88 × 44` at x=166, Metrics `88 × 44` at x=256, 14 px text.
+- Session: Entries `88 × 48`; first format button `96 × 48`; first book button
+  `147 × 48`; metrics row `300 × 65.19`; Add session `116.09 × 48`.
+- Plan: first rest row `56` px high (4 px row padding above and below the 48 px
+  Remove button), label `2026-12-19 ? 2026-12-19`.
+
+### Still not comparable
+
+- The reconstructed sessions were repaired on import, so history
+  “total recorded” and per-entry contributions differ from native for data
+  reasons, not layout.
+- This round has no native Settings, group, calendar, edit/delete-dialog,
+  tablet or desktop references.
+- Actual-device and final approval remain #44/#60.
+
+### Checks
+
+- Full `npx playwright test`, one worker, zero retries: **173 passed**, exit 0,
+  6.1 minutes.
+- `node --check` passed for the changed scripts.

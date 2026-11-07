@@ -279,8 +279,9 @@ const updateSessionTarget = () => {
   const section = current?.books.sections.find((item) => item.books.some((book) => book.id === sessionBook.value));
   const book = section?.books.find((item) => item.id === sessionBook.value);
   const audio = section?.label.trim() === 'Audiobooks';
-  targetCaption.textContent = audio ? 'Target time left: ' : 'Target page: ';
-  paceCaption.textContent = audio ? 'Time per day: ' : 'Pages per day: ';
+  // Android's metricColumn captions carry no punctuation.
+  targetCaption.textContent = audio ? 'Target time left' : 'Target page';
+  paceCaption.textContent = audio ? 'Time per day' : 'Pages per day';
   targetValue.textContent = paceValue.textContent = '-';
   sessionMetrics.dataset.completed = String(!!book && sessionDate.value === window.ReadingSchedule.today() && book.target_completed_date === sessionDate.value);
   if (!book || !window.AndroidControls.sync(sessionDate) || !sessionDate.value) return;

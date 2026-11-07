@@ -44,8 +44,8 @@ write_json_bundle(sys.argv[1], books, today, today + timedelta(days=3), 'Quarter
     };
 
     await page.getByRole('button', { name: 'Choose book Paper' }).click();
-    await expect(page.locator('#session-form')).toContainText('Target page: 2');
-    await expect(page.locator('#session-form')).toContainText('Pages per day: 2');
+    await expect(page.locator('#session-form')).toContainText(/Target page\s*2/);
+    await expect(page.locator('#session-form')).toContainText(/Pages per day\s*2/);
     await position.fill('2');
     await page.getByRole('button', { name: 'Add session' }).click();
     await expect(page.getByTestId('editor-status')).toHaveText('Reading session saved.');
@@ -60,13 +60,13 @@ write_json_bundle(sys.argv[1], books, today, today + timedelta(days=3), 'Quarter
     await page.locator('#session-entry-position').fill('8');
     await page.locator('#session-entry-save').click();
     await page.locator('#close-entries').click();
-    await expect(page.locator('#session-form')).toContainText('Target page: 8');
+    await expect(page.locator('#session-form')).toContainText(/Target page\s*8/);
     await remove('paper', today);
     expect((await getBook('paper')).current_page).toBeNull();
 
     const yesterday = await page.evaluate(() => window.ReadingSchedule.iso(window.ReadingSchedule.parseDate(window.ReadingSchedule.today()) - 1));
     await page.locator('#session-date').fill(yesterday);
-    await expect(page.locator('#session-form')).toContainText('Target page: 1');
+    await expect(page.locator('#session-form')).toContainText(/Target page\s*1/);
     await position.fill('1');
     await page.getByRole('button', { name: 'Add session' }).click();
     expect((await getBook('paper')).target_completed_date).toBeNull();
@@ -74,8 +74,8 @@ write_json_bundle(sys.argv[1], books, today, today + timedelta(days=3), 'Quarter
 
     await page.getByRole('button', { name: 'Choose Audiobooks' }).click();
     await expect(bookInput).toHaveValue('audio');
-    await expect(page.locator('#session-form')).toContainText('Target time left: 0:00:06');
-    await expect(page.locator('#session-form')).toContainText('Time per day: 0:00:02');
+    await expect(page.locator('#session-form')).toContainText(/Target time left\s*0:00:06/);
+    await expect(page.locator('#session-form')).toContainText(/Time per day\s*0:00:02/);
     await position.fill('6');
     await page.getByRole('button', { name: 'Add session' }).click();
     expect((await getBook('audio')).target_completed_date).toBe(today);

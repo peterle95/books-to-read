@@ -165,7 +165,7 @@ test('rest ranges reject absent, invalid and reversed drafts; calendar OK never 
   await chooseDate(page, end, '2030-03-13');
   expect(await rawBundle(page)).toBe(raw);
   await tab(page, 'Add rest-day range');
-  await expect(page.locator('#rest-list')).toContainText('2030-03-12 to 2030-03-13');
+  await expect(page.locator('#rest-list')).toContainText('2030-03-12 ? 2030-03-13');
   expect((await snapshot(page)).plan.rest_days).toEqual([{ start_date: '2030-03-12', end_date: '2030-03-13' }]);
 });
 

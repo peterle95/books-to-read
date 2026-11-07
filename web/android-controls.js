@@ -29,7 +29,8 @@
     controls.add(input);
     input.type = 'text';
     input.dataset.dateMode = mode;
-    input.placeholder = 'YYYY-MM-DD';
+    // Android's editText has no hint; empty date fields stay blank.
+    input.removeAttribute('placeholder');
     input.addEventListener('input', () => sync(input));
     input.addEventListener('change', () => sync(input));
     const form = input.form;

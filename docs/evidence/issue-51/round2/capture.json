@@ -1,0 +1,175 @@
+{
+  "captured_at": "2026-11-07T14:55:00+01:00",
+  "browser": "156.0.8078.4",
+  "native_references": {
+    "source": "assets/screenshots/, supplied 2026-11-07 references from the installed Android app",
+    "raster": "521 x 1280 JPEG",
+    "device": "real reading plan (coming wave, byung chul, the fall, specchio americano, designing apps, tools); 360 dp wide layout",
+    "clock": "not frozen; status bar shows 09:28-09:33 local, Europe/Berlin",
+    "fixture": "native bundle files were not supplied, so bundle bytes are not comparable",
+    "hashes": {
+      "native-books.jpg": "aa53f220c56272a96c9ec697c50de04726a60852555ae5980a6da3471453a8f1",
+      "native-charts.jpg": "835967176e94af5562a5ab44836a6eb3e9f9d8487f40a123cfb7adc688a72a8b",
+      "native-entries-chooser.jpg": "c2cb8f37b664b78c7ed64685ce5da2736b52198d3078c3b0b4bc5d855fd77b0a",
+      "native-entries.jpg": "89e6e2fb0b0b1bb84b4aeb04d137a1da3e03c3724aaa4b32b22e242da461abce",
+      "native-plan.jpg": "7ef1817d6b439b03804e50b39c91ed41e4d388f0dfddf0c945426c05b6dd60e0",
+      "native-session.jpg": "d750870fe8a28d74449a3faaf8698f28eedaacbb00dbddfe234e599233f98059"
+    }
+  },
+  "web_capture": {
+    "viewports": [
+      {
+        "width": 360,
+        "height": 884,
+        "dpr": 3
+      },
+      {
+        "width": 360,
+        "height": 732,
+        "dpr": 3
+      }
+    ],
+    "timezone": "Europe/Berlin",
+    "frozen_instant": "2026-11-07T08:28:00Z",
+    "service_workers": "blocked",
+    "font": "AndroidRoboto, sans-serif",
+    "screens": [
+      "Session",
+      "Plan",
+      "Books",
+      "Charts",
+      "Reading history",
+      "Reading history book chooser"
+    ],
+    "scroll": [
+      0,
+      0
+    ],
+    "source_hashes": {
+      "android-calendar.css": "414d6be70142cd949056dd6dede4de2dc00d9b2c9e27b97f7b101027e4049d83",
+      "android-calendar.js": "b92f498cfeda3bb386f9f5906675929f822422b99afff95d533f59a1d6764ae1",
+      "android-controls.js": "2acdeb49d60e3039aa8381c9fd1f4cac76fc57c342699506cb7aeb988d0db906",
+      "android-native.css": "2f8830be96097a0f3b2015282f0e23b90062643f8255bcae6b33467bc984cc3c",
+      "app.js": "c788d5b71eeefc1fb502263c45862f9865fe07bb4d51d51cdcf2d9648bd83ae7",
+      "bundle-export.js": "c7bc93a4235ae7e91cd839410f2dba78f09db4255f6cb8fb7ee58fde5ff22b23",
+      "bundle-validator.js": "47fb2ce8d551cb7a3d7e0bbc94e92b61d1c3e347be7c7808d2225bbd45ddc76c",
+      "charts.js": "790bae2b0b8517cbb3b9d080cc62ca89bfff00d9dfcabd8821567bfd6766eddc",
+      "csv.js": "7838d35826d8be3e45c577a161c41ffff66e39f6f4b639abb3bc36428d918928",
+      "editor.js": "59866f2fe19847e9cbfeed6ff01994811d091cb56ac4f224679b7bd49d895743",
+      "history.js": "8ea68768a3ac4e95dd3ced8523de88411748578b0f684e18e6865f66eb168c4f",
+      "index.html": "b677556ce5915915747358d6fcb5dd95d9fc6b6754111979c2a06aaa26b1bb4f",
+      "projection.js": "d31bcf7ae89635c29d19d75d3caa8175ac263bf4a632a4f97852e5913964d4e7",
+      "quarter.js": "b23680a1d9b7ef5689becd70d3f03177142e9fc8a02953ab3e330ded3db3f2c2",
+      "schedule.js": "0dcfc225069cf7fe2a8c97faf06dee0574bbf4db23057af47aa903652b87db8a",
+      "style.css": "7a552679662fbf4927368164d99d7d00cad56d4db2b5ab4e15076b0041d089db",
+      "sw.js": "2501946e17239ed53396876548a1d314553b5dd21244283aa2e9cb4f1584f58b"
+    },
+    "fixture_hashes": {
+      "books.json": "1433e99f5b52409884536602918b09bb822ca695baed18a02d2fd8ecdfe3479e",
+      "manifest.json": "c3174f8ae0d133215a0a27be28b2ed27a7f9b5cbc5f7ed2c1b7dc92fed20f1bf",
+      "plan.json": "e3dd3fd62604dcf1e7b01c123c9cbdcdafa566bfc2b2ec136d22ace6cf6c76cb",
+      "sessions.json": "d995a8e06ddd3c512744782c1e041f7a4198171d050c86ab21df660781d62889"
+    }
+  },
+  "reconstructed_fixture_limit": "The four bundle files were rebuilt from the visible reference data (same six books, sessions, rest days and plan metadata shape). Titles, pages and rest days match the screenshots; session contributions did not reproduce the native recorded-progress split, so the web importer repaired the chain and history amounts are not comparable.",
+  "measurements": {
+    "charts_header": {
+      "source": "web DOM at 360x884 CSS",
+      "all": {
+        "width": 88,
+        "height": 44,
+        "x": 166,
+        "y": 98.16
+      },
+      "metrics": {
+        "width": 88,
+        "height": 44,
+        "x": 256,
+        "y": 98.16
+      },
+      "gap": 2,
+      "font_size": "14px"
+    },
+    "session_controls": {
+      "source": "web DOM at 360x884 CSS",
+      "entries": {
+        "width": 88,
+        "height": 48,
+        "x": 248,
+        "y": 100
+      },
+      "format_button": {
+        "width": 96,
+        "height": 48,
+        "x": 30,
+        "y": 208
+      },
+      "book_button": {
+        "width": 147,
+        "height": 48,
+        "x": 30,
+        "y": 340
+      },
+      "metrics": {
+        "width": 300,
+        "height": 65.19,
+        "x": 30,
+        "y": 644.19
+      },
+      "add_session": {
+        "width": 116.09,
+        "height": 48,
+        "x": 30,
+        "y": 717.38
+      }
+    },
+    "rest_row": {
+      "source": "visible-layout-parity.spec.js",
+      "height": 56,
+      "row_padding": 4,
+      "remove_button_height": 48,
+      "label": "2026-12-19 ? 2026-12-19"
+    }
+  },
+  "resolved_this_round": {
+    "session_metric_captions": "No colon, matching ReadingPlanUi.metricColumn captions.",
+    "rest_day_separator": "Every range renders \"start ? end\", matching ReadingPlanPlanView.renderRestDayRanges.",
+    "empty_date_fields": "No YYYY-MM-DD placeholder, matching ReadingPlanUi.editText.",
+    "charts_header": "All and Metrics are 88 x 44 CSS px, 2 px apart, 14 px text, matching secondaryButton with the 88 dp default minimum width.",
+    "session_controls": "Format row is a fixed 48 px tall; book buttons and Entries use min-height 48 px; Add session uses 15 px text.",
+    "history_geometry": "Sheet heading, Close, chooser and entry cards match the reference hierarchy and row sizes."
+  },
+  "remaining_differences": [
+    "Settings still shows the manual-transfer cards instead of Android directory/CSV actions; only manual four-file transfer is an approved exception, so its other presentation differences are unresolved.",
+    "Plan keeps the web-only text-draft section below the rest-day form; the native reference has no such section.",
+    "History amount text is not comparable because the reconstructed sessions were repaired on import; the native bundle was not supplied.",
+    "Native clock was not frozen and the native bundle bytes are unknown, so this is structural/label parity for the supplied references, not same-instant, same-bundle visual identity.",
+    "No actual-device or tablet/desktop sign-off; chart and Settings content were compared only for the states shown."
+  ],
+  "images": {
+    "native-books.jpg": "aa53f220c56272a96c9ec697c50de04726a60852555ae5980a6da3471453a8f1",
+    "native-charts.jpg": "835967176e94af5562a5ab44836a6eb3e9f9d8487f40a123cfb7adc688a72a8b",
+    "native-entries-chooser.jpg": "c2cb8f37b664b78c7ed64685ce5da2736b52198d3078c3b0b4bc5d855fd77b0a",
+    "native-entries.jpg": "89e6e2fb0b0b1bb84b4aeb04d137a1da3e03c3724aaa4b32b22e242da461abce",
+    "native-plan.jpg": "7ef1817d6b439b03804e50b39c91ed41e4d388f0dfddf0c945426c05b6dd60e0",
+    "native-session.jpg": "d750870fe8a28d74449a3faaf8698f28eedaacbb00dbddfe234e599233f98059",
+    "paired-books.png": "ddd3bd003c00ac68cfc5f3f4f447756cd582fd33ef41e09f47ce73b77bd3aa64",
+    "paired-charts.png": "078543914de65c91cd5366c1a36cfd93c2a238f306e22e32f156dedb147e4ce1",
+    "paired-entries-chooser.png": "a3abf43837d231b6b5fba57b8df429f187e2f40e294b79b7bd11592bc487d1ba",
+    "paired-entries.png": "cd5b67c56027ce8da4306e3cad619717a05137483208b42b821e2a5d5d5954d2",
+    "paired-plan.png": "f1cdc249d6407b5c56aad0ad3657c81c5dc396bee7b0c437cc93006b5ff58875",
+    "paired-session.png": "99c4d3ff5016362ea14a19f7fd9dfd39ace119b231833b4e6b535af8b7fe229c",
+    "web-books-360x732.png": "a8130885799efe27906c614fdd784250b7d8b4d0a3c9db5777f01a66f60b6096",
+    "web-books.png": "46d481827bf33dc1df4b9c09fc37fb6a4c18ad74e037a888d8d6a1af37c212b9",
+    "web-charts-360x732.png": "8068cd8e7be7c6845604dd18cebcad193dc65bd3196bbdbebda5d6454fe24fe4",
+    "web-charts.png": "a65ca459bd668f1e35ee07c0ea8846efc59b233487035aeb3e5e0aefb3bcb902",
+    "web-entries-360x732.png": "998385dcdfb989d76eb7df6046a2362f48644dc2acf05144c552d4203469955e",
+    "web-entries-chooser-360x732.png": "060ba8883627de78a32f035b8112357b53cd61811954b60f0768af59d81470e3",
+    "web-entries-chooser.png": "04d7d2df02d2915ab17bd98765b8ed9e8463803f48c5ed92201c0712a19d80ea",
+    "web-entries.png": "aa62ece80d5182d0c9677f3e7612efc71bc3889a2f939ae7cfd5189bb8370c65",
+    "web-plan-360x732.png": "c1d88c5b0e2c53c6edccc038c5bfbef570ceec7277bfeeb588ca5356701aebae",
+    "web-plan.png": "2ffa7b437beb8843cb1923992f42944fed1c016f53c3b4ffb99c240daffc1b27",
+    "web-session-360x732.png": "4691d99ddd1c2c406dff4acfc2f0f2692e5d4836cbcc84d05f4cc74ec91e8a88",
+    "web-session.png": "41aefc2b8308f0bb4d44f78a3f93f7303204c443d28d461f90be31301bf2933d"
+  }
+}

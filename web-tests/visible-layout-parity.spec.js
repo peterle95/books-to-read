@@ -127,6 +127,8 @@ test('populated 360x732 first fold preserves native page gutters and useful land
   await expect(page.locator('#editor-status')).toBeHidden();
   expect((await page.locator('#books-heading').boundingBox()).y).toBeLessThan(110);
   await expect(page.getByLabel('Start page', { exact: true })).toHaveCSS('height', '50px');
+  // ReadingPlanUi.editText has no hint, so empty override fields stay blank.
+  expect(await page.locator('#book-start-override').getAttribute('placeholder')).toBeNull();
   await expect(page.locator('label[for="book-title"]')).toHaveCSS('font-weight', '400');
   const nav = await page.getByRole('navigation').boundingBox();
   const deadline = await page.locator('label[for="book-deadline-override"]').boundingBox();
@@ -139,10 +141,13 @@ test('populated 360x732 first fold preserves native page gutters and useful land
   const addRange = await page.locator('#rest-form button').boundingBox();
   expect(restEnd.y + restEnd.height).toBeLessThan(nav.y);
   expect(addRange.y + addRange.height).toBeLessThan(nav.y);
+  expect(await page.locator('#rest-start').getAttribute('placeholder')).toBeNull();
+  await expect(page.locator('#rest-list li').first()).toHaveText('2026-11-08 ? 2026-11-09 Remove');
   const range = await page.locator('#rest-list li').boundingBox();
   const remove = await page.getByRole('button', { name: /Remove rest days/ }).boundingBox();
   expect(remove.y).toBeGreaterThanOrEqual(range.y);
   expect(remove.y + remove.height).toBeLessThanOrEqual(range.y + range.height);
+  expect(range.height).toBe(56); // 4dp row padding above and below the 48dp Remove button.
   await expect(page.locator('#rest-list')).toHaveCSS('list-style-type', 'none');
   await page.screenshot({ path: testInfo.outputPath('populated-plan-360x732.png') });
 
@@ -153,6 +158,14 @@ test('populated 360x732 first fold preserves native page gutters and useful land
     expect(box.y).toBeGreaterThanOrEqual(heading.y);
     expect(box.y + box.height).toBeLessThanOrEqual(heading.y + heading.height);
   }
+  // ReadingPlanChartsView: both header buttons are 14sp secondaryButton boxes
+  // with Android's 88dp minimum width and 44dp minimum height, 2dp apart.
+  const all = await page.locator('#charts-all').boundingBox();
+  const metrics = await page.locator('#metrics-open').boundingBox();
+  expect([all.width, all.height, metrics.width, metrics.height]).toEqual([88, 44, 88, 44]);
+  expect(metrics.x - all.x - all.width).toBe(2);
+  await expect(page.locator('#charts-all')).toHaveCSS('font-size', '14px');
+  await expect(page.locator('#charts-all')).toHaveCSS('min-width', '88px');
   const plot = await page.locator('#charts svg').first().boundingBox();
   expect(plot.height).toBe(500);
   expect(plot.width).toBeLessThanOrEqual(328);
@@ -185,6 +198,8 @@ test('populated chooser, group and history use native alert actions without losi
   const firstBook = await bookButtons.nth(0).boundingBox(), secondBook = await bookButtons.nth(1).boundingBox();
   expect(firstBook.x).toBe(30); // surfaceCard 14dp inset, including its drawable stroke.
   expect(secondBook.x - firstBook.x - firstBook.width).toBe(6);
+  expect(firstBook.height).toBeGreaterThanOrEqual(48); // selectionButton minHeight 48dp; wrapped titles grow.
+  expect((await page.locator('#session-formats button').first().boundingBox()).height).toBe(48); // Format row is a fixed 48dp.
   await expect(page.locator('.session-metrics strong')).toHaveCount(2);
   await expect(page.locator('.session-metrics strong').first()).toHaveCSS('font-size', '21px');
   await page.getByRole('button', { name: 'Entries', exact: true }).click();
