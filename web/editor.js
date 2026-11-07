@@ -209,7 +209,10 @@ bookPickerTrigger.addEventListener('click', () => {
     input.checked = editingBook === book.id;
     input.dataset.bookId = book.id;
     input.addEventListener('click', () => {
-       if (selectBookForEdit(book.id)) bookPicker.close('selected');
+       if (selectBookForEdit(book.id)) {
+         bookPicker.close('selected');
+         bookTitle.focus();
+       }
     });
     label.append(input, `${index + 1}. ${book.title}`);
     return label;
@@ -219,7 +222,6 @@ bookPickerTrigger.addEventListener('click', () => {
   bookPicker.showModal();
 });
 document.querySelector('#cancel-book-picker').addEventListener('click', () => bookPicker.close());
-bookPicker.addEventListener('close', () => (bookPicker.returnValue === 'selected' ? bookTitle : bookPickerTrigger).focus());
 
 window.renderEditor = () => {
   const current = readBundleFiles();

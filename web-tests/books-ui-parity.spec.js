@@ -101,6 +101,21 @@ test('Books accepts native page zero and equal endpoints', async ({ page }) => {
   expect(await page.evaluate(() => readBundleFiles().books.sections[0].books.at(-1))).toMatchObject({ start_page: 0, end_page: 0, pages: 1 });
 });
 
+test('book picker does not steal focus after selection closes', async ({ page }) => {
+  await openBooks(page);
+  await page.locator('#open-book-picker').click();
+  const result = await page.evaluate(async () => {
+    const picker = document.querySelector('#book-picker-dialog');
+    const closed = new Promise((resolve) => picker.addEventListener('close', resolve, { once: true }));
+    picker.querySelector('input').click();
+    const selectedFocus = document.activeElement.id;
+    document.querySelector('#book-from').focus();
+    await closed;
+    return { selectedFocus, finalFocus: document.activeElement.id };
+  });
+  expect(result).toEqual({ selectedFocus: 'book-title', finalFocus: 'book-from' });
+});
+
 test('Books hierarchy uses a numbered current-format modal, restores cancel focus and switches editable formats', async ({ page }) => {
   await openBooks(page);
   await expect(page.locator('#books-heading')).toHaveText('Books');
