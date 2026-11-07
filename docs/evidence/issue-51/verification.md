@@ -80,6 +80,11 @@ Each crop and web image is 1080 × 2196 physical pixels; compare without scaling
    approved exception. Which associated visual and explanatory differences are
    necessary to that exception remains to be reviewed; this comparison does not
    approve the rest of the Settings presentation.
+7. **Session spacing and Entries button:** in the native crop the top of Entries
+   and the tops of the book buttons are visibly clipped; the corresponding web
+   buttons are fully rounded. The date/target card also begins lower in the native
+   image than in web. These are visual observations, not measured root causes;
+   fresh synchronized captures must establish the geometry before correction.
 
 These observations are not exhaustive. In particular, the Session clipping may
 be a native defect, but it is not an approved exception to the stated parity
