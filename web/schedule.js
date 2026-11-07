@@ -34,18 +34,53 @@
     return merged;
   };
 
-  const availableDays = (start, end, restDays = []) => {
-    const days = [];
-    for (let day = start; day <= end; day += 1) {
-      if (!restDays.some((range) => range.start <= day && day <= range.end)) days.push(day);
+  // Merged rest-day ranges are sorted and disjoint, so counts and single days can be
+  // derived arithmetically instead of materializing every day in the interval.
+  const countDays = (start, end, restDays) => {
+    if (end < start) return 0;
+    let days = end - start + 1;
+    for (const range of restDays) {
+      const from = Math.max(range.start, start), to = Math.min(range.end, end);
+      if (to >= from) days -= to - from + 1;
     }
     return days;
   };
 
+  // The index-th reading day of the interval, or null when the index is out of range.
+  const dayAt = (start, end, restDays, index) => {
+    if (end < start || index < 0) return null;
+    let cursor = start;
+    for (const range of restDays) {
+      if (range.end < cursor) continue;
+      if (range.start > end) break;
+      const before = Math.max(range.start, cursor) - cursor;
+      if (index < before) return cursor + index;
+      index -= before;
+      cursor = Math.max(cursor, range.end + 1);
+      if (cursor > end) return null;
+    }
+    return index <= end - cursor ? cursor + index : null;
+  };
+
+  const firstDay = (start, end, restDays) => dayAt(start, end, restDays, 0);
+
+  const availableDayCount = (startIso, endIso, restDays = []) => {
+    const start = parse(startIso), end = parse(endIso);
+    return end < start ? 0 : countDays(start, end, normalizeRestDays(restDays));
+  };
+
+  // Long plans are valid data, but no view needs every day listed. Refuse to
+  // materialize one rather than silently truncating it or exhausting memory.
+  const MAX_LISTED_DAYS = 10000;
   const availableReadingDays = (startIso, endIso, restDays) => {
     const start = parse(startIso), end = parse(endIso);
     if (end < start) return [];
-    return availableDays(start, end, normalizeRestDays(restDays)).map(iso);
+    const rest = normalizeRestDays(restDays);
+    const days = countDays(start, end, rest);
+    if (days > MAX_LISTED_DAYS) {
+      throw new RangeError(`Refusing to list ${days} reading days; the limit is ${MAX_LISTED_DAYS}. Use availableDayCount for long intervals.`);
+    }
+    return Array.from({ length: days }, (_, index) => iso(dayAt(start, end, rest, index)));
   };
 
   const count = (book, key, fallback) => (book[key] == null ? fallback : Number(book[key]));
@@ -96,8 +131,8 @@
 
   const effectiveRemainingStart = (start, end, today, restDays) => {
     const candidate = Math.min(Math.max(start, today), end);
-    const days = availableDays(candidate, end, restDays);
-    return days.length ? days[0] : end;
+    const day = firstDay(candidate, end, restDays);
+    return day == null ? end : day;
   };
 
   // Books are scheduled in order at the section's pace; groups share a start and deadline.
@@ -106,7 +141,7 @@
     const groupByFirst = new Map(groups.map((group) => [group[0], group]));
     const grouped = new Set(groups.flat());
     const byNumber = new Map(section.books.map((book) => [book.number, book]));
-    const readingDays = availableDays(start, end, restDays);
+    const readingDayCount = countDays(start, end, restDays);
     const deadlines = [];
     let cumulativeWork = 0, previousDays = 0;
     for (const book of section.books) {
@@ -117,8 +152,8 @@
       cumulativeWork += groupWork;
       const cumulativeDays = dailyPace <= 0 || cumulativeWork === 0 ? previousDays : Math.max(1, Math.ceil(cumulativeWork / dailyPace - 1e-9));
       const allocated = cumulativeDays - previousDays;
-      const deadline = readingDays.length ? readingDays[Math.max(0, Math.min(cumulativeDays, readingDays.length) - 1)] : end;
-      const groupStart = readingDays.length ? (allocated === 0 ? deadline : readingDays[previousDays]) : end;
+      const deadline = readingDayCount ? dayAt(start, end, restDays, Math.max(0, Math.min(cumulativeDays, readingDayCount) - 1)) : end;
+      const groupStart = readingDayCount ? (allocated === 0 ? deadline : dayAt(start, end, restDays, previousDays) ?? end) : end;
       for (const member of groupBooks) {
         const work = workOf(member);
         let dailyPages = 0;
@@ -140,7 +175,7 @@
       const group = groupOf.get(deadline.book.number) || [deadline.book.number];
       const groupBooks = group.map((number) => byNumber.get(number));
       const groupWork = total(groupBooks.map(workOf));
-      const groupDays = availableDays(deadline.start, deadline.deadline, restDays).length;
+      const groupDays = countDays(deadline.start, deadline.deadline, restDays);
       const groupPace = groupWork && groupDays ? groupWork / groupDays : 0;
       const work = workOf(deadline.book);
       targets.set(deadline.book.number, groupWork && work ? groupPace * work / groupWork : 0);
@@ -156,7 +191,7 @@
     for (const section of sections) {
       if (!section.books.length) continue;
       const workOf = remaining ? (book) => book.remaining : (book) => book.total;
-      const periodDays = availableDays(start, end, remaining ? rest : []).length;
+      const periodDays = countDays(start, end, remaining ? rest : []);
       const work = total(section.books.map(workOf));
       const dailyPace = periodDays ? work / periodDays : 0;
       const deadlines = calculateDeadlines(section, start, end, dailyPace, activeGroups(section), workOf, remaining ? rest : []);
@@ -196,7 +231,7 @@
     }
     const remaining = book.remaining;
     const paceStart = effectiveRemainingStart(parse(baseline.startDate), deadline, today, rest);
-    const days = availableDays(paceStart, deadline, rest).length;
+    const days = countDays(paceStart, deadline, rest);
     baselines[book.id] = { startDate: iso(paceStart), deadline: iso(deadline), dailyTarget: remaining && days ? remaining / days : 0 };
     if (containingGroup) {
       const active = containingGroup.filter((number) => {
@@ -209,7 +244,7 @@
         const groupBooks = active.map((number) => section.books.find((item) => item.number === number));
         const groupRemaining = total(groupBooks.map((item) => item.remaining));
         const groupStart = effectiveRemainingStart(sharedStart, sharedDeadline, today, rest);
-        const groupDays = availableDays(groupStart, sharedDeadline, rest).length;
+        const groupDays = countDays(groupStart, sharedDeadline, rest);
         const groupPace = groupRemaining && groupDays ? groupRemaining / groupDays : 0;
         for (const member of groupBooks) {
           baselines[member.id] = {
@@ -229,8 +264,9 @@
     if (!baseline) throw new Error('Calculate the schedule before setting a start date override.');
     const start = override || planStart;
     if (parse(start) > parse(baseline.deadline)) throw new Error('Start date override cannot be after the deadline.');
-    const effective = effectiveRemainingStart(parse(start), parse(baseline.deadline), parse(today), normalizeRestDays(restDays));
-    const days = availableDays(effective, parse(baseline.deadline), normalizeRestDays(restDays)).length;
+    const rest = normalizeRestDays(restDays);
+    const effective = effectiveRemainingStart(parse(start), parse(baseline.deadline), parse(today), rest);
+    const days = countDays(effective, parse(baseline.deadline), rest);
     baselines[book.id] = { ...baseline, startDate: start, dailyTarget: days ? book.remaining / days : 0 };
   };
   const applyPersistedOverrides = (sections, baselines, planEndIso, todayIso, restDays) => {
@@ -281,8 +317,7 @@
         if (!baseline) continue;
         const start = parse(baseline.startDate), deadline = parse(baseline.deadline);
         const candidate = Math.min(Math.max(start, today), deadline);
-        const readingDays = availableDays(candidate, deadline, rest);
-        const days = readingDays.length ? availableDays(readingDays[0], deadline, rest).length : 0;
+        const days = countDays(candidate, deadline, rest);
         pace[book.id] = book.remaining && days ? book.remaining / days : 0;
       }
     }
@@ -339,13 +374,13 @@
     const start = parse(baseline.startDate), deadline = parse(baseline.deadline);
     const today = parse(todayIso), date = parse(dateIso);
     const paceStart = effectiveRemainingStart(start, deadline, today, normalizeRestDays(rest));
-    const days = availableDays(paceStart, deadline, normalizeRestDays(rest)).length;
+    const days = countDays(paceStart, deadline, normalizeRestDays(rest));
     const dailyPace = book.remaining && days ? book.remaining / days : 0;
     let target = book.completed;
     if (!book.remaining || date > deadline) target = book.total;
     else if (date >= start && dailyPace > 0) {
       const from = book.completed && today > start ? today : start;
-      if (date >= from) target = Math.min(book.total, book.completed + Math.ceil(dailyPace * availableDays(from, date, normalizeRestDays(rest)).length - 1e-9));
+      if (date >= from) target = Math.min(book.total, book.completed + Math.ceil(dailyPace * countDays(from, date, normalizeRestDays(rest)) - 1e-9));
     }
     const raw = booksFile.sections.find((item) => item.label.trim() === section.label).books.find((item) => item.id === bookId);
     const first = Number(section.audio ? raw.start_time_seconds ?? 0 : raw.start_page ?? 1);
@@ -381,7 +416,7 @@
       if (today >= first && today <= last && !rest.some((range) => today >= range.start && today <= range.end)) {
         const pace = baseline.dailyTarget;
         // Audio targets are cumulative rounded units; today's amount is the difference.
-        const elapsed = availableDays(first, today, rest).length;
+        const elapsed = countDays(first, today, rest);
         const audioUnits = Math.max(0, Math.min(book.remaining, Math.ceil(pace * elapsed - 1e-9))
           - Math.min(book.remaining, Math.ceil(pace * (elapsed - 1) - 1e-9)));
         value = section.audio ? formatDuration(audioUnits) : String(Math.ceil(pace - 1e-9));
@@ -397,6 +432,7 @@
     sectionsFromBooksFile,
     units,
     normalizeRestDays,
+    availableDayCount,
     availableReadingDays,
     activeGroups,
     calculateBaselines,

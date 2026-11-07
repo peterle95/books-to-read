@@ -1,6 +1,6 @@
 // Native-style reading charts and focused metrics; calculations never write plan state.
 (() => {
-  const { parseDate, iso, availableReadingDays, units } = window.ReadingSchedule;
+  const { parseDate, iso, availableDayCount, units } = window.ReadingSchedule;
   const all = document.querySelector('#charts-all');
   const chartContainer = document.querySelector('#charts');
   const dialog = document.querySelector('#metrics-dialog');
@@ -49,7 +49,8 @@
     const end = Math.max(start + 1, Math.min(horizon, Math.max(deadline, day,
       forecast.projectedDeadline ? parseDate(forecast.projectedDeadline) : forecast.pace > 0 ? horizon : day,
       forecast.latestDeadline ? parseDate(forecast.latestDeadline) : day)));
-    const reading = new Set(availableReadingDays(iso(start), iso(end), state.restDays));
+    const rest = window.ReadingSchedule.normalizeRestDays(state.restDays);
+    const isReadingDay = (day) => !rest.some((range) => range.start <= day && day <= range.end);
     const ordered = sessions.filter((session) => !session.deleted && parseDate(session.date) <= day)
       .sort((a, b) => parseDate(a.date) - parseDate(b.date));
     const from = Number(audio ? book.start_time_seconds || 0 : book.start_page ?? 1);
@@ -58,12 +59,12 @@
       (audio ? session.current_time_seconds ?? endPosition - session.remaining_time_seconds : session.current_page) - from + (audio ? 0 : 1)));
     const dailyRead = new Map();
     for (const session of ordered) dailyRead.set(parseDate(session.date), (dailyRead.get(parseDate(session.date)) || 0) + Number(audio ? session.time_listened_seconds : session.pages_read));
-    const initialDays = scheduledStart < start ? availableReadingDays(iso(scheduledStart), iso(start - 1), state.restDays).length : 0;
+    const initialDays = scheduledStart < start ? availableDayCount(iso(scheduledStart), iso(start - 1), state.restDays) : 0;
     let plannedDays = initialDays, forecastDays = 0;
     const data = [];
-    let daysRemaining = availableReadingDays(iso(Math.max(start, scheduledStart)), iso(Math.max(start, deadline)), state.restDays).length;
+    let daysRemaining = availableDayCount(iso(Math.max(start, scheduledStart)), iso(Math.max(start, deadline)), state.restDays);
     for (let date = start; date <= end; date += 1) {
-      const isReading = reading.has(iso(date));
+      const isReading = isReadingDay(date);
       if (date >= scheduledStart && isReading) plannedDays += 1;
       if (date > day && isReading) forecastDays += 1;
       const actual = date < day ? actualOn(date) : forecast.completed;
@@ -199,7 +200,7 @@
     const state = activated ? { startDate: activated.start, endDate: activated.end, restDays: (scheduleState || loadSchedule(bundle)).restDays.filter((range) => range.end >= activated.start) } : scheduleState || loadSchedule(bundle);
     const sections = activated ? window.ReadingSchedule.sectionsFromBooksFile({ sections: activated.sections }) : sectionsForState(bundle, state);
     const start = nextMetrics && activated ? state.startDate : iso(Math.min(parseDate(state.endDate), Math.max(parseDate(state.startDate), parseDate(window.ReadingSchedule.today()))));
-    const days = availableReadingDays(start, state.endDate, state.restDays).length;
+    const days = availableDayCount(start, state.endDate, state.restDays);
     const totals = sections.map((section) => ({ label: section.label, count: section.books.length, remaining: section.books.reduce((sum, book) => sum + book.remaining, 0) }));
     const baselines = activated ? window.ReadingSchedule.calculateBaselines(sections, state.startDate, state.endDate, state.restDays, true) : state.baselines;
     const pace = activated ? null : window.ReadingSchedule.requiredPace(sections, baselines, window.ReadingSchedule.today(), state.restDays);
@@ -235,7 +236,7 @@
           const daily = data.pace ? data.pace[book.id] : baseline.dailyTarget;
           return [`${book.number}. ${book.title}`, audioBook ? window.formatReadingTime(daily).replace(/:00$/, '') : `${data.pace ? daily.toFixed(2) : formatUnits(daily)} pages`,
             audioBook ? window.formatReadingTime(book.remaining) : `${book.remaining} pages`,
-            availableReadingDays(remainingStart, baseline.deadline, state.restDays).length, baseline.startDate, baseline.deadline,
+            availableDayCount(remainingStart, baseline.deadline, state.restDays), baseline.startDate, baseline.deadline,
             baseline.deadline < state.endDate ? 'before end' : baseline.deadline === state.endDate ? 'on end date' : 'after end'];
         }), ['Book', 'Daily', 'Remaining', 'Remaining days', 'Start date', 'Deadline', 'Status']));
         content.append(card);
@@ -258,7 +259,7 @@
       rows.push(['Physical book count', physical.count], ['Digital book count', digital.count], ['Audiobook count', audio.count]);
       rows.push(['Physical page share', `${(remaining ? physical.remaining / remaining * 100 : 0).toFixed(1)}%`], ['Digital page share', `${(remaining ? digital.remaining / remaining * 100 : 0).toFixed(1)}%`]);
       rows.push(['Physical average pages/book', (physical.count ? physical.remaining / physical.count : 0).toFixed(1)], ['Digital average pages/book', (digital.count ? digital.remaining / digital.count : 0).toFixed(1)], ['Audiobook average duration', window.formatReadingTime(audio.count ? audio.remaining / audio.count : 0)]);
-      rows.push(['Reading period', `${availableReadingDays(state.startDate, state.endDate, state.restDays).length} days`]);
+      rows.push(['Reading period', `${availableDayCount(state.startDate, state.endDate, state.restDays)} days`]);
       rows.push(['Pace driver', `${[physical, digital].filter((item) => item.remaining > 0 && days && Math.abs(item.remaining / days - highest) < 1e-9).map((item) => item.label).join(', ') || 'None'} (${highest.toFixed(2)} pages/day)`]);
       rows = rows.map(([metric, value]) => ['Summary', metric, value, 'Optional metric']);
     }

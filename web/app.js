@@ -537,7 +537,7 @@ scheduleForm.addEventListener('submit', async (event) => {
     if (!startInput.value || !finishInput.value) throw new Error('Set both plan dates.');
     window.AndroidControls.parseDate(startInput.value);
     window.AndroidControls.parseDate(finishInput.value);
-    if (!window.ReadingSchedule.availableReadingDays(startInput.value, finishInput.value, []).length) throw new Error('The plan finish date is before its start date.');
+    if (!window.ReadingSchedule.availableDayCount(startInput.value, finishInput.value)) throw new Error('The plan finish date is before its start date.');
     scheduleState.startDate = startInput.value;
     scheduleState.endDate = finishInput.value;
     await scheduleChanged();
