@@ -69,6 +69,64 @@ test('history spinner follows native handle, heading and row without browser but
   expect(await stored(page)).toBe(before);
 });
 
+test.describe('mobile display-sized history', () => {
+  test.use({ screen: { width: 360, height: 780 }, isMobile: true, hasTouch: true });
+
+  test('matches the native sheet and popup origin within one physical pixel', async ({ page }, info) => {
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    await page.getByLabel('Bundle files').setInputFiles(['plan.json', 'books.json', 'sessions.json', 'manifest.json']
+      .map((name) => `fixtures/issue-45-populated/${name}`));
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.getByRole('button', { name: 'Import bundle', exact: true }).click();
+    await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+    const before = await stored(page);
+    await tab(page, 'Session');
+    await page.getByRole('button', { name: 'Entries', exact: true }).click();
+    const sheet = page.getByRole('dialog', { name: 'Reading history', exact: true });
+    const combo = sheet.getByRole('combobox', { name: 'Book', exact: true });
+    near((await sheet.boundingBox()).y, 61 + 1 / 3);
+    await combo.click();
+    const popup = page.getByRole('listbox');
+    near((await popup.boundingBox()).y, 146 + 2 / 3);
+    near((await popup.boundingBox()).height, 192);
+    for (const option of await popup.getByRole('option').all()) near((await option.boundingBox()).height, 48);
+    await capture(page, info, 'history-display-sized-popup');
+    await combo.press('Escape');
+    await expect(combo).toBeFocused();
+    await sheet.getByRole('button', { name: 'Close', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Entries', exact: true })).toBeFocused();
+    expect(await stored(page)).toBe(before);
+    await tab(page, 'Charts');
+    await page.getByRole('button', { name: 'Metrics', exact: true }).click();
+    near((await page.locator('#metrics-dialog').boundingBox()).y, 61 + 1 / 3);
+  });
+
+  test('keeps the sheet usable when the viewport becomes shorter or taller', async ({ page }) => {
+    await page.getByRole('button', { name: 'Entries', exact: true }).click();
+    const sheet = page.getByRole('dialog', { name: 'Reading history', exact: true });
+    for (const height of [600, 900]) {
+      await page.setViewportSize({ width: 360, height });
+      await expect.poll(async () => { const box = await sheet.boundingBox(); return box.y + box.height; }).toBe(height);
+      const box = await sheet.boundingBox();
+      expect(box.height).toBeGreaterThan(height * 0.8);
+      expect(box.height).toBeLessThan(height);
+      near(box.y + box.height, height);
+      await expect(sheet.getByRole('button', { name: 'Close', exact: true })).toBeVisible();
+    }
+  });
+});
+
+test.describe('mobile sheet with reduced viewport', () => {
+  test.use({ viewport: { width: 360, height: 600 }, screen: { width: 360, height: 780 }, isMobile: true, hasTouch: true });
+
+  test('caps display-sized sheets to leave room for browser chrome or keyboard', async ({ page }) => {
+    await page.getByRole('button', { name: 'Entries', exact: true }).click();
+    const sheet = page.getByRole('dialog', { name: 'Reading history', exact: true });
+    near((await sheet.boundingBox()).height, 552);
+    await expect(sheet.getByRole('button', { name: 'Close', exact: true })).toBeVisible();
+  });
+});
+
 test('quarter popup keeps native horizontal bounds inside the wider custom-content anchor', async ({ page }, info) => {
   const before = await stored(page);
   await tab(page, 'Plan');

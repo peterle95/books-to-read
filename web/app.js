@@ -10,6 +10,14 @@ const backupReminder = document.querySelector('#backup-reminder');
 const lastBackupKey = 'reading-plan-last-backup-v1';
 const backupReminderDays = 7;
 
+// Screen height is display-relative; cap it in CSS when browser chrome or a
+// keyboard leaves less room than the native sheet would need.
+function sizeNativeSheets() {
+  if (screen.height > 0) document.documentElement.style.setProperty('--native-sheet-height', `${screen.height * 0.86}px`);
+}
+sizeNativeSheets();
+window.addEventListener('resize', sizeNativeSheets);
+
 const screens = [...document.querySelectorAll('main > .screen')];
 const tabs = [...document.querySelectorAll('.tab-bar button')];
 let previousScreen = 'session';

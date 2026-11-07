@@ -32,9 +32,11 @@ main { box-sizing: border-box; width: 100%; margin: 0 auto; padding: .75rem 1rem
 .session-metrics strong { font-size: 1.3125rem; }
 .session-metrics[data-completed="true"] { background: #3b6a50; color: #fff8f0; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
-/* Native sizes against the full display, not the browser's content viewport.
-   Keep a responsive content-area approximation; Android insets are not universal. */
+/* Native sizes against the full display, not the browser's content viewport. */
 #entries-dialog, #metrics-dialog { --sheet-height: 92vh; --sheet-height: 92dvh; }
+@media (pointer: coarse) {
+  #entries-dialog, #metrics-dialog { --sheet-height: min(92dvh, var(--native-sheet-height, 92dvh)); }
+}
 #entries-dialog { box-sizing: border-box; position: fixed; inset: auto 0 0; width: 100%; max-width: none; height: var(--sheet-height); max-height: none; margin: 0; padding: .75rem 1.25rem 1.25rem; border: 0; border-radius: 0; overflow: hidden; overscroll-behavior: contain; }
 #entries-dialog[open], #metrics-dialog[open] { display: flex; flex-direction: column; }
 .entries-handle { flex-shrink: 0; width: 2.75rem; height: .3125rem; margin: 0 auto .75rem; border-radius: 1rem; background: #d6baa1; touch-action: none; cursor: grab; }

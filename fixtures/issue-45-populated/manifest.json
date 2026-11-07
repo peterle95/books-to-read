@@ -1,0 +1,11 @@
+{
+  "schema_version": 2,
+  "revision": 1,
+  "last_modified": "2026-11-06T12:00:00Z",
+  "modified_by": "synthetic-parity-reference-v2",
+  "files": {
+    "plan.json": "2c8e9ed3838cf03cb1c6dd2dd473e0ec96d8385c2df365c35a5f9a987bc08b1e",
+    "books.json": "93731590354418d4a45b92e5bd940a9a3f927352cd32289f5c7cf711310fc4c9",
+    "sessions.json": "ca127144d7d6b2ac81bfe511df9827c4d2e304eb06028c6dc85a353896afe48f"
+  }
+}

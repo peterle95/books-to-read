@@ -1,0 +1,142 @@
+{
+  "schema_version": 2,
+  "sections": [
+    {
+      "label": "Physical books",
+      "baseline_needs_recalculation": false,
+      "simultaneous_groups": [
+        [
+          "physical-id",
+          "paper-partner"
+        ]
+      ],
+      "books": [
+        {
+          "id": "physical-id",
+          "number": 1,
+          "title": "Synthetic paper - history and projection",
+          "baseline_schedule": {
+            "start_date": "2026-10-27",
+            "deadline": "2026-12-06",
+            "daily_target": 2
+          },
+          "deadline_override": "2026-12-01",
+          "start_date_override": null,
+          "target_completed_date": null,
+          "start_page": 1,
+          "end_page": 100,
+          "current_page": 30,
+          "pages": 100,
+          "pages_read": 30
+        },
+        {
+          "id": "paper-partner",
+          "number": 2,
+          "title": "Synthetic simultaneous partner",
+          "baseline_schedule": {
+            "start_date": "2026-10-27",
+            "deadline": "2026-12-06",
+            "daily_target": 2
+          },
+          "deadline_override": null,
+          "start_date_override": null,
+          "target_completed_date": null,
+          "start_page": 1,
+          "end_page": 100,
+          "current_page": null,
+          "pages": 100,
+          "pages_read": 0
+        }
+      ]
+    },
+    {
+      "label": "Digital books",
+      "baseline_needs_recalculation": false,
+      "simultaneous_groups": [],
+      "books": [
+        {
+          "id": "digital-id",
+          "number": 1,
+          "title": "Synthetic digital - future start",
+          "baseline_schedule": {
+            "start_date": "2026-11-10",
+            "deadline": "2026-12-16",
+            "daily_target": 3
+          },
+          "deadline_override": null,
+          "start_date_override": "2026-11-10",
+          "target_completed_date": null,
+          "start_page": 1,
+          "end_page": 100,
+          "current_page": null,
+          "pages": 100,
+          "pages_read": 0
+        }
+      ]
+    },
+    {
+      "label": "Audiobooks",
+      "baseline_needs_recalculation": false,
+      "simultaneous_groups": [],
+      "books": [
+        {
+          "id": "audio-id",
+          "number": 1,
+          "title": "Synthetic audio - seconds history",
+          "baseline_schedule": {
+            "start_date": "2026-10-27",
+            "deadline": "2026-12-06",
+            "daily_target": 120
+          },
+          "deadline_override": null,
+          "start_date_override": null,
+          "target_completed_date": null,
+          "start_time_seconds": 0,
+          "end_time_seconds": 3600,
+          "current_time_seconds": 1800,
+          "duration_seconds": 3600,
+          "time_listened_seconds": 1800,
+          "remaining_time_seconds": 1800
+        }
+      ]
+    }
+  ],
+  "planned_quarter": {
+    "start_date": "2027-01-01",
+    "sections": [
+      {
+        "label": "Physical books",
+        "baseline_needs_recalculation": false,
+        "simultaneous_groups": [],
+        "books": [
+          {
+            "id": "next-paper",
+            "number": 1,
+            "title": "Synthetic next quarter",
+            "baseline_schedule": null,
+            "deadline_override": null,
+            "start_date_override": null,
+            "target_completed_date": null,
+            "start_page": 1,
+            "end_page": 100,
+            "current_page": null,
+            "pages": 100,
+            "pages_read": 0
+          }
+        ]
+      },
+      {
+        "label": "Digital books",
+        "baseline_needs_recalculation": false,
+        "simultaneous_groups": [],
+        "books": []
+      },
+      {
+        "label": "Audiobooks",
+        "baseline_needs_recalculation": false,
+        "simultaneous_groups": [],
+        "books": []
+      }
+    ]
+  }
+}

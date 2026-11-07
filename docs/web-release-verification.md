@@ -65,8 +65,10 @@ plan fixtures. Populated synthetic fixtures now cover first-fold layout at
 with automated coverage, **not visual approval**. A fresh same-data Android/web
 comparison is actively pending, including populated books, groups, overrides,
 history, charts and open dialogs/sheets.
-Known visual residuals remain: History has a **−2.776 px origin offset**;
-calendar weekday/day ink alignment and shadows still differ; and quarter footer
+The History origin mismatch has a bounded automated correction and comparison
+in `docs/evidence/issue-45/verification.md`; actual-device confirmation remains
+pending. Known visual residuals remain: calendar weekday/day ink alignment and
+shadows still differ; and quarter footer
 text remains **2 physical px lower** than native. The earlier 622.188 px quarter
 height discrepancy is historical: the latest verified snapshot covers measured
 mobile/desktop quarter geometry, including the native-source **27dp label box**
