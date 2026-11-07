@@ -6,7 +6,7 @@ permissions:
   contents: read
 jobs:
   diagnose:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -15,7 +15,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: npx playwright test web-tests/quarter-visual-parity.spec.js web-tests/visible-layout-parity.spec.js --workers=1 --trace=on --reporter=list
+      - run: npm run test:web
       - uses: actions/upload-artifact@v4
         if: always()
         with:
