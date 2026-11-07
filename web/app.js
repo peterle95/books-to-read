@@ -966,9 +966,11 @@ const storePlannedBook = (replace) => {
     const audio = section.label === 'Audiobooks';
     const title = quarterTitle.value.trim();
     if (!title) throw new Error('A planned book needs a title.');
-    if (!quarterFrom.value || !quarterTo.value) throw new Error('Set the start and end pages or times.');
-    const from = window.parseReadingUnits(quarterFrom.value, audio), to = window.parseReadingUnits(quarterTo.value, audio);
-    if (!Number.isInteger(from) || !Number.isInteger(to) || to < from || (!audio && from < 1)) {
+    // Android's planned dialog defaults a blank start to page 1 or audio second 0 and
+    // has no default end, so blank fields are resolved here instead of by the form.
+    const from = quarterFrom.value.trim() ? window.parseBookField(quarterFrom.value, audio) : audio ? 0 : 1;
+    const to = window.parseBookField(quarterTo.value, audio);
+    if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to) || from < 0 || to < from) {
       throw new Error(audio ? 'Set whole-second times, with the end time on or after the start.' : 'Set whole page numbers, with the end page on or after the start page.');
     }
     const source = quarterDraft.sections.find((item) => item.books.some((book) => book.id === editingPlannedBook));

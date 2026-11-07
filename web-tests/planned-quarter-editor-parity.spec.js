@@ -82,7 +82,7 @@ test('one validated Save preserves other file bytes, stable IDs, positions and g
   await fields(page, 'Moved audio', 'Audiobooks', '00:00', '01:30:00');
   await page.getByRole('button', { name: 'Update selected', exact: true }).click();
   await page.getByRole('button', { name: 'Physical books — Third', exact: true }).click();
-  await fields(page, 'Also audio', 'Audiobooks', '60', '120');
+  await fields(page, 'Also audio', 'Audiobooks', '0:01:00', '0:02:00');
   await page.getByRole('button', { name: 'Update selected', exact: true }).click();
   await fields(page, 'Added');
   await page.getByRole('button', { name: 'Add', exact: true }).click();
@@ -241,6 +241,67 @@ test('invalid fields and a conflict during hashing fail closed', async ({ page }
   await expect(page.locator('#quarter-draft-status')).toHaveText('The plan changed during this save. Try again.');
   expect((await read(page)).manifest.revision).toBe(7);
   expect((await read(page)).books.planned_quarter.sections[1].books).toEqual([]);
+});
+
+test('planned Add and Update follow Android: blank start default, page zero, native audio syntax', async ({ page }) => {
+  const original = await raw(page);
+  await open(page);
+  // Native readBookFields substitutes page 1 for a blank planned start page.
+  await fields(page, 'Blank start', 'Digital books', '', '12');
+  await page.getByRole('button', { name: 'Add', exact: true }).click();
+  await page.getByRole('button', { name: 'Digital books — Blank start', exact: true }).click();
+  await expect(page.locator('#quarter-from')).toHaveValue('1');
+  await expect(page.locator('#quarter-to')).toHaveValue('12');
+  // Native validatePageRange accepts a zero start page.
+  await fields(page, 'Zero pages', 'Digital books', '0', '0');
+  await page.getByRole('button', { name: 'Add', exact: true }).click();
+  await page.getByRole('button', { name: 'Digital books — Zero pages', exact: true }).click();
+  await expect(page.locator('#quarter-from')).toHaveValue('0');
+  // Native parseBookUnit rejects bare seconds for audiobooks.
+  await fields(page, 'Bare seconds', 'Audiobooks', '60', '120');
+  await page.getByRole('button', { name: 'Add', exact: true }).click();
+  await expect(page.locator('#quarter-draft-status')).toHaveText('Time must be HH:MM or HH:MM:SS.');
+  await expect(page.getByRole('button', { name: 'Audiobooks — Bare seconds', exact: true })).toHaveCount(0);
+  expect(await raw(page)).toBe(original);
+  // Native parseDuration accepts unpadded minutes.
+  await fields(page, 'Audio', 'Audiobooks', '1:5', '1:30');
+  await page.getByRole('button', { name: 'Add', exact: true }).click();
+  await page.getByRole('button', { name: 'Audiobooks — Audio', exact: true }).click();
+  await expect(page.locator('#quarter-from')).toHaveValue('1:05:00');
+  await expect(page.locator('#quarter-to')).toHaveValue('1:30:00');
+  // A blank start on Update also falls back to 1, as the native dialog does.
+  await page.getByRole('button', { name: 'Physical books — Second', exact: true }).click();
+  await fields(page, 'Second', 'Physical books', '', '30');
+  await page.getByRole('button', { name: 'Update selected', exact: true }).click();
+  await page.getByRole('button', { name: 'Physical books — Second', exact: true }).click();
+  await expect(page.locator('#quarter-from')).toHaveValue('1');
+  await expect(page.locator('#quarter-to')).toHaveValue('30');
+  await page.locator('#save-quarter').click();
+  await expect(page.locator('#quarter-dialog')).not.toBeVisible();
+  const planned = (await read(page)).books.planned_quarter;
+  expect(planned.sections[0].books.map((book) => [book.title, book.start_page, book.end_page])).toEqual([
+    ['First', 1, 20], ['Second', 1, 30], ['Third', 1, 20]]);
+  expect(planned.sections[1].books.map((book) => [book.title, book.start_page, book.end_page, book.pages])).toEqual([
+    ['Blank start', 1, 12, 12], ['Zero pages', 0, 0, 1]]);
+  expect(planned.sections[2].books[0]).toMatchObject({ title: 'Audio', start_time_seconds: 3900, end_time_seconds: 5400, duration_seconds: 1500 });
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'planned-validation-'));
+  try {
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    const download = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Export bundle ZIP' }).click();
+    const zip = path.join(directory, 'bundle.zip');
+    await (await download).saveAs(zip);
+    execFileSync('python', ['-c', `
+import sys, zipfile
+from reading_plan import load_json_bundle
+with zipfile.ZipFile(sys.argv[2]) as archive: archive.extractall(sys.argv[1])
+*_, planned = load_json_bundle(sys.argv[1], include_planned=True)
+zero = planned.sections[1].books[1]
+assert (zero.title, zero.start_page, zero.end_page, zero.pages) == ('Zero pages', 0, 0, 1)
+audio = planned.sections[2].books[0]
+assert (audio.start_page, audio.end_page) == (3900, 5400)
+`, directory, zip]);
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 });
 
 test('dialog fits phone and desktop viewports', async ({ page }) => {

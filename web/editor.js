@@ -107,6 +107,8 @@ const parseBookField = (raw, audio) => {
   if (audio && (minutes >= 60 || seconds >= 60)) throw new Error('Minutes and seconds must be below 60.');
   return audio ? first * 3600 + minutes * 60 + seconds : first;
 };
+// The planned-quarter editor reads the same fields, so it shares this parser.
+window.parseBookField = parseBookField;
 const saveBook = async (mode) => {
   const saved = await editorAction((current) => {
     const section = current.books.sections.find((item) => item.label.trim() === bookFormat.value);
