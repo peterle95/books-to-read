@@ -96,6 +96,13 @@ for (const width of [360, 1440]) {
     await page.getByRole('button', { name: 'Edit next-quarter plan', exact: true }).click();
     await page.evaluate(() => document.fonts.ready);
     await expect(page.locator('#quarter-dialog-heading')).toHaveText('Next quarter — 2027-01-01');
+    // Issue #49: paint the API35 decor approximation outside the verified box.
+    // Chromium serializes .039 through its 8-bit alpha as .04; the backdrop stays
+    // the dimmed page so the measured shadow band is comparable across captures.
+    const panel = page.locator('#quarter-dialog');
+    await expect(panel).toHaveCSS('box-shadow', 'rgba(0, 0, 0, 0.19) 0px 4px 18px 0px, rgba(0, 0, 0, 0.04) 0px 3px 28px 0px');
+    await expect(panel).toHaveCSS('border-radius', '2px');
+    expect(await panel.evaluate((el) => getComputedStyle(el, '::backdrop').backgroundColor)).toBe('rgba(0, 0, 0, 0.6)');
     await expect(page.locator('#quarter-title')).toBeEmpty();
     const content = page.locator('#quarter-content');
     await content.evaluate((el) => { el.scrollTop = el.scrollHeight; });
@@ -182,11 +189,11 @@ for (const width of [360, 1440]) {
       }
       expect(geometry['#quarter-content'].scrollTop).toBe(44);
     } else {
-      const dialog = geometry['#quarter-dialog'];
-      expect(dialog.width).toBe(640);
-      expect(dialog.height).toBeLessThanOrEqual(700);
-      expect(dialog.y).toBeGreaterThanOrEqual(16);
-      expect(dialog.bottom).toBeLessThanOrEqual(716);
+      const wide = geometry['#quarter-dialog'];
+      expect(wide.width).toBe(640);
+      expect(wide.height).toBeLessThanOrEqual(700);
+      expect(wide.y).toBeGreaterThanOrEqual(16);
+      expect(wide.bottom).toBeLessThanOrEqual(716);
       expect(geometry['#quarter-content-box'].height).toBeLessThan(637); // wider text reflows
       expect(geometry['#quarter-content'].scrollTop).toBeLessThan(44);
       expect(geometry['#quarter-content'].scrollTop).toBe(geometry['#quarter-content'].scrollHeight - geometry['#quarter-content'].clientHeight);

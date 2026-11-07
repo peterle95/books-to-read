@@ -1,0 +1,103 @@
+{
+  "native": {
+    "source": "docs/evidence/issue-48/native-bottom.png — retained API35 AVD issue48-parity capture, 1080x2196 @480dpi (360x732dp), adb exec-out screencap",
+    "dialog_rect_px": [75, 120, 1005, 2004],
+    "dialog_rect_css": [25, 40, 310, 628],
+    "corner_radius": "2dp",
+    "elevation": "16dp framework floating_window_z; spot alpha .19, ambient alpha .039",
+    "measurement": "median luminance perpendicular to each straight edge, dialog rect + 70 physical px, normalized by the local dim field at 55-69 px",
+    "edge_darkening_at_panel": {
+      "left": 0.105,
+      "right": 0.106,
+      "top": 0.073,
+      "bottom": 0.089
+    },
+    "reach_within_0_5pct_css": {
+      "left": 20.0,
+      "right": 17.0,
+      "top": 18.0,
+      "bottom": 19.3
+    },
+    "dim_field_luminance": {
+      "left": 95.0,
+      "right": 94.0,
+      "top": 96.0,
+      "bottom": 90.0
+    }
+  },
+  "web": {
+    "viewport": "360x732 css, DPR 3",
+    "dialog_rect_css": [25, 16, 310, 700],
+    "border_radius": "2px",
+    "backdrop": "rgba(0, 0, 0, 0.6)",
+    "before": {
+      "box_shadow": "none",
+      "edge_luminance_at_panel": {
+        "left": 96.0,
+        "right": 96.0,
+        "top": 96.0,
+        "bottom": 102.0
+      },
+      "band_rmse_luminance": {
+        "left": 4.72,
+        "right": 4.77,
+        "top": 3.32,
+        "bottom": 10.63,
+        "mean": 5.86
+      }
+    },
+    "after": {
+      "box_shadow": "0 4px 18px rgb(0 0 0 / .19), 0 3px 28px rgb(0 0 0 / .039)",
+      "serialized": "rgba(0, 0, 0, 0.19) 0px 4px 18px 0px, rgba(0, 0, 0, 0.04) 0px 3px 28px 0px",
+      "edge_luminance_at_panel": {
+        "left": 86.0,
+        "right": 86.0,
+        "top": 89.0,
+        "bottom": 87.0
+      },
+      "band_rmse_luminance": {
+        "left": 0.70,
+        "right": 0.56,
+        "top": 0.67,
+        "bottom": 0.75,
+        "mean": 0.67
+      }
+    },
+    "corner_rmse_luminance": {
+      "before": {
+        "top_left": 2.27,
+        "top_right": 2.2,
+        "bottom_left": 6.14,
+        "bottom_right": 6.58,
+        "mean": 4.3
+      },
+      "after": {
+        "top_left": 1.03,
+        "top_right": 0.97,
+        "bottom_left": 4.58,
+        "bottom_right": 4.85,
+        "mean": 2.86
+      }
+    }
+  },
+  "captures": {
+    "native_reference": "../issue-48/native-bottom.png",
+    "web_before": "web capture with `#quarter-dialog { box-shadow: none }` forced for the same page state",
+    "web_after": "web-bottom.png",
+    "paired": [
+      "paired-left-edge.png",
+      "paired-top-left-corner.png",
+      "paired-bottom-right-corner.png"
+    ]
+  },
+  "limits": [
+    "CSS blur approximates Android ambient/spot rendering; it is not a dp-to-px conversion.",
+    "Bottom corner deltas are dominated by differing dimmed page paint behind the panel (native nav bar vs web tab bar), not by the dialog shadow.",
+    "The web panel sits 16px from the viewport top and bottom, so the vertical spread is viewport-clipped as on a small native display.",
+    "One retained native capture at one density and one Chromium build; this is a measured paint bound, not pixel approval or actual-device sign-off."
+  ],
+  "checks": {
+    "quarter-visual-parity": "4/4",
+    "full_web_suite": "164/164, exit 0, 4.2 min; an earlier full run hit one release.spec.js book-editing status timeout (163/164) that passed in isolation and in the clean rerun"
+  }
+}

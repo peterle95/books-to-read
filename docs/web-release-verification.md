@@ -68,7 +68,9 @@ history, charts and open dialogs/sheets.
 The History origin mismatch has a bounded automated correction and comparison
 in `docs/evidence/issue-45/verification.md`; actual-device confirmation remains
 pending. Known visual residuals remain:
-the Quarter dialog's surrounding elevation shadow still differs (#49), quarter
+the Quarter dialog's surrounding elevation shadow is a measured CSS
+approximation, not a dp conversion (#49; see
+`docs/evidence/issue-49/verification.md`), quarter
 footer text remains **2 physical px lower** than native, and Android fades the
 year scrollbar after about a second while the web overlay thumb stays painted.
 Planned-book and Remove button shadows now follow Android's `clipToPadding`

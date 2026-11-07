@@ -131,6 +131,11 @@ dialog:not(#entries-dialog):not(#metrics-dialog) h2 { font-size: 1.25rem; font-w
    verticalBoxes retain source 16/12/16/20dp padding; no fixture-height cap. */
 #quarter-dialog:not(#entries-dialog):not(#metrics-dialog) { width: min(calc(100vw - 3.125rem), 40rem); max-height: calc(100dvh - 2rem); border: 0; padding: 0; overflow: hidden; }
 #quarter-dialog[open] { display: flex; flex-direction: column; }
+/* API35 AlertDialog decor: 16dp elevation paints black spot/ambient components
+   (alphas .19/.039) around the 2dp panel. The 16px viewport inset clips the
+   top/bottom spread; the measured side band reaches ~21px. CSS blur is an
+   approximation of the ambient/spot renderer, not a dp-to-px conversion. */
+#quarter-dialog:not(#entries-dialog):not(#metrics-dialog) { box-shadow: 0 4px 18px rgb(0 0 0 / .19), 0 3px 28px rgb(0 0 0 / .039); }
 #quarter-dialog > h2, #quarter-dialog > .quarter-actions { flex-shrink: 0; }
 #quarter-dialog:not(#entries-dialog):not(#metrics-dialog) > h2 { margin: 0; padding: 18px 24px 0; line-height: 27px; }
 #quarter-content { min-height: 0; overflow-y: auto; }
