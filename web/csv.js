@@ -56,7 +56,8 @@
       const from = units(values[audio ? 'Start time' : 'Start page'] || (audio ? '0' : '1'));
       const to = units(values[audio ? 'End time' : 'End page'] || values[audio ? 'Duration' : 'Pages']);
       const title = values.Title.trim();
-      if (!title || to < from || (!audio && from < 1)) throw new Error('Each book needs a title and valid range.');
+      // Desktop and the native app allow a book that begins on page zero.
+      if (!title || to < from || from < 0) throw new Error('Each book needs a title and valid range.');
       const book = window.ReadingQuarter.newBook(section.label, title, from, to);
       let current = null;
       if (audio && values['Remaining time']) current = to - units(values['Remaining time']);
