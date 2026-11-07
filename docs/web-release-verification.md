@@ -11,12 +11,12 @@ actual Android/desktop device evidence. Keep the native Android and desktop apps
 | Reading sessions and history | Record, review, edit/delete, backdate; canonical ordering and tombstones; verify on phone |
 | Plan dates, rest days, baseline schedule, current required pace | Web forms and tables; verify exported changes on desktop |
 | Simultaneous groups and deadline overrides | Web forms; verify transfer and phone usability |
-| Next-quarter plan and activation | Add/edit/remove books and quarter start; stable IDs retained on edits; preview in Metrics |
+| Next-quarter plan and activation | Add/edit/remove books; the start is derived or preserved from the imported plan, not edited; stable IDs retained on edits; preview in Metrics |
 | Reading projections | Central estimate and approximate 80% finish range in tables and charts; native-style All toggle and focused metrics views |
-| Audiobook input | Whole seconds, HH:MM and HH:MM:SS for ranges and remaining time |
+| Audiobook input | Books range fields use HH:MM or HH:MM:SS; session remaining time also accepts whole seconds. Planned-book input differences are tracked in #62 |
 | CSV import/export | Desktop-compatible current-plan CSV; deliberately not a complete history/next-quarter backup |
 | Syncthing / directory access | Not available in web; manual four-file import and ZIP export only |
-| Summary settings and start-date overrides | Editable, persisted in bundles; verify on phone and desktop |
+| Summary settings and start-date overrides | Imported summary settings are preserved but have no web editor; start-date overrides are editable and persisted. Verify transfer on phone and desktop |
 | Desktop snapshot comparison | Desktop-only, intentionally out of scope |
 
 The reader requested all editing conveniences above. As of 2026-11-06, history
@@ -79,9 +79,10 @@ in `docs/evidence/issue-45/verification.md`; actual-device confirmation remains
 pending. Known visual residuals remain:
 the Quarter dialog's surrounding elevation shadow is a measured CSS
 approximation, not a dp conversion (#49; see
-`docs/evidence/issue-49/verification.md`), quarter
-footer text remains **2 physical px lower** than native, and Android fades the
-year scrollbar after about a second while the web overlay thumb stays painted.
+`docs/evidence/issue-49/verification.md`). Quarter footer text was previously
+2 physical px lower than native; the measured correction leaves a one-physical-
+pixel residual in the other direction (#50). Android fades the year scrollbar
+after about a second while the web overlay thumb stays painted.
 Planned-book and Remove button shadows now follow Android's `clipToPadding`
 clipping at the content box; see `docs/evidence/issue-48/verification.md`. The year list now uses Android's 1900–2100 window
 and a `ScrollBarUtils`-sized overlay thumb; paired captures in

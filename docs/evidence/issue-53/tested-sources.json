@@ -1,0 +1,314 @@
+[
+  {
+    "path": ".gitignore",
+    "sha256": "6fce4010ac56ab98854231d8228f5bddde8510745b183c48d9697c8637b85f48"
+  },
+  {
+    "path": "fixtures/android-session-contract/books.json",
+    "sha256": "429d315443565c4910100ce221664c5f3043d6b55d5ed511c67907e9f6555a1c"
+  },
+  {
+    "path": "fixtures/android-session-contract/manifest.json",
+    "sha256": "692f7b8177324ab08021f824654a657582142f1fb86784a826a81bd4d82cf05a"
+  },
+  {
+    "path": "fixtures/android-session-contract/plan.json",
+    "sha256": "d91a571cee2b19661e12b8ad969022ea60a2d325254c6d65bf71edac9153a90c"
+  },
+  {
+    "path": "fixtures/android-session-contract/sessions.json",
+    "sha256": "9511c8674b333eec0790484d6a5b179bb17ec0fbbd0ede5be86b340f49921b0e"
+  },
+  {
+    "path": "fixtures/issue-45-populated/books.json",
+    "sha256": "93731590354418d4a45b92e5bd940a9a3f927352cd32289f5c7cf711310fc4c9"
+  },
+  {
+    "path": "fixtures/issue-45-populated/manifest.json",
+    "sha256": "835966a4415a13635e91ab6bd5cf8d515a3c4ce3b979fb19b7949c5a80b947ef"
+  },
+  {
+    "path": "fixtures/issue-45-populated/plan.json",
+    "sha256": "2c8e9ed3838cf03cb1c6dd2dd473e0ec96d8385c2df365c35a5f9a987bc08b1e"
+  },
+  {
+    "path": "fixtures/issue-45-populated/sessions.json",
+    "sha256": "ca127144d7d6b2ac81bfe511df9827c4d2e304eb06028c6dc85a353896afe48f"
+  },
+  {
+    "path": "package-lock.json",
+    "sha256": "bbf85cb6523c50ab81d51b7ececddae84fd3e4821ec362d6a8780d97493ba6a7"
+  },
+  {
+    "path": "package.json",
+    "sha256": "b27da377964d32c06d9dd65cdf0cafdc5caf52e4e5020365c01d2ab069ee1011"
+  },
+  {
+    "path": "playwright.config.js",
+    "sha256": "cea58462a35371faed5c457abe95a5d166cdb602812b582cd049d1f5b3ae7511"
+  },
+  {
+    "path": "reading_plan_gui.py",
+    "sha256": "d31988178978f0cdbc69465ee90e8fdaa730edb24de3ce58a48529e3a0d8db42"
+  },
+  {
+    "path": "reading_plan.py",
+    "sha256": "d62fdad2d65e10c09bda19c53b294139ddddd6acc207e79746d85b5a661ce72e"
+  },
+  {
+    "path": "test_reading_plan.py",
+    "sha256": "1d6fbc137a702e247b76aa44f71c5726d4b8173b99c794ad3857a3fda8b4f2ee"
+  },
+  {
+    "path": "web-tests/android-calendar.spec.js",
+    "sha256": "b0bbf0b89ca8e6677502b1a880bf5a94c8c9b27e26e397e3dfb54c0c1a16f166"
+  },
+  {
+    "path": "web-tests/android-controls.spec.js",
+    "sha256": "bcfab596429326925170479443e04d7a162d736f5ac07c6cbb2b6febc33b4b4c"
+  },
+  {
+    "path": "web-tests/android-select-controls.spec.js",
+    "sha256": "c2ad9e8f3ee998d1a0cadb63095eb2b08226f4f87c2dc9ff287f2989965318e7"
+  },
+  {
+    "path": "web-tests/android-select-regressions.spec.js",
+    "sha256": "21b0ffc6327816640830a81069459b6372331a6d0d1343c062348901874f19cf"
+  },
+  {
+    "path": "web-tests/book-replacement-parity.spec.js",
+    "sha256": "5db681bf8bb983be0c85c5f221a9ec6d3e90c3da0aed13b2653e01f442249205"
+  },
+  {
+    "path": "web-tests/books-parity.spec.js",
+    "sha256": "6fd8595ab8c644eb1c0dbdd917a2a818a9252554c216656bcfd857bfbc847f10"
+  },
+  {
+    "path": "web-tests/books-ui-parity.spec.js",
+    "sha256": "16fb345150340cf8a14d971c81666bcb3169452728ad1d4aac87f2d25cf40ec7"
+  },
+  {
+    "path": "web-tests/calendar-helper.js",
+    "sha256": "89ed7d40cbb363956dfdb0eccd6be0c7eb876767fd3619c2dfd3479f5d66400d"
+  },
+  {
+    "path": "web-tests/calendar-integration.spec.js",
+    "sha256": "21e0ec30d5aa91cdc7e7401e86922578d3dba4fa73e2ded16ce4e5b1d4d3a014"
+  },
+  {
+    "path": "web-tests/chart-date-boundary.spec.js",
+    "sha256": "c9fad6d0f2366d65afcc500dc99098d0bc1972cead607ff2ea5e23966bfc383b"
+  },
+  {
+    "path": "web-tests/chart-parity.spec.js",
+    "sha256": "83089da3599990950145006667e8bb38c5fd3d75df151d649f1c423c84e76ff1"
+  },
+  {
+    "path": "web-tests/chart-presentation-parity.spec.js",
+    "sha256": "abf7d2c3e08f9e3764ebaba5c1dff4b09e577b5cd471fd753b204449cff83094"
+  },
+  {
+    "path": "web-tests/controls-visual-parity.spec.js",
+    "sha256": "142a4d24bdcb5889010bd934dd93c547638f07682742a0a550b6d23a3693147d"
+  },
+  {
+    "path": "web-tests/early-projection-parity.spec.js",
+    "sha256": "9998988a7abef47dcc961959bfc74e6753d9c45925d6e9867cebc3d9e6916403"
+  },
+  {
+    "path": "web-tests/early-quarter-parity.spec.js",
+    "sha256": "f2957c124c1408247c620fe777f234da6fbc74e3cb792da3b226f8ea549cd73c"
+  },
+  {
+    "path": "web-tests/editor-atomicity.spec.js",
+    "sha256": "20e9f3e554949502c6cb74ed20a2590f9ee596d576a1c54565a60fd616b2b6e0"
+  },
+  {
+    "path": "web-tests/group-picker-legacy.spec.js",
+    "sha256": "d9303be0771275f0b9386a08f280004ba0fa8b5a592dcd8b10da1047a1981dd6"
+  },
+  {
+    "path": "web-tests/group-picker-parity.spec.js",
+    "sha256": "f53a5afb49056d685b50e04847cf547212b773a8f62753fb88fa8c0b40896f78"
+  },
+  {
+    "path": "web-tests/metrics-parity.spec.js",
+    "sha256": "e924715cd3d65f27f0e5c685833b22c8367486d97d7b78eb0d107701bf18b22c"
+  },
+  {
+    "path": "web-tests/native-assets.spec.js",
+    "sha256": "12e31be01180e4382bcb8e9e6f0991ee4ad2fa04133c853cf4398cc5955f1d1c"
+  },
+  {
+    "path": "web-tests/navigation.spec.js",
+    "sha256": "21c27cf345c078a8dee7c4408f0b4d02e1376d403dede9db50aeb67cb2e4295a"
+  },
+  {
+    "path": "web-tests/new-plan-parity.spec.js",
+    "sha256": "9166faf7a0b2fe0c49d16331c09b1c4556c0123c90f5df676ab808027c0b20a5"
+  },
+  {
+    "path": "web-tests/plan-ui-parity.spec.js",
+    "sha256": "9fae9f4cde1a0d9f7d1cae48eaf9d047ef8d710b49f04b22f78a94ca7ef40902"
+  },
+  {
+    "path": "web-tests/planned-quarter-editor-parity.spec.js",
+    "sha256": "72d56a15ae1c7cf314ba01e85026ef8b11946c03b703fcbace5303a9784f8bf2"
+  },
+  {
+    "path": "web-tests/projection.spec.js",
+    "sha256": "d24697a28c0a4a22a8f27ff214e35ca50b2a684cfe62254634c5a5f8232e72a4"
+  },
+  {
+    "path": "web-tests/quarter-import-boundary.spec.js",
+    "sha256": "8046ec10a3855eb44e419fa40e2ba9cf7679097d391db17825d71cbf7057c315"
+  },
+  {
+    "path": "web-tests/quarter-visual-parity.spec.js",
+    "sha256": "494c1627c9e2cdc7f97c4838909f37651784abe0cf74b16c44f606d9d55ffe20"
+  },
+  {
+    "path": "web-tests/quarter.spec.js",
+    "sha256": "1bcd8ec115a68bcfc2e682769d55f51a831212d3945c10a8720ea3d9e0e33547"
+  },
+  {
+    "path": "web-tests/reading-plan.spec.js",
+    "sha256": "5e7d115d90b47f12afb35191b2474fac7c8c2977c4e2be56aa08158b508b52d5"
+  },
+  {
+    "path": "web-tests/release.spec.js",
+    "sha256": "b0acb6d66dc6c1b860ffea1b90e68c9df1b5b57f56e88b2603c5d94b9c203f42"
+  },
+  {
+    "path": "web-tests/scheduling.spec.js",
+    "sha256": "6efa2d2023e7cb4d1ee4bf349f006a2ed58153b07273cb6d14d58f4937cf3056"
+  },
+  {
+    "path": "web-tests/server.js",
+    "sha256": "a43d2d41335e7550772007bfe19d59114f0f83f016bc2483b42448be8134cc26"
+  },
+  {
+    "path": "web-tests/session-parity.spec.js",
+    "sha256": "3d1eaeeca45908b10de97894addf2a8c9aa5da597d6364fb0c591f0f2230e2e2"
+  },
+  {
+    "path": "web-tests/session-ui-parity.spec.js",
+    "sha256": "d0b6a1ee93bc62a87c26a9fec7695dba89d093e99dce244cf72a1e23cd565712"
+  },
+  {
+    "path": "web-tests/settings-parity.spec.js",
+    "sha256": "d7b2b83a59a5a318e55a17a007df5de0a606ab460265e6dbaff4704510350c60"
+  },
+  {
+    "path": "web-tests/updates-and-backups.spec.js",
+    "sha256": "6d803351bbef884843ce0aaa0a1924be42221fe56a4a980a36aaad141c857327"
+  },
+  {
+    "path": "web-tests/visible-layout-parity.spec.js",
+    "sha256": "84eec2955620fadfd8b6ae69b594e4aed3be5e2d75d7f9c24df54423858732a6"
+  },
+  {
+    "path": "web-tests/visual-parity.spec.js",
+    "sha256": "3a3f967dd4660af965c3ccab0e2bb4359eec5b8bfe057c416451ef3f65fa35fd"
+  },
+  {
+    "path": "web/android-calendar.css",
+    "sha256": "414d6be70142cd949056dd6dede4de2dc00d9b2c9e27b97f7b101027e4049d83"
+  },
+  {
+    "path": "web/android-calendar.js",
+    "sha256": "b92f498cfeda3bb386f9f5906675929f822422b99afff95d533f59a1d6764ae1"
+  },
+  {
+    "path": "web/android-controls.js",
+    "sha256": "2acdeb49d60e3039aa8381c9fd1f4cac76fc57c342699506cb7aeb988d0db906"
+  },
+  {
+    "path": "web/android-native.css",
+    "sha256": "2f8830be96097a0f3b2015282f0e23b90062643f8255bcae6b33467bc984cc3c"
+  },
+  {
+    "path": "web/app.js",
+    "sha256": "c788d5b71eeefc1fb502263c45862f9865fe07bb4d51d51cdcf2d9648bd83ae7"
+  },
+  {
+    "path": "web/assets/android/ic-menu-manage-api35-xxhdpi.png",
+    "sha256": "1463cc538c405e5d1d33b9b298d0773a8f65e7b55f9246fe3b6b1f7a458d9065"
+  },
+  {
+    "path": "web/assets/android/LICENSE-Apache-2.0.txt",
+    "sha256": "3ddf9be5c28fe27dad143a5dc76eea25222ad1dd68934a047064e56ed2fa40c5"
+  },
+  {
+    "path": "web/assets/android/Roboto-Regular.woff2",
+    "sha256": "697837d196a61b1dfc60928a80e35164c3f2525871b811e363517752a952d593"
+  },
+  {
+    "path": "web/assets/android/THIRD-PARTY-NOTICES.md",
+    "sha256": "ea3fcc77be290cec6f19db246d1d8371b519f0ffd8b072c7ea6fab28802c8654"
+  },
+  {
+    "path": "web/bundle-export.js",
+    "sha256": "c7bc93a4235ae7e91cd839410f2dba78f09db4255f6cb8fb7ee58fde5ff22b23"
+  },
+  {
+    "path": "web/bundle-validator.js",
+    "sha256": "47fb2ce8d551cb7a3d7e0bbc94e92b61d1c3e347be7c7808d2225bbd45ddc76c"
+  },
+  {
+    "path": "web/charts.js",
+    "sha256": "790bae2b0b8517cbb3b9d080cc62ca89bfff00d9dfcabd8821567bfd6766eddc"
+  },
+  {
+    "path": "web/csv.js",
+    "sha256": "7838d35826d8be3e45c577a161c41ffff66e39f6f4b639abb3bc36428d918928"
+  },
+  {
+    "path": "web/editor.js",
+    "sha256": "59866f2fe19847e9cbfeed6ff01994811d091cb56ac4f224679b7bd49d895743"
+  },
+  {
+    "path": "web/history.js",
+    "sha256": "8ea68768a3ac4e95dd3ced8523de88411748578b0f684e18e6865f66eb168c4f"
+  },
+  {
+    "path": "web/icon-192.png",
+    "sha256": "a0b7f8ae9398874a57aaa3108e6a6865cdf01f8bbc069d823590c381f221ed09"
+  },
+  {
+    "path": "web/icon-512.png",
+    "sha256": "c65aa4dd9185ce339d9e3acaf736f62f5ad4c2a6bad936b49c373fa19a6f61e2"
+  },
+  {
+    "path": "web/index.html",
+    "sha256": "b677556ce5915915747358d6fcb5dd95d9fc6b6754111979c2a06aaa26b1bb4f"
+  },
+  {
+    "path": "web/manifest.webmanifest",
+    "sha256": "2e8a6334152042ab16e575fc8a75cfd8e6fbc41a4fc0cb6a667d80ac957ed619"
+  },
+  {
+    "path": "web/projection.js",
+    "sha256": "d31bcf7ae89635c29d19d75d3caa8175ac263bf4a632a4f97852e5913964d4e7"
+  },
+  {
+    "path": "web/quarter.js",
+    "sha256": "b23680a1d9b7ef5689becd70d3f03177142e9fc8a02953ab3e330ded3db3f2c2"
+  },
+  {
+    "path": "web/README.md",
+    "sha256": "a034f5e52825a4d5c63e1ad1f933c5f492caab98877425365e7554c999ea9651"
+  },
+  {
+    "path": "web/schedule.js",
+    "sha256": "0dcfc225069cf7fe2a8c97faf06dee0574bbf4db23057af47aa903652b87db8a"
+  },
+  {
+    "path": "web/style.css",
+    "sha256": "7a552679662fbf4927368164d99d7d00cad56d4db2b5ab4e15076b0041d089db"
+  },
+  {
+    "path": "web/sw.js",
+    "sha256": "2501946e17239ed53396876548a1d314553b5dd21244283aa2e9cb4f1584f58b"
+  }
+]

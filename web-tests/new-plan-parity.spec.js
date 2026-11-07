@@ -105,4 +105,3 @@ test('New plan creates a complete bundle without prior import', async ({ page })
   await expect(page.locator('#new-plan-status')).toHaveText('New plan saved.');
   expect((await page.evaluate(() => readBundleFiles())).manifest.files).toHaveProperty(['sessions.json']);
 });
-
