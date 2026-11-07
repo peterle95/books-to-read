@@ -113,7 +113,11 @@ class QuarterPlanningTests(unittest.TestCase):
             self.assertIsNone(loaded[-1])
             self.assertEqual("Old plan", loaded[0][0].books[0].title)
     def test_desktop_chart_filter_and_rollover_are_idempotent(self):
-        with patch.object(ReadingPlanApp, "load_initial_plan"):
+        temporary_directory = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary_directory.cleanup)
+        default_directory = Path(temporary_directory.name) / "reading_plan_data"
+        with patch("reading_plan_gui.DEFAULT_DATA_DIRECTORY", default_directory), \
+                patch.object(ReadingPlanApp, "load_initial_plan"):
             try:
                 app = ReadingPlanApp()
             except tk.TclError as error:

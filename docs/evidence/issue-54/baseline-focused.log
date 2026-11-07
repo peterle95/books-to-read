@@ -1,0 +1,23 @@
+test_remaining_plan_reflow_excludes_rest_days (test_reading_plan.DeadlineOverrideTests.test_remaining_plan_reflow_excludes_rest_days) ... FAIL
+test_session_target_starts_from_today_current_page (test_reading_plan.DeadlineOverrideTests.test_session_target_starts_from_today_current_page) ... FAIL
+
+======================================================================
+FAIL: test_remaining_plan_reflow_excludes_rest_days (test_reading_plan.DeadlineOverrideTests.test_remaining_plan_reflow_excludes_rest_days)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<baseline-source>\test_reading_plan.py", line 971, in test_remaining_plan_reflow_excludes_rest_days
+    self.assertEqual(date(2026, 8, 24), deadlines[3].start_date)
+AssertionError: datetime.date(2026, 8, 24) != datetime.date(2026, 8, 4)
+
+======================================================================
+FAIL: test_session_target_starts_from_today_current_page (test_reading_plan.DeadlineOverrideTests.test_session_target_starts_from_today_current_page)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<baseline-source>\test_reading_plan.py", line 1119, in test_session_target_starts_from_today_current_page
+    self.assertEqual(1003, target)
+AssertionError: 1003 != 1000
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.004s
+
+FAILED (failures=2)

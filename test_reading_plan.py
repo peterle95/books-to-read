@@ -4,6 +4,7 @@ import tempfile
 import unittest
 from datetime import date
 from pathlib import Path
+from unittest.mock import patch
 
 from reading_plan import (
     BUNDLE_DATA_FILES,
@@ -968,9 +969,12 @@ class DeadlineOverrideTests(unittest.TestCase):
         )
         deadlines = {item.book.number: item for item in plans[0].deadlines}
 
-        self.assertEqual(date(2026, 8, 24), deadlines[3].start_date)
-        self.assertEqual(date(2026, 8, 31), deadlines[3].deadline)
-        self.assertEqual(8, deadlines[3].days_allocated)
+        self.assertAlmostEqual(140 / 60, plans[0].daily_pace)
+        self.assertEqual(date(2026, 8, 1), deadlines[2].deadline)
+        self.assertEqual(date(2026, 8, 4), deadlines[3].start_date)
+        self.assertEqual(date(2026, 8, 12), deadlines[3].deadline)
+        self.assertEqual(9, deadlines[3].days_allocated)
+        self.assertEqual("achievable", plans[0].overall_status)
 
     def test_remaining_plan_reports_not_achievable_when_reflow_runs_past_plan_end(self):
         sections = self.make_sections(
@@ -1112,9 +1116,11 @@ class DeadlineOverrideTests(unittest.TestCase):
             status="",
         )
 
-        target = target_units_for_date(
-            book, "Physical books", deadline, date(2026, 7, 17)
-        )
+        with patch("reading_plan_gui.date", wraps=date) as clock:
+            clock.today.return_value = date(2026, 7, 17)
+            target = target_units_for_date(
+                book, "Physical books", deadline, date(2026, 7, 17)
+            )
 
         self.assertEqual(1003, target)
 

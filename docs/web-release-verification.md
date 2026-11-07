@@ -198,12 +198,14 @@ conclusion are historical, not evidence that the current Android parity scope
 passes or has no blockers. They do not close the parity and actual-device gate
 above.
 
-The previously recorded baseline Python run reported two existing failures:
-`test_remaining_plan_reflow_excludes_rest_days` and
-`test_session_target_starts_from_today_current_page`. They predate these web
-changes according to that prior evidence; they have not been newly rerun for
-this documentation update. Retain them as release limitations until triaged,
-not as passing checks.
+Issue #54 re-ran the Python suite in an isolated source copy: **68/68 passed**
+after correcting an inconsistent rest-day test expectation and freezing the
+clock assumed by a session-target test. Both failures were reproduced at the
+pre-parity `541957e` baseline. No desktop production code or authoritative
+bundle was changed. Detailed calculations, test-isolation audit, commands,
+source manifest and complete logs are in `docs/evidence/issue-54/`. Focused
+web/Python date, schedule and bundle checks passed **15/15**; this is not a
+fresh full web-suite pass or actual-device release approval.
 
 Historical supplied automated evidence (2026-11-06): full `npm run test:web` —
 **103 passed**, one worker, zero retries, terminal exit code **0**, in **5.5

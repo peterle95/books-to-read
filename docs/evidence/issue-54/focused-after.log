@@ -1,0 +1,8 @@
+test_remaining_plan_reflow_excludes_rest_days (test_reading_plan.DeadlineOverrideTests.test_remaining_plan_reflow_excludes_rest_days) ... ok
+test_session_target_starts_from_today_current_page (test_reading_plan.DeadlineOverrideTests.test_session_target_starts_from_today_current_page) ... ok
+test_android_repaired_sessions_survive_desktop_read_and_write (test_android_bundle_contract.AndroidBundleContractTests.test_android_repaired_sessions_survive_desktop_read_and_write) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.120s
+
+OK

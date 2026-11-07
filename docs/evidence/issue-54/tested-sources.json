@@ -1,0 +1,50 @@
+[
+  {
+    "path": "compare_reading_sessions.py",
+    "sha256": "19ae26957af4e7f7999cbce34cf80d1f247e537d307c0b05f14b0f6428d69b1f"
+  },
+  {
+    "path": "export_reading_sessions.py",
+    "sha256": "cdcf3d2453802a7eb872458432df2a46a92118113d217db179ccaaf0527c9d54"
+  },
+  {
+    "path": "fixtures/android-session-contract/books.json",
+    "sha256": "429d315443565c4910100ce221664c5f3043d6b55d5ed511c67907e9f6555a1c"
+  },
+  {
+    "path": "fixtures/android-session-contract/manifest.json",
+    "sha256": "692f7b8177324ab08021f824654a657582142f1fb86784a826a81bd4d82cf05a"
+  },
+  {
+    "path": "fixtures/android-session-contract/plan.json",
+    "sha256": "d91a571cee2b19661e12b8ad969022ea60a2d325254c6d65bf71edac9153a90c"
+  },
+  {
+    "path": "fixtures/android-session-contract/sessions.json",
+    "sha256": "9511c8674b333eec0790484d6a5b179bb17ec0fbbd0ede5be86b340f49921b0e"
+  },
+  {
+    "path": "reading_plan_gui.py",
+    "sha256": "d31988178978f0cdbc69465ee90e8fdaa730edb24de3ce58a48529e3a0d8db42"
+  },
+  {
+    "path": "reading_plan.py",
+    "sha256": "d62fdad2d65e10c09bda19c53b294139ddddd6acc207e79746d85b5a661ce72e"
+  },
+  {
+    "path": "test_android_bundle_contract.py",
+    "sha256": "d20a87a249ce9a72db9b2183f586ef70ed726f11175a9e6c653b180256df4d8b"
+  },
+  {
+    "path": "test_plan_snapshot.py",
+    "sha256": "62061e38ccafbf6d1abf776c1101a48a9e5badef73d920ded8f7ed5839796df8"
+  },
+  {
+    "path": "test_quarter_planning.py",
+    "sha256": "1855de06f9325e6255b2d44def5e69b8d4a34618776443926c84abab3cbea7e7"
+  },
+  {
+    "path": "test_reading_plan.py",
+    "sha256": "44267dec7d01519d667bd0c02a1a12e782b0e874f9f6446c6342e4a0a82201b2"
+  }
+]

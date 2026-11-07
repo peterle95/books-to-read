@@ -1,0 +1,62 @@
+
+Running 15 tests using 1 worker
+
+[1/15] web-tests\early-quarter-parity.spec.js:4:1 ÔÇ║ early-year quarter dates and day arithmetic agree with Python
+
+
+web-tests\early-quarter-parity.spec.js:4:1 ÔÇ║ early-year quarter dates and day arithmetic agree with Python
+[2/15] web-tests\early-quarter-parity.spec.js:34:1 ÔÇ║ year 9999 keeps valid quarter ends and rejects out-of-range results explicitly
+[3/15] web-tests\early-quarter-parity.spec.js:51:1 ÔÇ║ early-year and final-year activation preserve the quarter dates
+[4/15] web-tests\quarter-import-boundary.spec.js:21:1 ÔÇ║ off-boundary planned quarter imports fail without replacing the stored bundle
+[5/15] web-tests\reading-plan.spec.js:8:1 ÔÇ║ a reading plan survives reload and an offline reopening
+[6/15] web-tests\reading-plan.spec.js:31:1 ÔÇ║ rejects an incomplete bundle without changing the saved plan
+[7/15] web-tests\reading-plan.spec.js:61:1 ÔÇ║ rejects checksum-valid bundles with invalid plan dates
+[8/15] web-tests\reading-plan.spec.js:85:1 ÔÇ║ desktop bundle survives import, cancellation, offline reload and export
+web-tests\reading-plan.spec.js:85:1 ÔÇ║ desktop bundle survives import, cancellation, offline reload and export
+
+
+
+
+[9/15] web-tests\reading-plan.spec.js:171:37 ÔÇ║ desktop and browser agree on lexical integers and semantic edge cases (legacy parser: false)
+web-tests\reading-plan.spec.js:171:37 ÔÇ║ desktop and browser agree on lexical integers and semantic edge cases (legacy parser: false)
+
+
+[10/15] web-tests\reading-plan.spec.js:171:37 ÔÇ║ desktop and browser agree on lexical integers and semantic edge cases (legacy parser: true)
+web-tests\reading-plan.spec.js:171:37 ÔÇ║ desktop and browser agree on lexical integers and semantic edge cases (legacy parser: true)
+
+
+[11/15] web-tests\scheduling.spec.js:117:1 ÔÇ║ web scheduling agrees with the desktop calculation model
+
+web-tests\scheduling.spec.js:117:1 ÔÇ║ web scheduling agrees with the desktop calculation model
+
+
+
+
+
+
+
+
+
+
+
+[12/15] web-tests\scheduling.spec.js:132:1 ÔÇ║ schedule date domain and UTC day numbers agree with Python for early and boundary years
+web-tests\scheduling.spec.js:132:1 ÔÇ║ schedule date domain and UTC day numbers agree with Python for early and boundary years
+
+
+[13/15] web-tests\scheduling.spec.js:157:1 ÔÇ║ plan dates, rest days and baselines persist and are only rewritten on request
+
+web-tests\scheduling.spec.js:157:1 ÔÇ║ plan dates, rest days and baselines persist and are only rewritten on request
+
+[14/15] web-tests\scheduling.spec.js:333:1 ÔÇ║ groups and deadline overrides agree with the desktop calculation model
+
+web-tests\scheduling.spec.js:333:1 ÔÇ║ groups and deadline overrides agree with the desktop calculation model
+
+
+
+
+
+[15/15] web-tests\scheduling.spec.js:350:1 ÔÇ║ groups and deadline overrides can be planned, cleared and persist
+web-tests\scheduling.spec.js:350:1 ÔÇ║ groups and deadline overrides can be planned, cleared and persist
+
+
+  15 passed (46.9s)
