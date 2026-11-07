@@ -1,0 +1,117 @@
+{
+  "native": {
+    "source": "API35 AVD issue48-parity, 1080x2196 @480dpi (360x732dp)",
+    "apk_sha256": "cc26c206c0a954e76af7af9674c10c87b44d9048dbbcee6e835bfc2400807bb2",
+    "capture": "adb exec-out screencap after scrolling the AlertDialog ScrollView to max",
+    "remove": [
+      123,
+      1614,
+      957,
+      1758
+    ],
+    "add": [
+      123,
+      1302,
+      387,
+      1446
+    ],
+    "update": [
+      123,
+      1458,
+      518,
+      1602
+    ],
+    "remove_shadow": "none outside the rounded rect; paint remains in the corner notches inside the rect (e.g. bottom-left 250/239/223 at x=126/132/138, y=1752)",
+    "mechanism": "LinearLayout verticalBox padding 16/12/16/20dp with clipToPadding keeps children clipped to the content box; secondaryButton spans the content width while actionButton wraps its label"
+  },
+  "web": {
+    "viewport": "360x732 css, DPR 3",
+    "bounds_css": {
+      "#quarter-dialog": {
+        "x": 25,
+        "y": 16,
+        "width": 310,
+        "height": 700,
+        "top": 16,
+        "right": 335,
+        "bottom": 716,
+        "left": 25
+      },
+      "#quarter-list": {
+        "x": 41,
+        "y": 72.3125,
+        "width": 278,
+        "height": 87.3125,
+        "top": 72.3125,
+        "right": 319,
+        "bottom": 159.625,
+        "left": 41
+      },
+      "#quarter-list li button": {
+        "x": 57,
+        "y": 84.3125,
+        "width": 246,
+        "height": 55.3125,
+        "top": 84.3125,
+        "right": 303,
+        "bottom": 139.625,
+        "left": 57
+      },
+      "#remove-planned-book": {
+        "x": 41,
+        "y": 585.890625,
+        "width": 278,
+        "height": 48,
+        "top": 585.890625,
+        "right": 319,
+        "bottom": 633.890625,
+        "left": 41
+      },
+      "#update-planned-book": {
+        "x": 41,
+        "y": 533.890625,
+        "width": 131.828125,
+        "height": 48,
+        "top": 533.890625,
+        "right": 172.828125,
+        "bottom": 581.890625,
+        "left": 41
+      },
+      "#quarter-book-form > button[type=\"submit\"]": {
+        "x": 41,
+        "y": 481.890625,
+        "width": 88,
+        "height": 48,
+        "top": 481.890625,
+        "right": 129,
+        "bottom": 529.890625,
+        "left": 41
+      }
+    },
+    "cast": ".quarter-shadow-cast absolute sibling, overflow hidden, border-radius 14px ::before box-shadow"
+  },
+  "mae": {
+    "box": "button rect +-12px, luminance",
+    "remove": {
+      "clipped": 2.08,
+      "unclipped_fallback": 2.19
+    },
+    "add": {
+      "clipped": 1.75,
+      "unclipped_fallback": 1.75
+    },
+    "update": {
+      "clipped": 3.68,
+      "unclipped_fallback": 3.68
+    }
+  },
+  "limits": [
+    "CSS blur is not Android ambient/spot conversion",
+    "Android native focus highlight is drawn inside the button; web keeps its 3px/2px outside outline by not clipping the button",
+    "capture bundles differ (native issue-45-populated, web synthetic fixture(1)); visible quarter content matches"
+  ],
+  "checks": {
+    "quarter-visual-parity": "4/4",
+    "full_web_suite": "164/164"
+  }
+}

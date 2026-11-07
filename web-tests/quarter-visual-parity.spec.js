@@ -51,7 +51,7 @@ for (const width of [360, 1440]) {
     await expect(heading).toBeInViewport({ ratio: 1 });
     await expect(footer).toBeInViewport({ ratio: 1 });
     expect(await page.locator('#quarter-dialog').evaluate((el) => el.scrollTop)).toBe(0);
-    const actions = page.locator('#quarter-book-form > button:not([role="combobox"])');
+    const actions = page.locator('#quarter-book-form > button:not([role="combobox"]), .quarter-remove > button');
     await expect(actions).toHaveText(['Add', 'Update selected', 'Remove selected']);
     const boxes = await actions.evaluateAll((els) => els.map((el) => el.getBoundingClientRect().toJSON()));
     expect(boxes[1].y).toBeGreaterThanOrEqual(boxes[0].bottom);
@@ -108,6 +108,56 @@ for (const width of [360, 1440]) {
     })), selectors);
     await testInfo.attach('quarter-bottom-geometry', { body: JSON.stringify(geometry, null, 2), contentType: 'application/json' });
     await testInfo.attach('quarter-bottom', { body: await page.screenshot(), contentType: 'image/png' });
+    // Paint intent only: CSS blur is not an exact Android elevation conversion.
+    const ordinary = page.locator('#quarter-list button, #quarter-book-form > button:not([role="combobox"]), .quarter-remove > button');
+    // Chromium serializes .039 through its 8-bit alpha as .04.
+    const shadow = 'rgba(0, 0, 0, 0.19) 0px 2px 3px 0px, rgba(0, 0, 0, 0.04) 0px 0px 2px 0px';
+    for (const button of await ordinary.all()) {
+      // Full-width planned/Remove shadows live on a clipped sibling: API35
+      // clipToPadding keeps only the corner slivers, and the button itself must
+      // stay unclipped for its 3px/2px focus outline. Add/Update stay unclipped.
+      const direct = await button.evaluate((el) => el.type === 'submit' || el.id === 'update-planned-book');
+      await expect(button).toBeEnabled();
+      await expect(button).toHaveCSS('box-shadow', direct ? shadow : 'none');
+      if (!direct) {
+        const cast = button.locator('xpath=preceding-sibling::*[1][@class="quarter-shadow-cast"]');
+        await expect(cast).toHaveCount(1);
+        const layer = await cast.evaluate((el) => ({
+          shadow: getComputedStyle(el, '::before').boxShadow,
+          overflow: getComputedStyle(el).overflow,
+          pointer: getComputedStyle(el).pointerEvents,
+          ancestor: el.closest('button') !== null,
+          rect: el.getBoundingClientRect().toJSON(),
+        }));
+        expect(layer.shadow).toBe(shadow);
+        expect(layer.overflow).toBe('hidden');
+        expect(layer.pointer).toBe('none');
+        expect(layer.ancestor).toBe(false);
+        const box = await button.boundingBox();
+        expect([layer.rect.x, layer.rect.y, layer.rect.width, layer.rect.height]).toEqual([box.x, box.y, box.width, box.height]);
+      }
+      const bounds = await button.boundingBox();
+      await button.evaluate((el) => { el.disabled = true; });
+      await expect(button).toHaveCSS('box-shadow', 'none');
+      expect(await button.boundingBox()).toEqual(bounds);
+      await button.evaluate((el) => { el.disabled = false; });
+      await expect(button).toHaveCSS('box-shadow', direct ? shadow : 'none');
+    }
+    for (const button of await page.locator('.quarter-actions button, #quarter-section-trigger').all()) {
+      await expect(button).toHaveCSS('box-shadow', 'none');
+    }
+    for (const [index, button] of (await ordinary.all()).entries()) {
+      await button.focus();
+      await page.keyboard.press('Shift+Tab');
+      await page.keyboard.press('Tab');
+      await expect(button).toBeFocused();
+      await expect(button).toHaveCSS('outline-style', 'solid');
+      await expect(button).toHaveCSS('outline-width', '3px');
+      await expect(button).toHaveCSS('outline-offset', '2px');
+      await testInfo.attach(`quarter-button-focus-${index}`, { body: await page.screenshot({ path: testInfo.outputPath(`quarter-button-focus-${index}.png`) }), contentType: 'image/png' });
+      await button.blur();
+    }
+    await content.evaluate((el) => { el.scrollTop = el.scrollHeight; });
     for (const button of await page.locator('.quarter-actions button').all()) await expect(button).toHaveCSS('font-weight', '400');
     await testInfo.attach('quarter-footer', { body: await page.locator('.quarter-actions').screenshot(), contentType: 'image/png' });
     await testInfo.attach('quarter-footer-text', { body: JSON.stringify(await page.locator('.quarter-actions button').evaluateAll((buttons) => buttons.map((button) => {

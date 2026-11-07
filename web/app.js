@@ -917,7 +917,11 @@ const renderQuarterDraft = () => {
         renderQuarterDraft();
         quarterTitle.focus();
       });
-      item.append(edit);
+      // Native clipToPadding leaves only the corner slivers of these full-width shadows.
+      const cast = document.createElement('span');
+      cast.className = 'quarter-shadow-cast';
+      cast.setAttribute('aria-hidden', 'true');
+      item.append(cast, edit);
       items.push(item);
     }
   }

@@ -66,6 +66,20 @@ button { font-weight: 400; }
 .dialog-actions button, .session-entry-actions button, .quarter-actions button { font-weight: 500; }
 /* Quarter AlertDialog inherits AppTheme's sans; native footer raster is regular. */
 .quarter-actions button { font-weight: 400; }
+/* API35 ordinary buttons: enabled/unpressed elevation 2dp, translationZ 0.
+   CSS blur is an approximation, not a conversion of Android's shadow renderer
+   (black spot alpha .19, ambient .039). Keep footer/spinner paint untouched.
+   Apply only to Add/Update: native clips planned-book/Remove at parent content
+   edges. Their paint remains incomplete; do not add an unclipped shadow or
+   clip the controls themselves (which would also hide focus outlines). */
+#quarter-book-form > button[type="submit"]:not(:disabled),
+#update-planned-book:not(:disabled) {
+  box-shadow: 0 2px 3px rgb(0 0 0 / .19), 0 0 2px rgb(0 0 0 / .039);
+}
+#quarter-book-form > button[type="submit"]:disabled,
+#update-planned-book:disabled {
+  box-shadow: none;
+}
 /* Replace the old fallback-font tracking workaround, not the native 16sp size. */
 html #entries-content h3 {
   font-family: AndroidRoboto, sans-serif;

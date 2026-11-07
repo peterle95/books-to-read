@@ -143,10 +143,17 @@ dialog:not(#entries-dialog):not(#metrics-dialog) h2 { font-size: 1.25rem; font-w
 #screen-plan #quarter-book-form > button { display: block; margin: 0 8px 4px 0; }
 #screen-plan #quarter-book-form > [role="combobox"] { margin: 0; }
 #screen-plan #quarter-book-form > button:not([role="combobox"]):not(#remove-planned-book) { min-width: 88px; padding-inline: 11px; font-size: 15px; }
-#screen-plan #quarter-book-form > #remove-planned-book { width: 100%; margin: 0; background: #f7ede2; color: #3a241a; border-color: #d6baa1; }
+#screen-plan .quarter-remove { position: relative; margin: 0; }
+#screen-plan #remove-planned-book { width: 100%; margin: 0; background: #f7ede2; color: #3a241a; border-color: #d6baa1; }
 #quarter-list { list-style: none; padding: 12px 16px 20px; margin: 0; }
-#quarter-list li { margin: 0; }
-#screen-plan #quarter-list button { width: 100%; text-align: center; margin: 0; padding: calc(31px / 3) 12px; line-height: calc(49px / 3); }
+#quarter-list li { position: relative; margin: 0; }
+#screen-plan #quarter-list button { position: relative; width: 100%; text-align: center; margin: 0; padding: calc(31px / 3) 12px; line-height: calc(49px / 3); }
+/* API35 clipToPadding clips the full-width planned/Remove shadows at the content
+   box: only the corner slivers inside the button's rectangle remain. Keep the
+   shadow on a clipped sibling layer so the button's focus outline is never cut. */
+.quarter-shadow-cast { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.quarter-shadow-cast::before { content: ""; position: absolute; inset: 0; border-radius: 14px; box-shadow: 0 2px 3px rgb(0 0 0 / .19), 0 0 2px rgb(0 0 0 / .039); }
+#screen-plan #remove-planned-book { position: relative; }
 #quarter-dialog > .quarter-actions { box-sizing: border-box; min-height: 62px; padding: 4px 12px; gap: 0; align-items: center; }
 #screen-plan .quarter-actions button { min-height: 54px; margin: 0; padding: 8px 11px; }
 #book-picker-dialog { box-sizing: border-box; width: min(94vw, 30rem); padding: 1rem 1.25rem; }
