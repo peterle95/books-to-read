@@ -3,6 +3,17 @@
 Status: **not approved for switching yet**. Automated Chromium checks are not
 actual Android/desktop device evidence. Keep the native Android and desktop apps.
 
+The deployment workflow runs the full Chromium suite on Windows before deploying
+from Ubuntu. The measured visual tests pass on Windows but fail on Ubuntu with
+different bundled-font geometry and rasterization: the quarter footer ink,
+Metrics card position, and history-title wrapping differ. A 2026-11-07 Ubuntu
+diagnostic ([run 42387054912](https://github.com/peterle95/books-to-read/actions/runs/42387054912))
+reproduced all three failures despite the font reporting loaded; the same full
+suite passed 174/174 on a GitHub Windows runner
+([run 42387203854](https://github.com/peterle95/books-to-read/actions/runs/42387203854)). This CI choice
+does not fix or approve Linux, Android, or other device rendering, and it does
+not replace the outstanding actual-device and same-data parity checks.
+
 ## Feature inventory
 
 | Native Android feature | Web status / remaining check |
