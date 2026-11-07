@@ -205,6 +205,7 @@ for (const width of [360, 1440]) {
       });
     }, (await page.locator('.quarter-actions').screenshot()).toString('base64'));
     const nativeFooterInk = [{ x0: 412, width: 153, y0: 79 }, { x0: 641, width: 213, y0: 79 }];
+    console.log('[DEBUG-ci-footer]', JSON.stringify({ width, footerInk, geometry: geometry['.quarter-actions'] }));
     if (width === 360) {
       expect(footerInk).toHaveLength(nativeFooterInk.length);
       for (const [index, native] of nativeFooterInk.entries()) {

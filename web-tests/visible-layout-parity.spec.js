@@ -76,6 +76,7 @@ test('360x732 chart controls, group rows and Metrics table viewport retain nativ
   const card = page.locator('#metrics-content .metrics-card').first();
   const table = card.getByRole('table');
   const cardBox = await card.boundingBox(), tableBox = await table.boundingBox();
+  console.log('[DEBUG-ci-metrics]', JSON.stringify({cardBox, nodes: await page.locator('#metrics-dialog, #metrics-dialog *').evaluateAll(nodes => nodes.slice(0, 15).map(el => ({tag: el.tagName, cls: el.className, box: el.getBoundingClientRect().toJSON(), font: getComputedStyle(el).font, lineHeight: getComputedStyle(el).lineHeight}))) }));
   expect(cardBox.x).toBe(36); // 20dp sheet + 16dp verticalBox padding.
   expect(Math.abs(cardBox.y - 278)).toBeLessThan(1); // Native first card; sheet viewport rounding is sub-dp.
   expect(tableBox.x - cardBox.x).toBe(14); // Drawable stroke is inside native padding.
@@ -249,6 +250,7 @@ test('360x732 populated sheets preserve native hierarchy, density and pinned chr
   const title = sheet.locator('#entries-content h3');
   await expect(title).toHaveText('Synthetic paper - history and projection');
   await expect(title).toHaveCSS('font-size', '16px');
+  console.log('[DEBUG-ci-title]', JSON.stringify(await title.evaluate(el => ({box: el.getBoundingClientRect().toJSON(), font: getComputedStyle(el).font, fontFamily: getComputedStyle(el).fontFamily, fontWeight: getComputedStyle(el).fontWeight, fonts: [...document.fonts].map(f => ({family: f.family, status: f.status})), ready: document.fonts.status}))));
   expect((await title.boundingBox()).height).toBe(40); // 20px line + native 12/8px padding.
   await title.evaluate((node) => { node.textContent = 'A much longer book title that must wrap instead of being clipped or hidden for visual parity'; });
   expect((await title.boundingBox()).height).toBeGreaterThan(40);

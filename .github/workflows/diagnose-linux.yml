@@ -1,0 +1,23 @@
+name: Diagnose Linux parity
+on:
+  push:
+    branches: [diagnose/ci-linux-parity-20261107]
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test web-tests/quarter-visual-parity.spec.js web-tests/visible-layout-parity.spec.js --workers=1 --trace=on --reporter=list
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-parity-diagnostics
+          path: test-results/
