@@ -67,9 +67,13 @@ comparison is actively pending, including populated books, groups, overrides,
 history, charts and open dialogs/sheets.
 The History origin mismatch has a bounded automated correction and comparison
 in `docs/evidence/issue-45/verification.md`; actual-device confirmation remains
-pending. Known visual residuals remain: calendar weekday/day ink alignment and
-shadows still differ; and quarter footer
-text remains **2 physical px lower** than native. The earlier 622.188 px quarter
+pending. Known visual residuals remain:
+shadows still differ, and quarter footer text remains **2 physical px lower**
+than native. Calendar ink alignment was re-measured in
+`docs/evidence/issue-46/verification.md` against a fresh API 35 capture: month,
+weekday and day ink centres are within 0.5 CSS px (1.5 physical px), and the
+header/date and year-list geometry match. The remainder is Chromium/Skia glyph
+rasterization rather than layout. The earlier 622.188 px quarter
 height discrepancy is historical: the latest verified snapshot covers measured
 mobile/desktop quarter geometry, including the native-source **27dp label box**
 and regular **400 footer weight**. This bounded geometry coverage is not visual

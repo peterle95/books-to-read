@@ -1,0 +1,368 @@
+{
+ "source": "API35 SimpleMonthView: month 14sp/56dp, weekday 12sp/36dp, day 12sp/40dp; Roboto hhea 1900/-500, upem 2048; 6dp top inset, 20dp horizontal inset; density 3.",
+ "native": {
+  "device": "issue46-parity AVD, API35 google_apis_tablet x86_64, 1080x2340, density 480, fontScale 1.0, en-US",
+  "dayRowBounds": [
+   168,
+   1039,
+   274,
+   1159
+  ],
+  "bodyTopPhysical": 745,
+  "navBox": [
+   108,
+   763,
+   972,
+   931
+  ],
+  "weekdayBox": [
+   168,
+   931,
+   274,
+   1039
+  ],
+  "titleBox": [
+   300,
+   763,
+   780,
+   931
+  ]
+ },
+ "web": {
+  "boxes": {
+   "dialog": {
+    "x": 36,
+    "y": 119.5,
+    "width": 288,
+    "height": 493
+   },
+   "header": {
+    "x": 36,
+    "y": 119.5,
+    "width": 288,
+    "height": 93
+   },
+   "year": {
+    "x": 60,
+    "y": 127.5,
+    "width": 35.96875,
+    "height": 32
+   },
+   "date": {
+    "x": 60,
+    "y": 152.5,
+    "width": 152.34375,
+    "height": 40
+   },
+   "body": {
+    "x": 36,
+    "y": 212.5,
+    "width": 288,
+    "height": 338
+   },
+   "navigation": {
+    "x": 36,
+    "y": 218.5,
+    "width": 288,
+    "height": 56
+   },
+   "title": {
+    "x": 130.03125,
+    "y": 238.5,
+    "width": 99.953125,
+    "height": 16
+   },
+   "weekdayS": {
+    "x": 56,
+    "y": 285.5,
+    "width": 35.421875,
+    "height": 14
+   },
+   "day1": {
+    "x": 56,
+    "y": 310.5,
+    "width": 35.421875,
+    "height": 40
+   },
+   "styles": {
+    "title": {
+     "fontSize": "14px",
+     "weight": "500"
+    },
+    "weekday": {
+     "fontSize": "12px",
+     "weight": "400",
+     "lineHeight": "normal"
+    },
+    "day": {
+     "fontSize": "12px",
+     "weight": "400",
+     "lineHeight": "normal"
+    }
+   },
+   "yearView": {
+    "dialog": {
+     "x": 36,
+     "y": 119.5,
+     "width": 288,
+     "height": 493
+    },
+    "body": {
+     "x": 36,
+     "y": 212.5,
+     "width": 288,
+     "height": 338
+    },
+    "active": {
+     "x": 36,
+     "y": 293.5,
+     "width": 288,
+     "height": 59
+    },
+    "activeText": "2026"
+   }
+  }
+ },
+ "residuals": {
+  "monthTitle": {
+   "128": {
+    "native": {
+     "top": 22.3333,
+     "bottom": 33.6667,
+     "center": 28.0,
+     "height": 11.3333
+    },
+    "web": {
+     "top": 22.8333,
+     "bottom": 33.5,
+     "center": 28.1667,
+     "height": 10.6667
+    },
+    "web_minus_native_center_css": 0.1667,
+    "web_minus_native_center_physical": 0.5
+   },
+   "180": {
+    "native": {
+     "top": 22.0,
+     "bottom": 34.0,
+     "center": 28.0,
+     "height": 12.0
+    },
+    "web": {
+     "top": 22.8333,
+     "bottom": 33.5,
+     "center": 28.1667,
+     "height": 10.6667
+    },
+    "web_minus_native_center_css": 0.1667,
+    "web_minus_native_center_physical": 0.5
+   },
+   "220": {
+    "native": {
+     "top": 22.0,
+     "bottom": 34.0,
+     "center": 28.0,
+     "height": 12.0
+    },
+    "web": {
+     "top": 22.8333,
+     "bottom": 33.8333,
+     "center": 28.3333,
+     "height": 11.0
+    },
+    "web_minus_native_center_css": 0.3333,
+    "web_minus_native_center_physical": 1.0
+   },
+   "245": {
+    "native": {
+     "top": 22.0,
+     "bottom": 34.0,
+     "center": 28.0,
+     "height": 12.0
+    },
+    "web": {
+     "top": 22.8333,
+     "bottom": 33.8333,
+     "center": 28.3333,
+     "height": 11.0
+    },
+    "web_minus_native_center_css": 0.3333,
+    "web_minus_native_center_physical": 1.0
+   }
+  },
+  "weekdayS": {
+   "128": {
+    "native": {
+     "top": 13.3333,
+     "bottom": 22.0,
+     "center": 17.6667,
+     "height": 8.6667
+    },
+    "web": {
+     "top": 13.8333,
+     "bottom": 22.5,
+     "center": 18.1667,
+     "height": 8.6667
+    },
+    "web_minus_native_center_css": 0.5,
+    "web_minus_native_center_physical": 1.5
+   },
+   "180": {
+    "native": {
+     "top": 13.3333,
+     "bottom": 22.0,
+     "center": 17.6667,
+     "height": 8.6667
+    },
+    "web": {
+     "top": 13.8333,
+     "bottom": 22.5,
+     "center": 18.1667,
+     "height": 8.6667
+    },
+    "web_minus_native_center_css": 0.5,
+    "web_minus_native_center_physical": 1.5
+   },
+   "220": {
+    "native": {
+     "top": 13.3333,
+     "bottom": 22.3333,
+     "center": 17.8333,
+     "height": 9.0
+    },
+    "web": {
+     "top": 13.8333,
+     "bottom": 22.8333,
+     "center": 18.3333,
+     "height": 9.0
+    },
+    "web_minus_native_center_css": 0.5,
+    "web_minus_native_center_physical": 1.5
+   },
+   "245": {
+    "native": {
+     "top": 13.3333,
+     "bottom": 22.3333,
+     "center": 17.8333,
+     "height": 9.0
+    },
+    "web": {
+     "top": 13.8333,
+     "bottom": 22.8333,
+     "center": 18.3333,
+     "height": 9.0
+    },
+    "web_minus_native_center_css": 0.5,
+    "web_minus_native_center_physical": 1.5
+   }
+  },
+  "day1": {
+   "128": {
+    "native": {
+     "top": 15.6667,
+     "bottom": 24.0,
+     "center": 19.8333,
+     "height": 8.3333
+    },
+    "web": {
+     "top": 15.8333,
+     "bottom": 24.5,
+     "center": 20.1667,
+     "height": 8.6667
+    },
+    "web_minus_native_center_css": 0.3334,
+    "web_minus_native_center_physical": 1.0
+   },
+   "180": {
+    "native": {
+     "top": 15.3333,
+     "bottom": 24.0,
+     "center": 19.6667,
+     "height": 8.6667
+    },
+    "web": {
+     "top": 15.8333,
+     "bottom": 24.5,
+     "center": 20.1667,
+     "height": 8.6667
+    },
+    "web_minus_native_center_css": 0.5,
+    "web_minus_native_center_physical": 1.5
+   },
+   "220": {
+    "native": {
+     "top": 15.3333,
+     "bottom": 24.0,
+     "center": 19.6667,
+     "height": 8.6667
+    },
+    "web": {
+     "top": 15.8333,
+     "bottom": 24.5,
+     "center": 20.1667,
+     "height": 8.6667
+    },
+    "web_minus_native_center_css": 0.5,
+    "web_minus_native_center_physical": 1.5
+   },
+   "245": {
+    "native": {
+     "top": 15.3333,
+     "bottom": 24.0,
+     "center": 19.6667,
+     "height": 8.6667
+    },
+    "web": {
+     "top": 15.8333,
+     "bottom": 24.5,
+     "center": 20.1667,
+     "height": 8.6667
+    },
+    "web_minus_native_center_css": 0.5,
+    "web_minus_native_center_physical": 1.5
+   }
+  }
+ },
+ "header": {
+  "date": {
+   "native": {
+    "top": 42.3333,
+    "bottom": 71.3333,
+    "center": 56.8333
+   },
+   "web": {
+    "top": 42.1667,
+    "bottom": 71.1667,
+    "center": 56.6667
+   },
+   "web_minus_native_center_css": -0.1666
+  },
+  "year": {
+   "native": {
+    "top": 19.6667,
+    "bottom": 30.0,
+    "center": 24.8333
+   },
+   "web": {
+    "top": 18.8333,
+    "bottom": 30.5,
+    "center": 24.6667
+   }
+  }
+ },
+ "yearView": {
+  "nativeSelected2026": [
+   108,
+   988,
+   972,
+   1165
+  ],
+  "nativeBodyTop": 745,
+  "nativeSelectedTopCssFromBody": 81.0,
+  "nativeSelectedHeightCss": 59.0,
+  "webBodyTop": 212.5,
+  "webActiveTopCssFromBody": 81.0,
+  "webActiveHeightCss": 59,
+  "webActiveText": "2026"
+ }
+}

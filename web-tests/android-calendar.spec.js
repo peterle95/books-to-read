@@ -230,3 +230,56 @@ test('360x732 framework geometry and screenshot artifact match accepted referenc
   expect(Math.abs(yearBox.y - (952 - 72) / 3)).toBeLessThan(1);
   await page.screenshot({ path: testInfo.outputPath('year-360x732.png') });
 });
+
+test('API35 SimpleMonthView typography and source baselines hold at 360x732', async ({ page }) => {
+  // AOSP android15-release core/res: date_picker_month_text_size 14sp,
+  // date_picker_day_of_week_text_size and date_picker_day_text_size 12sp,
+  // date_picker_month_height 56dp, date_picker_day_of_week_height 36dp,
+  // date_picker_day_height 40dp and day_picker_padding_top 6dp.
+  // SimpleMonthView centers Paint ascent/descent without text-view font padding.
+  // Shipped Roboto hhea is 1900/-500 over 2048 upem, so the source baseline in a
+  // box of height h is (h + (1900 - 500) * fontSize / 2048) / 2 below its top.
+  await page.setViewportSize({ width: 360, height: 732 });
+  await load(page);
+  await field(page).click();
+  const metrics = await page.evaluate(() => {
+    const dialog = document.querySelector('#reading-calendar');
+    // A zero-height inline-block's top edge sits on the used text baseline.
+    const baseline = (element) => {
+      const probe = document.createElement('span');
+      probe.style.cssText = 'display:inline-block;width:0;height:0;vertical-align:baseline;padding:0;margin:0;border:0';
+      element.prepend(probe);
+      const offset = probe.getBoundingClientRect().top - element.getBoundingClientRect().top;
+      probe.remove();
+      return offset;
+    };
+    const style = (element) => getComputedStyle(element);
+    const title = dialog.querySelector('.reading-calendar-navigation span');
+    const weekdays = dialog.querySelector('.reading-calendar-weekdays');
+    const weekday = weekdays.querySelector('span');
+    const day = dialog.querySelector('.reading-calendar-grid button');
+    return {
+      navigation: { height: parseFloat(style(dialog.querySelector('.reading-calendar-navigation')).height) },
+      weekdays: { height: parseFloat(style(weekdays).height) },
+      title: { size: style(title).fontSize, weight: style(title).fontWeight, height: title.getBoundingClientRect().height, baseline: baseline(title) },
+      weekday: { size: style(weekday).fontSize, weight: style(weekday).fontWeight, height: weekday.getBoundingClientRect().height, baseline: baseline(weekday) },
+      day: { size: style(day).fontSize, weight: style(day).fontWeight, height: day.getBoundingClientRect().height, baseline: baseline(day) },
+    };
+  });
+  const sourceBaseline = (height, fontSize) => (height + (1900 - 500) * fontSize / 2048) / 2;
+  // Chromium quantizes ascent/descent to whole CSS pixels; the remaining delta is
+  // under a quarter CSS pixel and is recorded in docs/evidence/issue-46.
+  const close = (actual, expected) => expect(Math.abs(actual - expected)).toBeLessThan(0.25);
+  expect(metrics.navigation.height).toBe(56);
+  expect(metrics.weekdays.height).toBe(36);
+  expect(metrics.title.size).toBe('14px');
+  expect(metrics.title.weight).toBe('500');
+  close(metrics.title.baseline, sourceBaseline(metrics.title.height, 14));
+  expect(metrics.weekday.size).toBe('12px');
+  expect(metrics.weekday.weight).toBe('400');
+  close(metrics.weekday.baseline, sourceBaseline(metrics.weekday.height, 12));
+  expect(metrics.day.size).toBe('12px');
+  expect(metrics.day.weight).toBe('400');
+  expect(metrics.day.height).toBe(40);
+  close(metrics.day.baseline, sourceBaseline(metrics.day.height, 12));
+});
