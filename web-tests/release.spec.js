@@ -60,9 +60,9 @@ test('saved web plan dates and rest days transfer to desktop', async ({ page }) 
     await tab(page, 'Plan');
     await page.getByLabel('Plan finish', { exact: true }).fill('2026-12-20');
     await page.getByRole('button', { name: 'Save plan dates' }).click();
-    await chooseDate(page, page.getByLabel('Rest day from'), '2026-11-10');
-    await chooseDate(page, page.getByLabel('Rest day to'), '2026-11-11');
-    await page.getByRole('button', { name: 'Add rest days' }).click();
+    await chooseDate(page, page.getByLabel('Rest start date'), '2026-11-10');
+    await chooseDate(page, page.getByLabel('Rest end date'), '2026-11-11');
+    await page.getByRole('button', { name: 'Add rest-day range' }).click();
     await page.reload();
     await tab(page, 'Plan');
     await expect(page.getByLabel('Plan finish', { exact: true })).toHaveValue('2026-12-20');

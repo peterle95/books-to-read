@@ -65,6 +65,10 @@ plan fixtures. Populated synthetic fixtures now cover first-fold layout at
 with automated coverage, **not visual approval**. A fresh same-data Android/web
 comparison is actively pending, including populated books, groups, overrides,
 history, charts and open dialogs/sheets.
+The partial same-fixture first-fold comparison in
+`docs/evidence/issue-51/verification.md` preserves native and web images
+and records unresolved differences; its native clock was not frozen, and it does
+not establish complete parity.
 The History origin mismatch has a bounded automated correction and comparison
 in `docs/evidence/issue-45/verification.md`; actual-device confirmation remains
 pending. Known visual residuals remain:

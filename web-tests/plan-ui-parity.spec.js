@@ -21,6 +21,21 @@ const fixture = () => {
   return files;
 };
 
+test('rest-day controls use the native labels without changing the imported bundle on navigation', async ({ page }) => {
+  await page.goto('./');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByLabel('Bundle files').setInputFiles(fixture());
+  page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('button', { name: 'Import bundle', exact: true }).click();
+  await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+  const before = await page.evaluate(() => localStorage.getItem(bundleKey));
+  await page.getByRole('button', { name: 'Plan', exact: true }).click();
+  await expect(page.getByLabel('Rest start date', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Rest end date', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Add rest-day range', exact: true })).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem(bundleKey))).toBe(before);
+});
+
 test('active plan actions expose next quarter and explicit recalculation; rest and date edits preserve baseline', async ({ page }) => {
   await page.goto('./');
   await page.getByRole('button', { name: 'Plan', exact: true }).click();
@@ -42,9 +57,9 @@ test('active plan actions expose next quarter and explicit recalculation; rest a
   const baseline = await page.evaluate(() => readBundleFiles().books.sections[0].books[0].baseline_schedule);
   await page.getByLabel('Plan finish').fill('2030-03-30');
   await page.getByRole('button', { name: 'Save plan dates' }).click();
-  await chooseDate(page, page.getByLabel('Rest day from'), '2030-02-01');
-  await chooseDate(page, page.getByLabel('Rest day to'), '2030-02-02');
-  await page.getByRole('button', { name: 'Add rest days' }).click();
+  await chooseDate(page, page.getByLabel('Rest start date'), '2030-02-01');
+  await chooseDate(page, page.getByLabel('Rest end date'), '2030-02-02');
+  await page.getByRole('button', { name: 'Add rest-day range' }).click();
   await expect(page.getByTestId('schedule-status')).toHaveText(/baseline stays unchanged/);
   expect(await page.evaluate(() => readBundleFiles().books.sections[0].books[0].baseline_schedule)).toEqual(baseline);
   await page.reload();

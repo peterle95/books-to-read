@@ -195,9 +195,9 @@ write_json_bundle(sys.argv[1], [
     await expect(page.getByTestId('schedule-status')).toHaveText(/baseline stays unchanged/);
     await expect(row('Second').locator('td').nth(3)).toHaveText('2026-03-31');
 
-    await chooseDate(page, page.getByLabel('Rest day from'), '2026-02-01');
-    await chooseDate(page, page.getByLabel('Rest day to'), '2026-02-02');
-    await page.getByRole('button', { name: 'Add rest days' }).click();
+    await chooseDate(page, page.getByLabel('Rest start date'), '2026-02-01');
+    await chooseDate(page, page.getByLabel('Rest end date'), '2026-02-02');
+    await page.getByRole('button', { name: 'Add rest-day range' }).click();
     await expect(page.getByTestId('schedule-status')).toHaveText(/baseline stays unchanged/);
     await expect(row('First').locator('td').nth(3)).toHaveText('2026-02-14');
     await expect(row('First').locator('td').nth(4)).toHaveText('0.44');

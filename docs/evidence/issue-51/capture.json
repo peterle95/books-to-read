@@ -1,0 +1,197 @@
+{
+  "native": {
+    "captured_at_host": "2026-11-06T11:55:24.612047+01:00",
+    "device_date": "2026-11-06T11:55:24+0100",
+    "timezone": "Europe/Berlin",
+    "size": "Physical size: 1080x2340",
+    "density": "Physical density: 480",
+    "font_scale": "1.0",
+    "fingerprint": "google/sdk_gtablet_x86_64/emu64xa:15/AE3A.240806.046.T1/13135149:userdebug/dev-keys",
+    "sdk": "35",
+    "fixture_sha256": {
+      "books.json": "93731590354418d4a45b92e5bd940a9a3f927352cd32289f5c7cf711310fc4c9",
+      "manifest.json": "835966a4415a13635e91ab6bd5cf8d515a3c4ce3b979fb19b7949c5a80b947ef",
+      "plan.json": "2c8e9ed3838cf03cb1c6dd2dd473e0ec96d8385c2df365c35a5f9a987bc08b1e",
+      "sessions.json": "ca127144d7d6b2ac81bfe511df9827c4d2e304eb06028c6dc85a353896afe48f"
+    },
+    "device_fixture_sha256": {
+      "books.json": "93731590354418d4a45b92e5bd940a9a3f927352cd32289f5c7cf711310fc4c9",
+      "manifest.json": "835966a4415a13635e91ab6bd5cf8d515a3c4ce3b979fb19b7949c5a80b947ef",
+      "plan.json": "2c8e9ed3838cf03cb1c6dd2dd473e0ec96d8385c2df365c35a5f9a987bc08b1e",
+      "sessions.json": "ca127144d7d6b2ac81bfe511df9827c4d2e304eb06028c6dc85a353896afe48f"
+    },
+    "fixture_unchanged_on_device": true,
+    "git_head": "541957e0caa5bfafec90bf6804082dcc5461646a"
+  },
+  "native_apk_sha256": "88c6e7e6e4e0239153f96cff089c5ba8991fb9d95dc0ea727364a60934404913",
+  "native_app_src_main_sha256": {
+    "app/src/main/AndroidManifest.xml": "731f362ff6a438c2993a7737efae2738e9a143790fab1620b7ae231c60d7f446",
+    "app/src/main/java/com/petermolnar/readingplan/BookCollections.java": "b0ee9cabf56b4eebc6a5365fbc05006d5968fac7cbda619c2b488ecbac23d6df",
+    "app/src/main/java/com/petermolnar/readingplan/BookModels.java": "88a5cc8c4431fc546a22f9b38ebc6229d65e5ba10d30dd5018cc6d7748beb405",
+    "app/src/main/java/com/petermolnar/readingplan/CsvSupport.java": "5c45b71a9fe13946a8b46f2319c4715f31ed427e95fcfaab3e2a71005f459076",
+    "app/src/main/java/com/petermolnar/readingplan/MainActivity.java": "2dac9db2a92ae0deb83aed2288bc595cae8cedd046ff3a3b45b41cf30dc62c3a",
+    "app/src/main/java/com/petermolnar/readingplan/PlannedQuarter.java": "e4103f32ff6bafd6869d426891d1dad37d9f438b93d8268d759b8f57c90a508d",
+    "app/src/main/java/com/petermolnar/readingplan/PlannedQuarterEditor.java": "9b9d8880363a5a921588f7ff754e9183a538d895bebf1765e1bbebfe4ef80099",
+    "app/src/main/java/com/petermolnar/readingplan/PlanPrimitives.java": "34008e23845a12c13afb0cb46fb614c2c91b0fdfe1a8897f49b1ca4594e3d574",
+    "app/src/main/java/com/petermolnar/readingplan/PlanValues.java": "96dba613882412d21c31033fef88db2aac099e55a826965e930c80a5b1ae6f8f",
+    "app/src/main/java/com/petermolnar/readingplan/ReadingPlanBookProgress.java": "cb7e8151811b61e73b60fe898c0f73d4f2870e891ed089f5517602b201bc0847",
+    "app/src/main/java/com/petermolnar/readingplan/ReadingPlanBooksView.java": "cde1f6728e8c48d51eb07aee94a23341c9d64a81e92f9c2581313d1549a7f2e9",
+    "app/src/main/java/com/petermolnar/readingplan/ReadingPlanBundleCodec.java": "23616f43d5fafa5fdece374ba1120a580aaae304c5db115d1c6df44da76543d4",
+    "app/src/main/java/com/petermolnar/readingplan/ReadingPlanCalendar.java": "81ab41f7b4bdac60fec0aab355d8afae96c48e08b2af5fb91545495f3d95c195",
+    "app/src/main/java/com/petermolnar/readingplan/ReadingPlanChartData.java": "64f1030ae70df501fa629b8ae653a4d838b30eb477f31e2ead21bb1d52438c7c",
+    "app/src/main/java/com/petermolnar/readingplan/ReadingPlanChartsView.java": "abaab6710b3629712bee104f65e16bc366400b6205c52ce20ff9506582adc0ed",
+    "app/src/main/java/com/petermolnar/readingplan/ReadingPlanChartView.java": "aa232310dbf58d70e58ca3ae42421c7c5e0b86769a0a8c612c35e71e36705b97",
+    "app/src/main/java/com/petermolnar/readingplan/ReadingPlanCsvReport.java": "40df2b85b8ab45d6ddd144dc8947d98bc592003bd260c1c90ec399fc9dc57666",
+    "app/src/main/java/com/petermolnar/readingplan/ReadingPlanDataStore.java": "f9f8f4350ca2f5f48d23eb77f4fef2c66f8690b8b2e3b0e42cc1ecfe0aa10888",
+    "app/src/main/java/com/petermolnar/readingplan/ReadingPlanMetricsView.java": "013bc2e4714d219db06393742cd144db1ed8b1fb9234babcf35f4979f1c980bb",
+    "app/src/main/java/com/petermolnar/readingplan/ReadingPlanPlanView.java": "0f3f3ef3ea4a4cad3ae8c656640a17a6af6f91b3cc9a575c63751e2ad03ee70b",
+    "app/src/main/java/com/petermolnar/readingplan/ReadingPlanScheduler.java": "94f540dc85f179e057dfafafe032ad5eacffa1b4d36db5d61d1e9bc31669d34c",
+    "app/src/main/java/com/petermolnar/readingplan/ReadingPlanSessionView.java": "9dd4c5ccc228b23a68c1d36b25af98d544b25fd87382f278a4ecf3603f0e3b2e",
+    "app/src/main/java/com/petermolnar/readingplan/ReadingPlanTables.java": "0f02e52a7dc15298ac5812861677e562e00023ae7423d2c48302a6b1c7b93583",
+    "app/src/main/java/com/petermolnar/readingplan/ReadingPlanTargets.java": "01587183f085178a9a7c0585fa128c4f230245b9c38971bc878eee96ea05e879",
+    "app/src/main/java/com/petermolnar/readingplan/ReadingPlanUi.java": "c3db7804f633886ecda09e80801673d8107c691e26859a4383d5c84aa17c12ca",
+    "app/src/main/java/com/petermolnar/readingplan/ReadingProjection.java": "96d685ffaef9fdc236ba36da4295a79ec5657887ebfd97ec126436a1f8a281f7",
+    "app/src/main/java/com/petermolnar/readingplan/ReadingSessionEntries.java": "7d2f23352cb8e63b10a7cd2f32f6b5bf3efd37d7c9b3290fcf58123cccc7b5bf",
+    "app/src/main/res/drawable/books_cover.png": "f6b01d61a6d187ef016a14f1e811f557fab07ed679fb38589caed639591b2949",
+    "app/src/main/res/drawable-nodpi/app_cover.png": "f6b01d61a6d187ef016a14f1e811f557fab07ed679fb38589caed639591b2949",
+    "app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml": "5056b7226b3f58e65a61739e8ab6f5c52099fccee3ae9aad0e8856f31709e3fa",
+    "app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml": "5056b7226b3f58e65a61739e8ab6f5c52099fccee3ae9aad0e8856f31709e3fa",
+    "app/src/main/res/mipmap-hdpi/ic_launcher.png": "3fb926edc0250047aff9ea410cf8f8c2662e9f3385339754535a6bbc7aac7e12",
+    "app/src/main/res/mipmap-hdpi/ic_launcher_foreground.png": "b0b43b785312bd7ae65e7cec6a8af6b4003fae4d8fedf4ffedbb397386f673bd",
+    "app/src/main/res/mipmap-hdpi/ic_launcher_round.png": "3fb926edc0250047aff9ea410cf8f8c2662e9f3385339754535a6bbc7aac7e12",
+    "app/src/main/res/mipmap-mdpi/ic_launcher.png": "baf638ed6f1c26479ad342e6bf7f7394b853871689a981b1ebe7d0a184202d69",
+    "app/src/main/res/mipmap-mdpi/ic_launcher_foreground.png": "a6faea7428557e231baceb9421829b811284830856d8fe0a2bb0949dfd701348",
+    "app/src/main/res/mipmap-mdpi/ic_launcher_round.png": "baf638ed6f1c26479ad342e6bf7f7394b853871689a981b1ebe7d0a184202d69",
+    "app/src/main/res/mipmap-xhdpi/ic_launcher.png": "4463e05acc1139d888f2c06e078d6d8596efe749763fa5ff09a68908e37618ce",
+    "app/src/main/res/mipmap-xhdpi/ic_launcher_foreground.png": "6b8c9210cc1c6230d614025332d2a0901e6fa0cd6a4b27f4d36c9b5f27632277",
+    "app/src/main/res/mipmap-xhdpi/ic_launcher_round.png": "4463e05acc1139d888f2c06e078d6d8596efe749763fa5ff09a68908e37618ce",
+    "app/src/main/res/mipmap-xxhdpi/ic_launcher.png": "605289d75ebdaa2f21a4ff7f1fb927998ee021df830b1e747332d7a201b92726",
+    "app/src/main/res/mipmap-xxhdpi/ic_launcher_foreground.png": "29ea409d4be5a35c40e4736ce9b91d1c7087d57e4a063d47b5d90422ed4f0cef",
+    "app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png": "605289d75ebdaa2f21a4ff7f1fb927998ee021df830b1e747332d7a201b92726",
+    "app/src/main/res/mipmap-xxxhdpi/ic_launcher.png": "49d6efc0411e8265b9dc69cac5b34bd7d96b9bcf8e2b10915573b61b514a4a26",
+    "app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png": "fcbd8936ecc3561844881939f85015fc1c26a7c4bb4d68c8999104852ef72203",
+    "app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png": "49d6efc0411e8265b9dc69cac5b34bd7d96b9bcf8e2b10915573b61b514a4a26",
+    "app/src/main/res/values/colors.xml": "8d1557b2cc9f9f791de6ca28887fe15e2858d25f81dd89535c6e0380c1cba0ab",
+    "app/src/main/res/values/styles.xml": "a33ade7c2ccb026cde2c17b9e5a58ec2fc0b8a1460b11534ff9c70a6de8af8c3"
+  },
+  "web": {
+    "browser": "156.0.8078.4",
+    "instant": "2026-11-06T10:55:24Z",
+    "timezone": "Europe/Berlin",
+    "viewport": {
+      "width": 360,
+      "height": 732
+    },
+    "screen": {
+      "width": 360,
+      "height": 780
+    },
+    "dpr": 3,
+    "views": {
+      "Session": {
+        "scrollX": 0,
+        "scrollY": 0
+      },
+      "Plan": {
+        "scrollX": 0,
+        "scrollY": 0
+      },
+      "Books": {
+        "scrollX": 0,
+        "scrollY": 0
+      },
+      "Charts": {
+        "scrollX": 0,
+        "scrollY": 0
+      },
+      "Settings": {
+        "scrollX": 0,
+        "scrollY": 0
+      }
+    },
+    "sourceBefore": {
+      "android-calendar.css": "414d6be70142cd949056dd6dede4de2dc00d9b2c9e27b97f7b101027e4049d83",
+      "android-calendar.js": "b92f498cfeda3bb386f9f5906675929f822422b99afff95d533f59a1d6764ae1",
+      "android-controls.js": "ce16f04cf6c904b81994592932ff5e0c81168b5febdd88db44f0841a30a5a91f",
+      "android-native.css": "2f8830be96097a0f3b2015282f0e23b90062643f8255bcae6b33467bc984cc3c",
+      "app.js": "635baab95887c1ceaa1038802f8584b62c565699d696a046cafbb2b14f6465c9",
+      "assets/android/ic-menu-manage-api35-xxhdpi.png": "1463cc538c405e5d1d33b9b298d0773a8f65e7b55f9246fe3b6b1f7a458d9065",
+      "assets/android/LICENSE-Apache-2.0.txt": "3ddf9be5c28fe27dad143a5dc76eea25222ad1dd68934a047064e56ed2fa40c5",
+      "assets/android/Roboto-Regular.woff2": "697837d196a61b1dfc60928a80e35164c3f2525871b811e363517752a952d593",
+      "assets/android/THIRD-PARTY-NOTICES.md": "ea3fcc77be290cec6f19db246d1d8371b519f0ffd8b072c7ea6fab28802c8654",
+      "bundle-export.js": "c7bc93a4235ae7e91cd839410f2dba78f09db4255f6cb8fb7ee58fde5ff22b23",
+      "bundle-validator.js": "47fb2ce8d551cb7a3d7e0bbc94e92b61d1c3e347be7c7808d2225bbd45ddc76c",
+      "charts.js": "398ba3e35d1d12a666f258886ed0eae35b89741b3ed1c79044388bbd43fc9a94",
+      "csv.js": "7838d35826d8be3e45c577a161c41ffff66e39f6f4b639abb3bc36428d918928",
+      "editor.js": "b65404f7e51e1fea12e73fc60f3130d1acef7570d174a1648102de801a79accf",
+      "history.js": "8ea68768a3ac4e95dd3ced8523de88411748578b0f684e18e6865f66eb168c4f",
+      "icon-192.png": "a0b7f8ae9398874a57aaa3108e6a6865cdf01f8bbc069d823590c381f221ed09",
+      "icon-512.png": "c65aa4dd9185ce339d9e3acaf736f62f5ad4c2a6bad936b49c373fa19a6f61e2",
+      "index.html": "56773fd8f8c7784acf6f64e56493a2ff3640b318c3ce29d7d66351a186213c62",
+      "manifest.webmanifest": "2e8a6334152042ab16e575fc8a75cfd8e6fbc41a4fc0cb6a667d80ac957ed619",
+      "projection.js": "d31bcf7ae89635c29d19d75d3caa8175ac263bf4a632a4f97852e5913964d4e7",
+      "quarter.js": "b23680a1d9b7ef5689becd70d3f03177142e9fc8a02953ab3e330ded3db3f2c2",
+      "README.md": "a034f5e52825a4d5c63e1ad1f933c5f492caab98877425365e7554c999ea9651",
+      "schedule.js": "0814be538e28691ba9948dbca94249a6a74c9afbba543d64decc13a86b8f95f8",
+      "style.css": "161695bcf1b2109dc9d38698c77eb5e58c0e0d362046a1dbc36b2f13163d22b2",
+      "sw.js": "2501946e17239ed53396876548a1d314553b5dd21244283aa2e9cb4f1584f58b"
+    },
+    "sourceAfter": {
+      "android-calendar.css": "414d6be70142cd949056dd6dede4de2dc00d9b2c9e27b97f7b101027e4049d83",
+      "android-calendar.js": "b92f498cfeda3bb386f9f5906675929f822422b99afff95d533f59a1d6764ae1",
+      "android-controls.js": "ce16f04cf6c904b81994592932ff5e0c81168b5febdd88db44f0841a30a5a91f",
+      "android-native.css": "2f8830be96097a0f3b2015282f0e23b90062643f8255bcae6b33467bc984cc3c",
+      "app.js": "635baab95887c1ceaa1038802f8584b62c565699d696a046cafbb2b14f6465c9",
+      "assets/android/ic-menu-manage-api35-xxhdpi.png": "1463cc538c405e5d1d33b9b298d0773a8f65e7b55f9246fe3b6b1f7a458d9065",
+      "assets/android/LICENSE-Apache-2.0.txt": "3ddf9be5c28fe27dad143a5dc76eea25222ad1dd68934a047064e56ed2fa40c5",
+      "assets/android/Roboto-Regular.woff2": "697837d196a61b1dfc60928a80e35164c3f2525871b811e363517752a952d593",
+      "assets/android/THIRD-PARTY-NOTICES.md": "ea3fcc77be290cec6f19db246d1d8371b519f0ffd8b072c7ea6fab28802c8654",
+      "bundle-export.js": "c7bc93a4235ae7e91cd839410f2dba78f09db4255f6cb8fb7ee58fde5ff22b23",
+      "bundle-validator.js": "47fb2ce8d551cb7a3d7e0bbc94e92b61d1c3e347be7c7808d2225bbd45ddc76c",
+      "charts.js": "398ba3e35d1d12a666f258886ed0eae35b89741b3ed1c79044388bbd43fc9a94",
+      "csv.js": "7838d35826d8be3e45c577a161c41ffff66e39f6f4b639abb3bc36428d918928",
+      "editor.js": "b65404f7e51e1fea12e73fc60f3130d1acef7570d174a1648102de801a79accf",
+      "history.js": "8ea68768a3ac4e95dd3ced8523de88411748578b0f684e18e6865f66eb168c4f",
+      "icon-192.png": "a0b7f8ae9398874a57aaa3108e6a6865cdf01f8bbc069d823590c381f221ed09",
+      "icon-512.png": "c65aa4dd9185ce339d9e3acaf736f62f5ad4c2a6bad936b49c373fa19a6f61e2",
+      "index.html": "56773fd8f8c7784acf6f64e56493a2ff3640b318c3ce29d7d66351a186213c62",
+      "manifest.webmanifest": "2e8a6334152042ab16e575fc8a75cfd8e6fbc41a4fc0cb6a667d80ac957ed619",
+      "projection.js": "d31bcf7ae89635c29d19d75d3caa8175ac263bf4a632a4f97852e5913964d4e7",
+      "quarter.js": "b23680a1d9b7ef5689becd70d3f03177142e9fc8a02953ab3e330ded3db3f2c2",
+      "README.md": "a034f5e52825a4d5c63e1ad1f933c5f492caab98877425365e7554c999ea9651",
+      "schedule.js": "0814be538e28691ba9948dbca94249a6a74c9afbba543d64decc13a86b8f95f8",
+      "style.css": "161695bcf1b2109dc9d38698c77eb5e58c0e0d362046a1dbc36b2f13163d22b2",
+      "sw.js": "2501946e17239ed53396876548a1d314553b5dd21244283aa2e9cb4f1584f58b"
+    },
+    "fixtureBefore": {
+      "books.json": "93731590354418d4a45b92e5bd940a9a3f927352cd32289f5c7cf711310fc4c9",
+      "manifest.json": "835966a4415a13635e91ab6bd5cf8d515a3c4ce3b979fb19b7949c5a80b947ef",
+      "plan.json": "2c8e9ed3838cf03cb1c6dd2dd473e0ec96d8385c2df365c35a5f9a987bc08b1e",
+      "sessions.json": "ca127144d7d6b2ac81bfe511df9827c4d2e304eb06028c6dc85a353896afe48f"
+    },
+    "fixtureAfter": {
+      "books.json": "93731590354418d4a45b92e5bd940a9a3f927352cd32289f5c7cf711310fc4c9",
+      "manifest.json": "835966a4415a13635e91ab6bd5cf8d515a3c4ce3b979fb19b7949c5a80b947ef",
+      "plan.json": "2c8e9ed3838cf03cb1c6dd2dd473e0ec96d8385c2df365c35a5f9a987bc08b1e",
+      "sessions.json": "ca127144d7d6b2ac81bfe511df9827c4d2e304eb06028c6dc85a353896afe48f"
+    },
+    "localStorageUnchanged": true
+  },
+  "images_sha256": {
+    "native-books-crop.png": "a28176ead1941e5e9094cacfa4b03b439d8eafbef49fb115cfa3f61929a49dc4",
+    "native-books-raw.png": "57f9f9b8d8e001061176606aeb81f51a2e1aa1a3552d08a6ff2c677ffb558f30",
+    "native-charts-crop.png": "2af73128d81dc612d0b7d2b4f4447fa2d49af8fa8dce0aff5f58b03503018978",
+    "native-charts-raw.png": "ea10040a1f30b820671b86253f05d02c65f366d27272cfd513d679d59bfa15c0",
+    "native-plan-crop.png": "7d7971f489de003c574a36eae95869e876b859bb1b21fd604fde400fb2d8f4fe",
+    "native-plan-raw.png": "6af63d382d21eb926355c7b19c8e503d76a8131c0c07d8304f5aa3f9a26245d4",
+    "native-session-crop.png": "4de425809ff82a089204a9eb937c8d03c4a0e8791c44a49f06edce6edc8070e2",
+    "native-session-raw.png": "bcccfd27f39d410be1c2ab3002af3c02bedef995e593e67162bef9a15d4d530a",
+    "native-settings-crop.png": "29ac469127baf0e12402194563694a0966519cad51a6d84b546345c816043647",
+    "native-settings-raw.png": "7bb1d9d21165c197aa70b23e1a0a5382b28c96a3d7b0e8f02f76f737861eb45d",
+    "web-books.png": "e449e38040adaf79e7fd95b191fa12e980d97635e9c21c7b8c444ec2818261ee",
+    "web-charts.png": "c2c706189fd6ab342ad62d484774f5fc2b161c7313d3d6a2ee000d7f5dbfb6f9",
+    "web-plan.png": "79ab46d50b1d87558e825c99065f987a6081f73a4fcb3fe6692358b1f2d464d5",
+    "web-session.png": "8b17402d174dfe411dda46d057e8246331d457ea3590ccbf2a6b1c78c548b23b",
+    "web-settings.png": "5c5cd3a8c70d72992091bec594e73ad381087b094cda0911a4d0d48be69645d7"
+  }
+}

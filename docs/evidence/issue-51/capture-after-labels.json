@@ -1,0 +1,104 @@
+{
+  "browser": "156.0.8078.4",
+  "instant": "2026-11-06T10:55:24Z",
+  "timezone": "Europe/Berlin",
+  "viewport": {
+    "width": 360,
+    "height": 732
+  },
+  "screen": {
+    "width": 360,
+    "height": 780
+  },
+  "dpr": 3,
+  "views": {
+    "Session": {
+      "scrollX": 0,
+      "scrollY": 0
+    },
+    "Plan": {
+      "scrollX": 0,
+      "scrollY": 0
+    },
+    "Books": {
+      "scrollX": 0,
+      "scrollY": 0
+    },
+    "Charts": {
+      "scrollX": 0,
+      "scrollY": 0
+    },
+    "Settings": {
+      "scrollX": 0,
+      "scrollY": 0
+    }
+  },
+  "sourceBefore": {
+    "android-calendar.css": "414d6be70142cd949056dd6dede4de2dc00d9b2c9e27b97f7b101027e4049d83",
+    "android-calendar.js": "b92f498cfeda3bb386f9f5906675929f822422b99afff95d533f59a1d6764ae1",
+    "android-controls.js": "ce16f04cf6c904b81994592932ff5e0c81168b5febdd88db44f0841a30a5a91f",
+    "android-native.css": "2f8830be96097a0f3b2015282f0e23b90062643f8255bcae6b33467bc984cc3c",
+    "app.js": "635baab95887c1ceaa1038802f8584b62c565699d696a046cafbb2b14f6465c9",
+    "assets/android/ic-menu-manage-api35-xxhdpi.png": "1463cc538c405e5d1d33b9b298d0773a8f65e7b55f9246fe3b6b1f7a458d9065",
+    "assets/android/LICENSE-Apache-2.0.txt": "3ddf9be5c28fe27dad143a5dc76eea25222ad1dd68934a047064e56ed2fa40c5",
+    "assets/android/Roboto-Regular.woff2": "697837d196a61b1dfc60928a80e35164c3f2525871b811e363517752a952d593",
+    "assets/android/THIRD-PARTY-NOTICES.md": "ea3fcc77be290cec6f19db246d1d8371b519f0ffd8b072c7ea6fab28802c8654",
+    "bundle-export.js": "c7bc93a4235ae7e91cd839410f2dba78f09db4255f6cb8fb7ee58fde5ff22b23",
+    "bundle-validator.js": "47fb2ce8d551cb7a3d7e0bbc94e92b61d1c3e347be7c7808d2225bbd45ddc76c",
+    "charts.js": "398ba3e35d1d12a666f258886ed0eae35b89741b3ed1c79044388bbd43fc9a94",
+    "csv.js": "7838d35826d8be3e45c577a161c41ffff66e39f6f4b639abb3bc36428d918928",
+    "editor.js": "b65404f7e51e1fea12e73fc60f3130d1acef7570d174a1648102de801a79accf",
+    "history.js": "8ea68768a3ac4e95dd3ced8523de88411748578b0f684e18e6865f66eb168c4f",
+    "icon-192.png": "a0b7f8ae9398874a57aaa3108e6a6865cdf01f8bbc069d823590c381f221ed09",
+    "icon-512.png": "c65aa4dd9185ce339d9e3acaf736f62f5ad4c2a6bad936b49c373fa19a6f61e2",
+    "index.html": "b677556ce5915915747358d6fcb5dd95d9fc6b6754111979c2a06aaa26b1bb4f",
+    "manifest.webmanifest": "2e8a6334152042ab16e575fc8a75cfd8e6fbc41a4fc0cb6a667d80ac957ed619",
+    "projection.js": "d31bcf7ae89635c29d19d75d3caa8175ac263bf4a632a4f97852e5913964d4e7",
+    "quarter.js": "b23680a1d9b7ef5689becd70d3f03177142e9fc8a02953ab3e330ded3db3f2c2",
+    "README.md": "a034f5e52825a4d5c63e1ad1f933c5f492caab98877425365e7554c999ea9651",
+    "schedule.js": "0814be538e28691ba9948dbca94249a6a74c9afbba543d64decc13a86b8f95f8",
+    "style.css": "161695bcf1b2109dc9d38698c77eb5e58c0e0d362046a1dbc36b2f13163d22b2",
+    "sw.js": "2501946e17239ed53396876548a1d314553b5dd21244283aa2e9cb4f1584f58b"
+  },
+  "sourceAfter": {
+    "android-calendar.css": "414d6be70142cd949056dd6dede4de2dc00d9b2c9e27b97f7b101027e4049d83",
+    "android-calendar.js": "b92f498cfeda3bb386f9f5906675929f822422b99afff95d533f59a1d6764ae1",
+    "android-controls.js": "ce16f04cf6c904b81994592932ff5e0c81168b5febdd88db44f0841a30a5a91f",
+    "android-native.css": "2f8830be96097a0f3b2015282f0e23b90062643f8255bcae6b33467bc984cc3c",
+    "app.js": "635baab95887c1ceaa1038802f8584b62c565699d696a046cafbb2b14f6465c9",
+    "assets/android/ic-menu-manage-api35-xxhdpi.png": "1463cc538c405e5d1d33b9b298d0773a8f65e7b55f9246fe3b6b1f7a458d9065",
+    "assets/android/LICENSE-Apache-2.0.txt": "3ddf9be5c28fe27dad143a5dc76eea25222ad1dd68934a047064e56ed2fa40c5",
+    "assets/android/Roboto-Regular.woff2": "697837d196a61b1dfc60928a80e35164c3f2525871b811e363517752a952d593",
+    "assets/android/THIRD-PARTY-NOTICES.md": "ea3fcc77be290cec6f19db246d1d8371b519f0ffd8b072c7ea6fab28802c8654",
+    "bundle-export.js": "c7bc93a4235ae7e91cd839410f2dba78f09db4255f6cb8fb7ee58fde5ff22b23",
+    "bundle-validator.js": "47fb2ce8d551cb7a3d7e0bbc94e92b61d1c3e347be7c7808d2225bbd45ddc76c",
+    "charts.js": "398ba3e35d1d12a666f258886ed0eae35b89741b3ed1c79044388bbd43fc9a94",
+    "csv.js": "7838d35826d8be3e45c577a161c41ffff66e39f6f4b639abb3bc36428d918928",
+    "editor.js": "b65404f7e51e1fea12e73fc60f3130d1acef7570d174a1648102de801a79accf",
+    "history.js": "8ea68768a3ac4e95dd3ced8523de88411748578b0f684e18e6865f66eb168c4f",
+    "icon-192.png": "a0b7f8ae9398874a57aaa3108e6a6865cdf01f8bbc069d823590c381f221ed09",
+    "icon-512.png": "c65aa4dd9185ce339d9e3acaf736f62f5ad4c2a6bad936b49c373fa19a6f61e2",
+    "index.html": "b677556ce5915915747358d6fcb5dd95d9fc6b6754111979c2a06aaa26b1bb4f",
+    "manifest.webmanifest": "2e8a6334152042ab16e575fc8a75cfd8e6fbc41a4fc0cb6a667d80ac957ed619",
+    "projection.js": "d31bcf7ae89635c29d19d75d3caa8175ac263bf4a632a4f97852e5913964d4e7",
+    "quarter.js": "b23680a1d9b7ef5689becd70d3f03177142e9fc8a02953ab3e330ded3db3f2c2",
+    "README.md": "a034f5e52825a4d5c63e1ad1f933c5f492caab98877425365e7554c999ea9651",
+    "schedule.js": "0814be538e28691ba9948dbca94249a6a74c9afbba543d64decc13a86b8f95f8",
+    "style.css": "161695bcf1b2109dc9d38698c77eb5e58c0e0d362046a1dbc36b2f13163d22b2",
+    "sw.js": "2501946e17239ed53396876548a1d314553b5dd21244283aa2e9cb4f1584f58b"
+  },
+  "fixtureBefore": {
+    "books.json": "93731590354418d4a45b92e5bd940a9a3f927352cd32289f5c7cf711310fc4c9",
+    "manifest.json": "835966a4415a13635e91ab6bd5cf8d515a3c4ce3b979fb19b7949c5a80b947ef",
+    "plan.json": "2c8e9ed3838cf03cb1c6dd2dd473e0ec96d8385c2df365c35a5f9a987bc08b1e",
+    "sessions.json": "ca127144d7d6b2ac81bfe511df9827c4d2e304eb06028c6dc85a353896afe48f"
+  },
+  "fixtureAfter": {
+    "books.json": "93731590354418d4a45b92e5bd940a9a3f927352cd32289f5c7cf711310fc4c9",
+    "manifest.json": "835966a4415a13635e91ab6bd5cf8d515a3c4ce3b979fb19b7949c5a80b947ef",
+    "plan.json": "2c8e9ed3838cf03cb1c6dd2dd473e0ec96d8385c2df365c35a5f9a987bc08b1e",
+    "sessions.json": "ca127144d7d6b2ac81bfe511df9827c4d2e304eb06028c6dc85a353896afe48f"
+  },
+  "localStorageUnchanged": true,
+  "plan_image_sha256": "898247c1d5049cddce044b5df482836711d2ba76774babe1bc885a4d54175186"
+}
