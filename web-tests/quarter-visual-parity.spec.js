@@ -166,6 +166,55 @@ for (const width of [360, 1440]) {
     }
     await content.evaluate((el) => { el.scrollTop = el.scrollHeight; });
     for (const button of await page.locator('.quarter-actions button').all()) await expect(button).toHaveCSS('font-weight', '400');
+    // Issue #50: native footer glyph ink relative to the footer top at DPR3,
+    // measured from the retained API35 capture (docs/evidence/issue-48/
+    // native-bottom.png, the source named in the issue's native capture).
+    // Native CANCEL is [412,79,153,30] and SAVE PLAN is [641,79,213,30]; the
+    // browser previously painted both at y0=81. Allow one physical px of raster
+    // tolerance, which still rejects the two-pixel baseline offset.
+    const footerInk = await page.evaluate(async (base64) => {
+      const image = new Image();
+      image.src = `data:image/png;base64,${base64}`;
+      await image.decode();
+      const canvas = document.createElement('canvas');
+      canvas.width = image.width; canvas.height = image.height;
+      const context = canvas.getContext('2d');
+      context.drawImage(image, 0, 0);
+      const { data } = context.getImageData(0, 0, image.width, image.height);
+      const pixels = [];
+      for (let index = 0; index < data.length; index += 4) {
+        const [r, g, b] = [data[index], data[index + 1], data[index + 2]];
+        if (r > 120 && r < 215 && g > 60 && g < 145 && b < 110 && r - b > 70 && r - g > 40) {
+          pixels.push([(index / 4) % image.width, Math.floor(index / 4 / image.width)]);
+        }
+      }
+      const columns = [...new Set(pixels.map(([x]) => x))].sort((a, b) => a - b);
+      const clusters = [];
+      for (const column of columns) {
+        const last = clusters[clusters.length - 1];
+        if (last && column - last.x1 <= 6) last.x1 = column; else clusters.push({ x0: column, x1: column });
+      }
+      const words = [];
+      for (const cluster of clusters) {
+        const last = words[words.length - 1];
+        if (last && cluster.x0 - last.x1 <= 40) last.x1 = cluster.x1; else words.push({ ...cluster });
+      }
+      return words.map(({ x0, x1 }) => {
+        const rows = pixels.filter(([x]) => x >= x0 && x <= x1).map(([, y]) => y);
+        return { x0, width: x1 - x0 + 1, y0: Math.min(...rows), height: Math.max(...rows) - Math.min(...rows) + 1 };
+      });
+    }, (await page.locator('.quarter-actions').screenshot()).toString('base64'));
+    const nativeFooterInk = [{ x0: 412, width: 153, y0: 79 }, { x0: 641, width: 213, y0: 79 }];
+    if (width === 360) {
+      expect(footerInk).toHaveLength(nativeFooterInk.length);
+      for (const [index, native] of nativeFooterInk.entries()) {
+        expect(Math.abs(footerInk[index].x0 - native.x0), `footer word ${index} x0`).toBeLessThanOrEqual(1);
+        expect(Math.abs(footerInk[index].width - native.width), `footer word ${index} width`).toBeLessThanOrEqual(1);
+        expect(Math.abs(footerInk[index].y0 - native.y0), `footer word ${index} baseline`).toBeLessThanOrEqual(1);
+        expect(footerInk[index].height, `footer word ${index} cap height`).toBeLessThanOrEqual(31);
+      }
+    }
+    await testInfo.attach('quarter-footer-ink', { body: JSON.stringify({ native: nativeFooterInk, web: footerInk }, null, 2), contentType: 'application/json' });
     await testInfo.attach('quarter-footer', { body: await page.locator('.quarter-actions').screenshot(), contentType: 'image/png' });
     await testInfo.attach('quarter-footer-text', { body: JSON.stringify(await page.locator('.quarter-actions button').evaluateAll((buttons) => buttons.map((button) => {
       const style = getComputedStyle(button), range = document.createRange();

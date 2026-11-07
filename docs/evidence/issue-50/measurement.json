@@ -1,0 +1,76 @@
+{
+  "native": {
+    "source": "docs/evidence/issue-48/native-bottom.png — retained API35 AVD issue48-parity capture, 1080x2196 @480dpi (360x732dp), adb exec-out screencap",
+    "dialog_rect_px": [75, 120, 1005, 2004],
+    "footer_origin_px": [75, 1818],
+    "footer_height_css": 62,
+    "button_box_css": {
+      "cancel": [149.3333, 658, 76.6667, 54],
+      "save_plan": [226, 658, 97, 54]
+    },
+    "ink_px": {
+      "cancel": { "origin": [487, 1897], "width": 153, "height": 30, "footer_relative_origin": [412, 79] },
+      "save_plan": { "origin": [716, 1897], "width": 213, "height": 30, "footer_relative_origin": [641, 79] }
+    },
+    "button_relative_ink_top": { "physical": 67, "css": 22.333 },
+    "coverage": {
+      "method": "coverage alpha from the green channel over the white surface, orange hue gate, rows with alpha > 0.5",
+      "rows_footer_relative": [79, 109],
+      "centroid_y_footer_relative": 94.183
+    }
+  },
+  "web": {
+    "viewport": "360x732 css, DPR 3, bundled AndroidRoboto woff2, Chromium from @playwright/test 1.64.1",
+    "footer_box_css": [25, 654, 310, 62],
+    "button_boxes_css": {
+      "cancel": [149.328125, 658, 76.84375, 54],
+      "save_plan": [226.171875, 658, 96.828125, 54]
+    },
+    "before": {
+      "padding_block_css": [8, 8],
+      "ink_px": {
+        "cancel": { "origin": [412, 81], "width": 154, "height": 30 },
+        "save_plan": { "origin": [641, 81], "width": 213, "height": 30 }
+      },
+      "coverage_rows_footer_relative": [81, 111],
+      "coverage_centroid_y": 96.163,
+      "baseline_delta_physical": 2.0
+    },
+    "after": {
+      "padding_block_css": ["22px / 3", "26px / 3"],
+      "padding_block_resolved_css": [7.328125, 8.671875],
+      "ink_px": {
+        "cancel": { "origin": [412, 78], "width": 154, "height": 30 },
+        "save_plan": { "origin": [641, 78], "width": 213, "height": 30 }
+      },
+      "coverage_rows_footer_relative": [78, 108],
+      "coverage_centroid_y": 93.163,
+      "baseline_delta_physical": -1.0
+    }
+  },
+  "widths": {
+    "native_cancel_px": 153,
+    "web_cancel_px": 154,
+    "native_save_plan_px": 213,
+    "web_save_plan_px": 213,
+    "note": "The one physical px CANCEL difference is pre-existing font rasterization; SAVE PLAN matches. This change does not alter horizontal metrics or button boxes."
+  },
+  "raster_grid": {
+    "finding": "Chromium paints this 14px footer text at whole-CSS-pixel vertical positions: padding 7.0-7.5, line-height 18-18.667 and text-rendering geometricPrecision all produce byte-identical glyph rows, while the layout line box moves by 1/64 px.",
+    "reachable_ink_tops_css_from_button": [22, 23],
+    "native_target_css_from_button": 22.333,
+    "chosen": 22,
+    "residual_css": 0.333
+  },
+  "checks": {
+    "quarter_visual_parity": "4/4 (exit 0, 14.5s)",
+    "regression_guard": "with the previous padding 8px/8px the 360px test fails on footer word 0 baseline (81 vs native 79, tolerance 1 physical px); 1440px unaffected",
+    "full_web_suite": "164/164, exit 0, 4.9 min, one worker"
+  },
+  "limits": [
+    "The native reference is the capture retained for #48; it shows the same synthetic quarter content, but this is not a fresh device run and not actual-device sign-off (#44/#51).",
+    "Chromium snaps text rasters to whole CSS pixels at this size, so the remaining third-CSS-pixel (one physical px) offset cannot be removed by intrinsic typography without also moving the button paint.",
+    "One Chromium build on Windows with the bundled Roboto woff2; Android rasterization is not reproduced, only its measured ink rows.",
+    "Vertical darkening from the #49 dialog shadow is outside the footer crop and unchanged by this issue."
+  ]
+}
