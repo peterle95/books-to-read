@@ -102,6 +102,21 @@ plan.addEventListener('input', () => {
   status.textContent = '';
 });
 
+// The browser reads a selected file from disk when the import asks for bytes,
+// not when the input changes. Antivirus, indexing or sync software can hold a
+// transient lock on that file and turn the read into a NotReadableError even
+// though the file is intact, so retry briefly before reporting the failure.
+const readSelectedFile = async (file) => {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await file.arrayBuffer();
+    } catch (error) {
+      if (error?.name !== 'NotReadableError' || attempt === 2) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 100 * (attempt + 1)));
+    }
+  }
+};
+
 document.querySelector('#bundle-form').addEventListener('submit', async (event) => {
   event.preventDefault();
   bundleMessage.textContent = '';
@@ -111,7 +126,7 @@ document.querySelector('#bundle-form').addEventListener('submit', async (event) 
     const names = bundleNames;
     if (files.length !== names.length || names.some((name) => files.filter((file) => file.name === name).length !== 1)) throw new Error('Select exactly the four required files.');
     const decoder = new TextDecoder('utf-8', { fatal: true });
-    const buffers = Object.fromEntries(await Promise.all(files.map(async (file) => [file.name, await file.arrayBuffer()])));
+    const buffers = Object.fromEntries(await Promise.all(files.map(async (file) => [file.name, await readSelectedFile(file)])));
     const nonIntegers = new WeakMap();
     const parsed = {};
     const parse = (name) => {
