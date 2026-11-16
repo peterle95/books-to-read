@@ -35,12 +35,28 @@
     element.textContent = value;
     return element;
   };
-  const chart = (book, label, sessions, state) => {
+  // A book without a saved baseline still has its own scheduled window: the same
+  // remaining-work plan the Books view shows. Never fall back to plan-wide dates.
+  const remainingBaselines = (bundle) => {
+    const baselines = {};
+    try {
+      for (const section of bundle.books.sections) {
+        const targets = window.ReadingSchedule.todayReading(bundle.plan, bundle.books, section.label);
+        for (const [id, target] of Object.entries(targets)) {
+          baselines[String(id).trim()] = { startDate: target.startDate, deadline: target.deadline, dailyTarget: target.dailyTarget };
+        }
+      }
+    } catch {
+      // Unreadable plan dates leave the saved baselines as the only schedule.
+    }
+    return baselines;
+  };
+  const chart = (book, label, sessions, state, baselines) => {
     const today = window.ReadingSchedule.today(), day = parseDate(today);
     const audio = label.trim() === 'Audiobooks';
     const progress = units(book, audio);
     const forecast = window.ReadingProjection.forecast({ book, sectionLabel: label, sessions, restDays: state.restDays, today });
-    const baseline = state.baselines[String(book.id).trim()];
+    const baseline = baselines[String(book.id).trim()];
     const scheduledStart = parseDate(baseline?.startDate || state.startDate);
     const deadline = parseDate(baseline?.deadline || state.endDate);
     const horizon = parseDate(forecast.horizon);
@@ -139,10 +155,11 @@
     const choices = [];
     if (bundle) {
       const state = scheduleState || loadSchedule(bundle);
+      const baselines = { ...remainingBaselines(bundle), ...state.baselines };
       for (const section of bundle.books.sections) for (const book of section.books) {
         const progress = units(book, section.label.trim() === 'Audiobooks');
         if (progress.total > 0 && (all.getAttribute('aria-pressed') === 'true' || (progress.completed > 0 && progress.remaining > 0))) {
-          choices.push({ book, label: section.label, sessions: bundle.sessions[String(book.id).trim()] || [], state });
+          choices.push({ book, label: section.label, sessions: bundle.sessions[String(book.id).trim()] || [], state, baselines });
         }
       }
     }
@@ -166,7 +183,7 @@
       projectionLabel.className = 'chart-projection-toggle';
       projectionLabel.append(toggle, ' Show projection and estimated finish range');
       const selected = choices.find(({ book }) => book.id === selectedBook);
-      chartContainer.replaceChildren(selector, projectionLabel, chart(selected.book, selected.label, selected.sessions, selected.state));
+      chartContainer.replaceChildren(selector, projectionLabel, chart(selected.book, selected.label, selected.sessions, selected.state, selected.baselines));
       const trigger = window.AndroidControls.select(selector);
       if (focusedControl === 'combobox') trigger.focus({ preventScroll: true });
       if (focusedControl === 'input') toggle.focus({ preventScroll: true });
@@ -202,7 +219,8 @@
     const start = nextMetrics && activated ? state.startDate : iso(Math.min(parseDate(state.endDate), Math.max(parseDate(state.startDate), parseDate(window.ReadingSchedule.today()))));
     const days = availableDayCount(start, state.endDate, state.restDays);
     const totals = sections.map((section) => ({ label: section.label, count: section.books.length, remaining: section.books.reduce((sum, book) => sum + book.remaining, 0) }));
-    const baselines = activated ? window.ReadingSchedule.calculateBaselines(sections, state.startDate, state.endDate, state.restDays, true) : state.baselines;
+    const baselines = activated ? window.ReadingSchedule.calculateBaselines(sections, state.startDate, state.endDate, state.restDays, true)
+      : { ...remainingBaselines(bundle), ...state.baselines };
     const pace = activated ? null : window.ReadingSchedule.requiredPace(sections, baselines, window.ReadingSchedule.today(), state.restDays);
     return { bundle, planned, state, sections, totals, days, baselines, pace };
   };

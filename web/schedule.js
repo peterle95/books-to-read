@@ -421,7 +421,7 @@
           - Math.min(book.remaining, Math.ceil(pace * (elapsed - 1) - 1e-9)));
         value = section.audio ? formatDuration(audioUnits) : String(Math.ceil(pace - 1e-9));
       }
-      result[book.id] = { value, startDate: baseline.startDate, deadline: baseline.deadline };
+      result[book.id] = { value, startDate: baseline.startDate, deadline: baseline.deadline, dailyTarget: baseline.dailyTarget };
     }
     return result;
   };
