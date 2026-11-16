@@ -45,9 +45,52 @@
         "date": "2026-11-06",
         "current_page": 276,
         "pages_read": 9
+      },
+      {
+        "id": "c2c96a90-e757-4c99-a13f-6d8cc7674eb4",
+        "date": "2026-11-08",
+        "current_page": 288,
+        "pages_read": 12
       }
     ],
-    "b426b299-cd4c-45b4-b518-155a79807854": [],
+    "b426b299-cd4c-45b4-b518-155a79807854": [
+      {
+        "id": "437a1f1e-b8d9-4862-8920-0f381ecc1f66",
+        "date": "2026-11-08",
+        "current_page": 23,
+        "pages_read": 23
+      },
+      {
+        "id": "1b81c607-f316-469c-a230-41dc7a1d4d24",
+        "date": "2026-11-09",
+        "current_page": 34,
+        "pages_read": 11
+      },
+      {
+        "id": "e2049a42-5f52-45f7-8768-c1c10fb9325f",
+        "date": "2026-11-10",
+        "current_page": 47,
+        "pages_read": 13
+      },
+      {
+        "id": "9066367b-dcba-43d3-a40b-9c22dd81b0d8",
+        "date": "2026-11-11",
+        "current_page": 58,
+        "pages_read": 11
+      },
+      {
+        "id": "b67c25f9-f72e-4142-9a47-f79c2915e9f4",
+        "date": "2026-11-13",
+        "current_page": 84,
+        "pages_read": 26
+      },
+      {
+        "id": "d497a29a-5cc2-4384-8870-f6d6f2a2d77e",
+        "date": "2026-11-15",
+        "current_page": 92,
+        "pages_read": 8
+      }
+    ],
     "97a43244-cd28-4ea5-87ad-6ef28c7fdc3b": [],
     "93c7a99f-a0c9-472e-b0e6-e8c6af19eb3e": [],
     "8cb74618-c1a6-485f-bf34-069eb2552d56": [
@@ -68,6 +111,30 @@
         "date": "2026-11-05",
         "current_page": 348,
         "pages_read": 30
+      },
+      {
+        "id": "6d9281eb-a2c4-4eb8-b854-3c41344586d4",
+        "date": "2026-11-08",
+        "current_page": 360,
+        "pages_read": 12
+      },
+      {
+        "id": "27a2dac1-f8dd-4bad-90ae-b2e3e3fe6b2c",
+        "date": "2026-11-12",
+        "current_page": 434,
+        "pages_read": 74
+      },
+      {
+        "id": "9d58b44a-8321-4e9a-bb52-6f462a685f2e",
+        "date": "2026-11-15",
+        "current_page": 436,
+        "pages_read": 2
+      },
+      {
+        "id": "70da37a5-fc8a-48b2-b145-181964d6b76b",
+        "date": "2026-11-15",
+        "current_page": 437,
+        "pages_read": 1
       }
     ],
     "6115376b-5502-4497-9a9a-657239e21cbb": []

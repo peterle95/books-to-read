@@ -79,6 +79,7 @@ test('create-plan and plan date text reject impossible dates without changing th
   await page.locator('#plan-start').fill('2028-02-30');
   await page.getByRole('button', { name: 'Save plan dates', exact: true }).click();
   expect(await snapshot(page)).toBe(before);
+  await page.getByRole('button', { name: 'Plan next quarter', exact: true }).click();
   page.once('dialog', (dialog) => dialog.dismiss());
   await page.locator('#new-plan').click();
   await page.locator('#create-plan-start').fill('2028-02-29');
@@ -87,7 +88,7 @@ test('create-plan and plan date text reject impossible dates without changing th
   expect(await snapshot(page)).toBe(before);
   await page.locator('#create-plan-finish').fill('2028-03-31');
   await page.getByRole('button', { name: 'Create plan', exact: true }).click();
-  await expect(page.locator('#new-plan-status')).toHaveText('Plan recalculated.');
+  await expect(page.locator('#new-plan-status')).toHaveText('New plan saved.');
 });
 
 test('ISO control preserves required, disabled, ID and form values; sync handles programmatic loads', async ({ page }) => {

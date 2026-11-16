@@ -16,9 +16,9 @@
           "target_completed_date": "2026-11-06",
           "start_page": 235,
           "end_page": 288,
-          "current_page": 276,
+          "current_page": 288,
           "pages": 54,
-          "pages_read": 42
+          "pages_read": 54
         },
         {
           "id": "b426b299-cd4c-45b4-b518-155a79807854",
@@ -27,25 +27,25 @@
           "baseline_schedule": null,
           "deadline_override": null,
           "start_date_override": null,
-          "target_completed_date": null,
+          "target_completed_date": "2026-11-15",
           "start_page": 1,
           "end_page": 111,
-          "current_page": null,
+          "current_page": 92,
           "pages": 111,
-          "pages_read": 0
+          "pages_read": 92
         },
         {
           "id": "97a43244-cd28-4ea5-87ad-6ef28c7fdc3b",
           "number": 3,
-          "title": "the fall",
+          "title": "wild swan",
           "baseline_schedule": null,
           "deadline_override": null,
           "start_date_override": null,
           "target_completed_date": null,
-          "start_page": 1,
-          "end_page": 90,
+          "start_page": 601,
+          "end_page": 669,
           "current_page": null,
-          "pages": 90,
+          "pages": 69,
           "pages_read": 0
         },
         {
@@ -76,12 +76,12 @@
           "baseline_schedule": null,
           "deadline_override": null,
           "start_date_override": null,
-          "target_completed_date": "2026-11-05",
+          "target_completed_date": "2026-11-12",
           "start_page": 283,
           "end_page": 759,
-          "current_page": 348,
+          "current_page": 437,
           "pages": 477,
-          "pages_read": 66
+          "pages_read": 155
         }
       ]
     },

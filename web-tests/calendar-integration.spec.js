@@ -74,12 +74,14 @@ test('six ISO fields remain editable; only rest and override fields attach reado
   await expect(page.locator('#plan-start')).toHaveValue('2030-01-01');
   await page.locator('#plan-start').click();
   await expect(calendar(page)).not.toBeVisible();
-  page.once('dialog', (dialog) => dialog.dismiss());
+  await page.getByRole('button', { name: 'Plan next quarter', exact: true }).click();
   await page.locator('#new-plan').click();
-  // Dismissing the replacement confirmation still exposes the existing plan dates.
-  await expect(page.locator('#create-plan-start')).toHaveValue('2030-01-01');
+  // New plan opens the period form without replacing anything yet.
+  const today = await page.evaluate(() => ReadingSchedule.today());
+  const finish = await page.evaluate((start) => ReadingQuarter.periodEnd(start), today);
+  await expect(page.locator('#create-plan-start')).toHaveValue(today);
   await page.locator('#create-plan-finish').click();
-  await expect(page.locator('#create-plan-finish')).toHaveValue('2030-12-31');
+  await expect(page.locator('#create-plan-finish')).toHaveValue(finish);
   await expect(calendar(page)).not.toBeVisible();
   for (const id of ['rest-start', 'rest-end']) {
     await page.locator(`#${id}`).click();
@@ -203,7 +205,7 @@ test('editable ISO fields and readonly overrides validate real and required date
     expect(await page.locator(`#${id}`).evaluate((field) => field.checkValidity())).toBe(false);
     expect(await rawBundle(page)).toBe(raw);
   }
-  page.once('dialog', (dialog) => dialog.dismiss());
+  await page.getByRole('button', { name: 'Plan next quarter', exact: true }).click();
   await page.locator('#new-plan').click();
   for (const value of ['', '2030-02-30']) {
     await page.locator('#create-plan-start').evaluate((field, next) => { field.value = next; }, value);

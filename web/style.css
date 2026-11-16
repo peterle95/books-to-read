@@ -75,8 +75,6 @@ button:disabled { opacity: .55; cursor: wait; }
 .header-actions { display: flex; align-items: center; gap: .5rem; }
 .app-header { gap: .5rem; }
 .app-header h1 { white-space: nowrap; }
-#json-status { min-width: 5.5rem; padding: .4rem .5rem; font-size: .75rem; color: #fff8f0; background: #a12e22; border-color: #85291f; }
-#json-status[data-loaded="true"] { color: #fff8f0; background: #3b6a50; border-color: #315742; }
 .app-header #open-settings { width: 3rem; padding: .25rem; font-size: 1.65rem; color: #fff8f0; background: #b56b3c; border-color: #87421e; }
 .app-header #open-settings svg { width: 1.75rem; height: 1.75rem; min-width: 0; margin: auto; }
 .settings-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: .75rem; }
@@ -194,7 +192,7 @@ dialog:not(#entries-dialog):not(#metrics-dialog) h2 { font-size: 1.25rem; font-w
 #screen-books label[for="book-format-trigger"] { margin: 0; padding: .25rem 0; line-height: 19px; }
 #screen-books button, #screen-plan button { font-size: .875rem; margin-top: 0; margin-bottom: .25rem; }
 /* ReadingPlanPlanView's actionButton (15sp) versus secondaryButton (14sp). */
-#screen-plan #open-quarter, #screen-plan #recalculate-plan, #screen-plan #rest-form button, #screen-plan #calculate-schedule { font-size: .9375rem; }
+#screen-plan #recalculate-plan, #screen-plan #rest-form button, #screen-plan #calculate-schedule { font-size: .9375rem; }
 #screen-books input, #screen-books select, #screen-plan input:not([type="checkbox"]) { height: 3.125rem; }
 #today-reading { overflow-x: auto; }
 #today-reading table { white-space: nowrap; font-size: .875rem; }
@@ -204,7 +202,16 @@ dialog:not(#entries-dialog):not(#metrics-dialog) h2 { font-size: 1.25rem; font-w
 #screen-books button { font-size: .9375rem; }
 #screen-plan .plan-heading { margin-bottom: .25rem; }
 #screen-plan .plan-heading h2 { margin: 0; }
-#screen-plan > section:first-child > p:not([role="status"]) { font-size: .875rem; line-height: 1.2; margin: .375rem 0 .25rem; color: #6f4e37; }
+.plan-action-buttons { display: flex; flex-wrap: wrap; gap: .5rem; margin: .25rem 0 .5rem; }
+.plan-action-buttons button { flex: 1 1 auto; margin: 0; }
+#planned-quarter-summary { font-size: .875rem; line-height: 1.2; margin: .25rem 0; color: #6f4e37; }
+#screen-plan > section:first-child > p:not([role="status"]), #screen-plan #plan-actions > p:not([role="status"]) { font-size: .875rem; line-height: 1.2; margin: .375rem 0 .25rem; color: #6f4e37; }
+#screen-plan #plan-actions { padding-top: .5rem; }
+#new-plan-books-fieldset { box-sizing: border-box; margin: .75rem 0 .25rem; padding: .5rem .75rem; border: 1px solid #d6baa1; border-radius: .875rem; background: #f7ede2; }
+#new-plan-books-fieldset legend { padding: 0 .25rem; font-size: .875rem; }
+#new-plan-books-fieldset > p { margin: .25rem 0; font-size: .8125rem; color: #6f4e37; }
+#new-plan-books-fieldset label { display: flex; align-items: center; gap: .5rem; margin: .25rem 0; }
+#new-plan-books-fieldset input { flex-shrink: 0; width: 1.25rem; height: 1.25rem; margin: 0; accent-color: #b56b3c; }
 #new-plan-status:empty { margin: 0; }
 #rest-heading { font-size: 1rem; margin: .5rem 0 .75rem; }
 /* ReadingPlanPlanView nests a verticalBox (16/12/16/20dp) with 4dp row padding. */

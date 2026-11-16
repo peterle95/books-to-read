@@ -2,6 +2,8 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 
+const port = Number(process.env.PLAYWRIGHT_PORT || 4173);
+
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.woff2': 'font/woff2' };
 let serviceWorkerDeployments = 0;
 http.createServer((req, res) => {
@@ -20,4 +22,4 @@ http.createServer((req, res) => {
     if (name === 'sw.js' && serviceWorkerDeployments) data = Buffer.concat([data, Buffer.from(`\n// test deployment ${serviceWorkerDeployments}\n`)]);
     res.writeHead(200, { 'Content-Type': types[path.extname(file)] || 'application/octet-stream' }).end(data);
   });
-}).listen(Number(process.env.PLAYWRIGHT_PORT || 4173), '127.0.0.1');
+}).listen(port, '127.0.0.1', () => console.log(`Open http://127.0.0.1:${port}/books-to-read/ (Ctrl+C to stop)`));

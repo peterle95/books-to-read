@@ -59,11 +59,7 @@ async function showSourceStatus() {
     // Missing, unreadable or invalid local data is not a loaded JSON source.
   }
   try { if (localStorage.getItem(bundleKey) !== stored) return; } catch { /* Storage may be unavailable. */ }
-  const button = document.querySelector('#json-status');
   const label = loaded ? 'JSON loaded' : 'JSON not loaded';
-  button.textContent = 'JSON';
-  button.dataset.loaded = String(loaded);
-  button.setAttribute('aria-label', `${label}. Open Settings`);
   document.querySelector('#source-status').textContent = `${label} in this browser. Transfers are manual.`;
 }
 
@@ -204,7 +200,7 @@ document.querySelector('#bundle-form').addEventListener('submit', async (event) 
   }
   if (imported) {
     renderSchedule();
-    if (!(await checkRollover())) renderQuarter();
+    renderQuarter();
   }
 });
 
@@ -590,9 +586,7 @@ calculateButton.addEventListener('click', async () => {
   }
 });
 
-const quarterEmpty = document.querySelector('#quarter-empty');
 const quarterDialog = document.querySelector('#quarter-dialog');
-const quarterOpen = document.querySelector('#open-quarter');
 const quarterDraftStatus = document.querySelector('#quarter-draft-status');
 const quarterBookForm = document.querySelector('#quarter-book-form');
 const quarterSection = document.querySelector('#quarter-section');
@@ -689,57 +683,141 @@ const newPlanStart = document.querySelector('#create-plan-start');
 const newPlanFinish = document.querySelector('#create-plan-finish');
 window.AndroidControls.date(newPlanStart, { mode: 'text' });
 window.AndroidControls.date(newPlanFinish, { mode: 'text' });
-const newPlanCustom = document.querySelector('#create-plan-custom');
 const newPlanStatus = document.querySelector('#new-plan-status');
-const newPlanSection = document.querySelector('#new-plan').closest('section');
-const quarterShortcut = document.createElement('button');
-quarterShortcut.type = 'button';
-quarterShortcut.textContent = 'Plan next quarter';
-quarterShortcut.addEventListener('click', () => quarterOpen.click());
-const activePlanHint = document.createElement('p');
-activePlanHint.textContent = 'Your current plan is active. Press New plan to choose start and finish dates.';
-const recalculatePlan = document.createElement('button');
-recalculatePlan.type = 'button';
-recalculatePlan.id = 'recalculate-plan';
-recalculatePlan.textContent = 'Recalculate current plan';
+const quarterShortcut = document.querySelector('#quarter-shortcut');
+quarterShortcut.addEventListener('click', () => openQuarterDialog());
+const activePlanHint = document.querySelector('#active-plan-hint');
+const recalculatePlan = document.querySelector('#recalculate-plan');
 recalculatePlan.addEventListener('click', () => calculateButton.click());
-newPlanSection.insertBefore(quarterShortcut, newPlanForm);
-newPlanSection.insertBefore(activePlanHint, newPlanForm);
-newPlanSection.insertBefore(recalculatePlan, newPlanForm);
+const plannedQuarterSummary = document.querySelector('#planned-quarter-summary');
+const deletePlannedQuarter = document.querySelector('#delete-planned-quarter');
 const showPlanActions = () => {
   const current = readBundleFiles();
   const active = !!current;
   const planned = current && window.ReadingQuarter.plannedFromBundle(current.books);
-  quarterShortcut.textContent = planned ? `Edit next quarter — ${planned.startDate}` : 'Plan next quarter';
-  quarterShortcut.hidden = !active;
   activePlanHint.hidden = !active || !newPlanForm.hidden;
   recalculatePlan.hidden = activePlanHint.hidden;
+  plannedQuarterSummary.hidden = !planned;
+  deletePlannedQuarter.hidden = !planned;
+  if (!planned) {
+    plannedQuarterSummary.textContent = '';
+    return;
+  }
+  const count = planned.sections.reduce((total, section) => total + section.books.length, 0);
+  const end = window.ReadingQuarter.periodEnd(planned.startDate);
+  plannedQuarterSummary.textContent = `Queued: ${planned.startDate} to ${end} — ${count} ${count === 1 ? 'book' : 'books'}. The current plan is unchanged.`;
 };
-const showPlanDates = () => {
+// Storing a quarter never touches the current plan, so removing it only clears the queued copy.
+deletePlannedQuarter.addEventListener('click', async () => {
+  try {
+    const current = readBundleFiles();
+    if (!current) throw new Error('Import a bundle before changing its next-quarter plan.');
+    await writeBundleFiles({ 'books.json': { ...current.books, planned_quarter: null } });
+    quarterStatus.textContent = 'Queued quarter deleted.';
+    renderQuarter();
+  } catch (error) {
+    quarterStatus.textContent = error.message;
+  }
+});
+const newPlanBooksFieldset = document.querySelector('#new-plan-books-fieldset');
+const newPlanBookChoices = document.querySelector('#new-plan-book-choices');
+const renderNewPlanBooks = () => {
   const current = readBundleFiles();
-  const start = current?.plan.start_date || window.ReadingQuarter.nextQuarterStart(window.ReadingSchedule.today());
+  const rows = [];
+  for (const section of current?.books.sections || []) {
+    const audio = String(section.label).trim() === 'Audiobooks';
+    for (const book of section.books || []) {
+      const remaining = window.ReadingSchedule.units(book, audio).remaining;
+      const label = document.createElement('label');
+      label.className = 'new-plan-book';
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.value = String(book.id).trim();
+      input.checked = remaining > 0;
+      label.append(input, ` ${book.title} — ${remaining} ${audio ? 'seconds' : 'pages'} left`);
+      rows.push(label);
+    }
+  }
+  newPlanBookChoices.replaceChildren(...rows);
+  newPlanBooksFieldset.hidden = !rows.length;
+};
+
+const showPlanDates = (refresh = false) => {
+  const current = refresh ? readBundleFiles() : null;
+  const start = current?.plan.start_date || window.ReadingSchedule.today();
+  let finish = current?.plan.end_date || start;
+  if (!current) {
+    try { finish = window.ReadingQuarter.periodEnd(start); } catch { /* an out-of-range today keeps the start date */ }
+  }
   window.AndroidControls.sync(newPlanStart, start);
-  window.AndroidControls.sync(newPlanFinish, current?.plan.end_date || window.ReadingQuarter.periodEnd(start));
-  newPlanCustom.checked = current?.plan.end_label === 'Target finish date';
+  window.AndroidControls.sync(newPlanFinish, finish);
+  renderNewPlanBooks();
   newPlanForm.hidden = false;
   showPlanActions();
 };
 
-document.querySelector('#new-plan').addEventListener('click', async () => {
-  showPlanDates();
+// Opening the form changes nothing; the current plan is replaced only on submit.
+document.querySelector('#new-plan').addEventListener('click', () => {
   newPlanStatus.textContent = '';
-  if (!window.confirm('Replace the current plan?')) return;
+  showPlanDates();
+});
+
+// Replace the current plan: unticked books leave with their history, ticked ones are rescheduled.
+newPlanForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
   try {
+    const start = newPlanStart.value, finish = newPlanFinish.value;
+    if (!start || !finish || finish < start) throw new Error('Finish date must be on or after the start date.');
+    window.AndroidControls.parseDate(start);
+    window.AndroidControls.parseDate(finish);
+    const end = finish;
+    let endLabel = 'Target finish date';
+    try { if (finish === window.ReadingQuarter.periodEnd(start)) endLabel = 'Quarter end'; } catch { /* an out-of-range start keeps the target label */ }
     const current = readBundleFiles();
-    const start = window.ReadingQuarter.nextQuarterStart(window.ReadingSchedule.today());
+    const keep = new Set([...newPlanBookChoices.querySelectorAll('input[type="checkbox"]')]
+      .filter((input) => input.checked).map((input) => input.value));
+    const sections = window.ReadingQuarter.blankSections().map((blank) => {
+      const source = (current?.books.sections || []).find((section) => String(section.label).trim() === blank.label);
+      const books = [];
+      const numbers = new Map();
+      for (const [index, book] of (source?.books || []).entries()) {
+        const id = String(book.id).trim();
+        if (!keep.has(id)) continue;
+        books.push({ ...book, number: books.length + 1, deadline_override: null, start_date_override: null, target_completed_date: null });
+        numbers.set(index + 1, books.length);
+        numbers.set(id, books.length);
+      }
+      const groups = (source?.simultaneous_groups || []).map((group) => {
+        const kept = [];
+        for (const entry of group) {
+          const number = numbers.get(entry) ?? numbers.get(Number(entry));
+          if (number != null && !kept.includes(number)) kept.push(number);
+        }
+        return kept;
+      }).filter((group) => group.length > 1).map((group) => group.map((number) => books[number - 1].id));
+      return { label: blank.label, baseline_needs_recalculation: false, books, simultaneous_groups: groups };
+    });
+    const baselines = window.ReadingSchedule.calculateBaselines(
+      window.ReadingSchedule.sectionsFromBooksFile({ sections }), start, end, [], true);
+    const scheduled = sections.map((section) => ({ ...section, books: section.books.map((book) => {
+      const baseline = baselines[String(book.id).trim()];
+      return { ...book, baseline_schedule: baseline
+        ? { start_date: baseline.startDate, deadline: baseline.deadline, daily_target: baseline.dailyTarget }
+        : null };
+    }) }));
+    const sessions = { ...(current?.sessions || { schema_version: 2 }), sessions: {} };
+    for (const section of scheduled) for (const book of section.books) {
+      const id = String(book.id).trim();
+      sessions.sessions[id] = current?.sessions.sessions?.[id] || [];
+    }
     await writeBundleFiles({
       'plan.json': {
-        ...(current?.plan || {}), schema_version: 2, start_date: start,
-        end_date: window.ReadingQuarter.periodEnd(start), end_label: 'Quarter end', rest_days: [],
-        stats_options: { book_counts: true, page_share: true, average_pages: true, reading_period: true, pace_driver: true },
+        ...(current?.plan || {}), schema_version: 2, start_date: start, end_date: end,
+        end_label: endLabel, rest_days: [],
+        stats_options: current?.plan?.stats_options || { book_counts: true, page_share: true, average_pages: true, reading_period: true, pace_driver: true },
       },
-      'books.json': { ...(current?.books || {}), schema_version: 2, sections: window.ReadingQuarter.blankSections() },
-      'sessions.json': { schema_version: 2, sessions: {} },
+      'books.json': { ...(current?.books || {}), schema_version: 2, sections: scheduled },
+      'sessions.json': sessions,
     });
     localStorage.removeItem(scheduleKey);
     scheduleState = null;
@@ -747,42 +825,10 @@ document.querySelector('#new-plan').addEventListener('click', async () => {
     if (typeof resetSession === 'function') resetSession();
     renderSchedule();
     renderQuarter();
-    showPlanDates();
+    newPlanForm.hidden = true;
+    renderNewPlanBooks();
+    showPlanActions();
     newPlanStatus.textContent = 'New plan saved.';
-  } catch (error) {
-    newPlanStatus.textContent = `Unable to replace the plan: ${error.message}`;
-  }
-});
-
-newPlanForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  try {
-    const current = readBundleFiles();
-    if (!current) throw new Error('Replace the plan first.');
-    const start = newPlanStart.value, finish = newPlanFinish.value;
-    if (!start || !finish || finish < start) throw new Error('Finish date must be on or after the start date.');
-    window.AndroidControls.parseDate(start);
-    window.AndroidControls.parseDate(finish);
-    const end = newPlanCustom.checked ? finish : window.ReadingQuarter.periodEnd(start);
-    const bundle = readBundleData();
-    const state = scheduleState || loadSchedule(bundle);
-    const sections = sectionsForState(bundle, state);
-    const baselines = window.ReadingSchedule.calculateBaselines(sections, start, end, state.restDays);
-    window.ReadingSchedule.applyPersistedOverrides(sections, baselines, end, window.ReadingSchedule.today(), state.restDays);
-    const books = { ...current.books, sections: current.books.sections.map((section) => ({
-      ...section, baseline_needs_recalculation: false,
-      books: section.books.map((book) => ({ ...book, baseline_schedule: baselines[book.id]
-        ? { start_date: baselines[book.id].startDate, deadline: baselines[book.id].deadline, daily_target: baselines[book.id].dailyTarget }
-        : null })),
-    })) };
-    await writeBundleFiles({ 'plan.json': { ...current.plan, start_date: start, end_date: end,
-      end_label: newPlanCustom.checked ? 'Target finish date' : 'Quarter end' }, 'books.json': books });
-    localStorage.removeItem(scheduleKey);
-    scheduleState = null;
-    renderSchedule();
-    renderQuarter();
-    showPlanDates();
-    newPlanStatus.textContent = 'Plan recalculated.';
   } catch (error) {
     newPlanStatus.textContent = error.message;
   }
@@ -806,100 +852,28 @@ const plannedDraft = () => {
   };
 };
 
-// Unfinished books carry forward, then the new quarter's schedule replaces the old baseline.
-const rollover = async () => {
-  const bundle = readBundleFiles();
-  if (!bundle) return null;
-  const result = window.ReadingQuarter.activate(bundle.books, window.ReadingSchedule.today());
-  if (!result) return null;
-  const restDays = (scheduleState ? scheduleState.restDays : window.ReadingSchedule.stateFromBundle(bundle.plan, bundle.books).restDays)
-    .filter((range) => range.end >= result.start);
-  const sections = window.ReadingSchedule.sectionsFromBooksFile({ sections: result.sections });
-  const baselines = window.ReadingSchedule.calculateBaselines(sections, result.start, result.end, restDays, true);
-  const books = {
-    ...bundle.books,
-    sections: result.sections.map((section) => ({
-      ...section,
-      baseline_needs_recalculation: false,
-      books: section.books.map((book) => ({
-        ...book,
-        baseline_schedule: baselines[book.id]
-          ? { start_date: baselines[book.id].startDate, deadline: baselines[book.id].deadline, daily_target: baselines[book.id].dailyTarget }
-          : null,
-      })),
-    })),
-    planned_quarter: null,
-  };
-  const ids = books.sections.flatMap((section) => section.books.map((book) => book.id));
-  await writeBundleFiles({
-    'plan.json': {
-      ...bundle.plan,
-      start_date: result.start,
-      end_date: result.end,
-      rest_days: restDays.map((range) => ({ start_date: range.start, end_date: range.end })),
-    },
-    'books.json': books,
-    'sessions.json': {
-      ...bundle.sessions,
-      sessions: Object.fromEntries(ids.map((id) => [id, (bundle.sessions.sessions || {})[id] || []])),
-    },
-  });
-  scheduleState = {
-    version: 1,
-    startDate: result.start,
-    endDate: result.end,
-    restDays,
-    groups: Object.fromEntries(sections.map((section) => [section.label, section.groups.map((group) => [...group])])),
-    overrides: Object.fromEntries(sections.flatMap((section) => section.books.map((book) => [book.id, null]))),
-    baselines,
-    needsRecalculation: false,
-  };
-  localStorage.removeItem(scheduleKey);
-  renderSchedule(`Next quarter activated: ${result.start} to ${result.end}.`);
-  return result;
-};
-
-const checkRollover = async () => {
-  try {
-    const result = await rollover();
-    if (result) renderQuarter(`Next quarter activated: ${result.start} to ${result.end}.`);
-    return result;
-  } catch (error) {
-    quarterStatus.textContent = error.message;
-    return null;
-  }
-};
-
+// The queued quarter is only stored: the current plan keeps running until a later change uses it.
 const renderQuarter = (message = '') => {
   showPlanActions();
   const current = readBundleFiles();
-  quarterEmpty.hidden = !!current;
-  quarterOpen.hidden = !current;
   if (!current) {
-    quarterStatus.textContent = message;
+    quarterStatus.textContent = message || 'Import a bundle to plan the next quarter.';
     return;
   }
-  let planned;
   try {
-    planned = plannedDraft();
-    quarterOpen.disabled = false;
+    plannedDraft();
     quarterShortcut.disabled = false;
   } catch (error) {
     if (!(error instanceof RangeError)) throw error;
-    quarterOpen.disabled = true;
     quarterShortcut.disabled = true;
     quarterStatus.textContent = error.message;
     return;
   }
-  const count = planned.sections.reduce((total, section) => total + section.books.length, 0);
-  quarterStatus.textContent = message || (count
-    ? `Next-quarter plan saved: ${count} ${count === 1 ? 'book' : 'books'}. Unfinished current books carry forward first, and the plan activates on ${planned.startDate}.`
-    : 'No books are planned for the next quarter yet.');
+  quarterStatus.textContent = message;
 };
 
-quarterOpen.addEventListener('click', async () => {
+const openQuarterDialog = async () => {
   try {
-    await rollover();
     const openingToken = localStorage.getItem(bundleKey);
     const draft = plannedDraft();
     if (!draft) throw new Error('Import a bundle to plan the next quarter.');
@@ -907,13 +881,14 @@ quarterOpen.addEventListener('click', async () => {
     quarterDraft = draft;
     cancelPlannedEdit();
     quarterDraftStatus.textContent = '';
-    document.querySelector('#quarter-dialog-heading').textContent = `Next quarter — ${draft.startDate}`;
+    const end = window.ReadingQuarter.periodEnd(draft.startDate);
+    document.querySelector('#quarter-dialog-heading').textContent = `Next quarter — ${draft.startDate} to ${end}`;
     renderQuarterDraft();
     quarterDialog.showModal();
   } catch (error) {
     quarterStatus.textContent = error.message;
   }
-});
+};
 
 const renderQuarterDraft = () => {
   const chosen = quarterSection.value;
@@ -1025,7 +1000,6 @@ document.querySelector('#remove-planned-book').addEventListener('click', () => {
 });
 document.querySelector('#save-quarter').addEventListener('click', async () => {
   try {
-    await rollover();
     if (localStorage.getItem(bundleKey) !== quarterOpeningToken) {
       throw new Error('The plan changed while you were editing. Reopen the editor before saving.');
     }
@@ -1042,13 +1016,8 @@ document.querySelector('#save-quarter').addEventListener('click', async () => {
 
 renderSchedule();
 renderQuarter();
-checkRollover();
-setInterval(checkRollover, 30000);
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) {
-    checkRollover();
-    showExports();
-  }
+  if (!document.hidden) showExports();
 });
 setInterval(showExports, 60 * 60 * 1000);
 

@@ -35,26 +35,30 @@ test('New plan cancellation preserves the bundle; replacement resets current dat
     await page.getByRole('button', { name: 'Import bundle' }).click();
     await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
     await page.getByRole('button', { name: 'Plan', exact: true }).click();
+    await page.getByRole('button', { name: 'Plan next quarter', exact: true }).click();
     await page.getByLabel('Reading plan').fill('Keep my draft');
     await page.getByRole('button', { name: 'Save plan', exact: true }).click();
     const original = await page.evaluate(() => localStorage.getItem('reading-plan-bundle-v1'));
-    page.once('dialog', (dialog) => dialog.dismiss());
     await page.getByRole('button', { name: 'New plan', exact: true }).click();
     await expect(page.getByLabel('Start date', { exact: true })).toBeVisible();
     expect(await page.evaluate(() => localStorage.getItem('reading-plan-bundle-v1'))).toBe(original);
 
-    page.once('dialog', (dialog) => dialog.accept());
-    await page.getByRole('button', { name: 'New plan', exact: true }).click();
+    // Unfinished books are offered for the new plan; unticking one drops it and its history.
+    const keep = page.getByRole('group', { name: 'Books to keep' }).getByRole('checkbox');
+    await expect(keep).toHaveCount(1);
+    await expect(keep).toBeChecked();
+    await keep.uncheck();
+    await page.getByRole('button', { name: 'Create plan', exact: true }).click();
     await expect(page.locator('#new-plan-status')).toHaveText('New plan saved.');
     const expected = await page.evaluate(() => {
-      const start = ReadingQuarter.nextQuarterStart(ReadingSchedule.today());
+      const start = ReadingSchedule.today();
       return { start, end: ReadingQuarter.periodEnd(start) };
     });
     await expect(page.getByLabel('Start date', { exact: true })).toHaveValue(expected.start);
     await expect(page.getByLabel('Finish date', { exact: true })).toHaveValue(expected.end);
     const data = await page.evaluate(() => readBundleFiles());
     expect(data.plan).toMatchObject({ start_date: expected.start, end_date: expected.end, end_label: 'Quarter end', rest_days: [] });
-    expect(Object.values(data.plan.stats_options)).toEqual([true, true, true, true, true]);
+    expect(Object.values(data.plan.stats_options)).toEqual([false, false, false, false, false]);
     expect(data.books.sections.map((section) => [section.label, section.books, section.simultaneous_groups])).toEqual([
       ['Physical books', [], []], ['Digital books', [], []], ['Audiobooks', [], []],
     ]);
@@ -72,7 +76,7 @@ test('New plan cancellation preserves the bundle; replacement resets current dat
     await page.getByLabel('Finish date', { exact: true }).fill('2028-02-14');
     await page.getByLabel('Custom finish date').check();
     await page.getByRole('button', { name: 'Create plan' }).click();
-    await expect(page.locator('#new-plan-status')).toHaveText('Plan recalculated.');
+    await expect(page.locator('#new-plan-status')).toHaveText('New plan saved.');
     expect((await page.evaluate(() => readBundleFiles())).plan).toMatchObject({ start_date: '2028-01-01', end_date: '2028-02-14', end_label: 'Target finish date' });
     await page.getByLabel('Custom finish date').uncheck();
     await page.getByRole('button', { name: 'Create plan' }).click();
@@ -100,8 +104,34 @@ test('New plan cancellation preserves the bundle; replacement resets current dat
 test('New plan creates a complete bundle without prior import', async ({ page }) => {
   await page.goto('./');
   await page.getByRole('button', { name: 'Plan', exact: true }).click();
-  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: 'Plan next quarter', exact: true }).click();
   await page.getByRole('button', { name: 'New plan', exact: true }).click();
+  await page.getByRole('button', { name: 'Create plan', exact: true }).click();
   await expect(page.locator('#new-plan-status')).toHaveText('New plan saved.');
   expect((await page.evaluate(() => readBundleFiles())).manifest.files).toHaveProperty(['sessions.json']);
+});
+
+test('New plan keeps ticked books, their history, and reschedules them inside the new dates', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-11-16T12:00:00'));
+  await page.goto('./');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByLabel('Bundle files').setInputFiles(fixture());
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: 'Import bundle' }).click();
+  await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+  await page.getByRole('button', { name: 'Plan', exact: true }).click();
+  await page.getByRole('button', { name: 'Plan next quarter', exact: true }).click();
+  await page.getByRole('button', { name: 'New plan', exact: true }).click();
+  await page.getByLabel('Start date', { exact: true }).fill('2026-11-20');
+  await page.getByLabel('Custom finish date').check();
+  await page.getByLabel('Finish date', { exact: true }).fill('2026-12-31');
+  await page.getByRole('button', { name: 'Create plan', exact: true }).click();
+  await expect(page.locator('#new-plan-status')).toHaveText('New plan saved.');
+  const data = await page.evaluate(() => readBundleFiles());
+  const books = data.books.sections.flatMap((section) => section.books);
+  expect(books).toHaveLength(1);
+  expect(books[0]).toMatchObject({ id: 'old-book', current_page: 3, deadline_override: null, start_date_override: null });
+  expect(books[0].baseline_schedule).toMatchObject({ start_date: '2026-11-20', deadline: '2026-12-31' });
+  expect(data.sessions.sessions['old-book']).toHaveLength(1);
+  expect(data.plan).toMatchObject({ start_date: '2026-11-20', end_date: '2026-12-31', end_label: 'Target finish date' });
 });

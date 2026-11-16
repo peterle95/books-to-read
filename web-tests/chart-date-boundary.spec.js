@@ -44,7 +44,7 @@ for (const [today, paceLabels, quietLabels] of [
     if (today.startsWith('9999')) {
       await expect(page.getByTestId('quarter-status')).toHaveText('Quarter date must be within years 0001–9999.');
       await expect(page.locator('#open-quarter')).toBeDisabled();
-      await expect(page.locator('section[aria-labelledby="new-plan-heading"] button').filter({ hasText: 'Plan next quarter' })).toBeDisabled();
+      await expect(page.locator('#plan-actions-toggle')).toBeDisabled();
     } else {
       await expect(page.locator('#open-quarter')).toBeEnabled();
     }
@@ -79,7 +79,7 @@ for (const [today, paceLabels, quietLabels] of [
       await page.getByRole('button', { name: 'Import bundle' }).click();
       await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
       await expect(page.locator('#open-quarter')).toBeEnabled();
-      await expect(page.locator('section[aria-labelledby="new-plan-heading"] button').filter({ hasText: 'Plan next quarter' })).toBeEnabled();
+      await expect(page.locator('#plan-actions-toggle')).toBeEnabled();
       expect(errors).toEqual([]);
     }
   });

@@ -17,7 +17,6 @@
   <header class="app-header">
     <h1>Reading Plan</h1>
     <div class="header-actions">
-      <button id="json-status" type="button" data-loaded="false" aria-label="JSON not loaded. Open Settings" aria-controls="screen-settings" aria-expanded="false">JSON</button>
       <button id="open-settings" type="button" aria-label="Settings" aria-controls="screen-settings" aria-expanded="false"><span class="native-settings-icon" aria-hidden="true"></span></button>
     </div>
   </header>
@@ -103,14 +102,29 @@
     </dialog>
     <div id="screen-plan" class="screen" aria-label="Plan" hidden>
     <section aria-labelledby="new-plan-heading">
-      <div class="plan-heading"><h2 id="new-plan-heading">Plan</h2><button id="new-plan" type="button">New plan</button></div>
-      <form id="create-plan-form" hidden>
-        <label for="create-plan-start">Start date</label><input id="create-plan-start" type="text" data-date-mode="text" required>
-        <label><input id="create-plan-custom" type="checkbox"> Custom finish date</label>
-        <label for="create-plan-finish">Finish date</label><input id="create-plan-finish" type="text" data-date-mode="text" required>
-        <button type="submit">Create plan</button>
-      </form>
-      <p id="new-plan-status" role="status" aria-live="polite"></p>
+      <div class="plan-heading"><h2 id="new-plan-heading">Plan</h2></div>
+      <div id="plan-actions">
+        <div class="plan-action-buttons">
+          <button id="new-plan" type="button">New plan</button>
+          <button id="quarter-shortcut" type="button" aria-haspopup="dialog" aria-controls="quarter-dialog">Plan next quarter</button>
+        </div>
+        <p id="active-plan-hint">New plan replaces the current plan. Plan next quarter stores the next quarter without replacing it.</p>
+        <button id="recalculate-plan" type="button">Recalculate current plan</button>
+        <p id="planned-quarter-summary" hidden></p>
+        <button id="delete-planned-quarter" type="button" hidden>Delete queued quarter</button>
+        <form id="create-plan-form" hidden>
+          <label for="create-plan-start">Start date</label><input id="create-plan-start" type="text" data-date-mode="text" required>
+          <label for="create-plan-finish">Finish date</label><input id="create-plan-finish" type="text" data-date-mode="text" required>
+          <fieldset id="new-plan-books-fieldset" hidden>
+            <legend>Books to keep</legend>
+            <p>Unticked books and their reading history are removed.</p>
+            <div id="new-plan-book-choices"></div>
+          </fieldset>
+          <button type="submit">Create plan</button>
+        </form>
+        <p id="new-plan-status" role="status" aria-live="polite"></p>
+        <p id="quarter-status" data-testid="quarter-status" role="status" aria-live="polite"></p>
+      </div>
     </section>
     <section aria-labelledby="rest-heading">
       <h3 id="rest-heading">Rest-day ranges</h3>
@@ -163,13 +177,6 @@
         </thead>
         <tbody id="projection-rows"></tbody>
       </table>
-    </section>
-    <section aria-labelledby="quarter-heading">
-      <h2 id="quarter-heading">Next quarter</h2>
-      <p>Plan the books for the next quarter here. When the quarter starts, unfinished current books carry forward first with their history and stable IDs, completed books leave the plan, and the baseline schedule is recalculated. The plan activates automatically when you open or use the app on or after its start date.</p>
-      <p id="quarter-empty">Import a bundle to plan the next quarter.</p>
-      <button id="open-quarter" type="button" aria-haspopup="dialog" aria-controls="quarter-dialog">Edit next-quarter plan</button>
-      <p id="quarter-status" data-testid="quarter-status" role="status" aria-live="polite"></p>
     </section>
     <dialog id="quarter-dialog" aria-labelledby="quarter-dialog-heading">
       <h2 id="quarter-dialog-heading">Next quarter</h2>

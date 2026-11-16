@@ -48,8 +48,9 @@ test('active plan actions expose next quarter and explicit recalculation; rest a
   await page.getByRole('button', { name: 'Import bundle' }).click();
   await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
   await page.getByRole('button', { name: 'Plan', exact: true }).click();
+  await page.getByRole('button', { name: 'Plan next quarter', exact: true }).click();
   await expect(page.getByText('Your current plan is active. Press New plan to choose start and finish dates.')).toBeVisible();
-  await page.getByRole('button', { name: 'Plan next quarter' }).click();
+  await page.locator('#plan-actions').getByRole('button', { name: 'Plan next quarter', exact: true }).click();
   await expect(page.locator('#quarter-dialog-heading')).toHaveText('Next quarter — 2030-04-01');
   await expect(page.locator('#quarter-dialog-heading')).toBeInViewport();
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
@@ -65,6 +66,7 @@ test('active plan actions expose next quarter and explicit recalculation; rest a
   await page.reload();
   await page.getByRole('button', { name: 'Plan', exact: true }).click();
   expect(await page.evaluate(() => readBundleFiles().books.sections[0].books[0].baseline_schedule)).toEqual(baseline);
+  await page.getByRole('button', { name: 'Plan next quarter', exact: true }).click();
   await page.getByRole('button', { name: 'Recalculate current plan' }).click();
   await expect(page.getByTestId('schedule-status')).toHaveText('Baseline schedule calculated on this device.');
   expect(await page.evaluate(() => readBundleFiles().books.sections[0].books[0].baseline_schedule)).not.toEqual(baseline);

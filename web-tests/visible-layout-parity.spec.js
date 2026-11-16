@@ -136,7 +136,7 @@ test('populated 360x732 first fold preserves native page gutters and useful land
   await page.screenshot({ path: testInfo.outputPath('populated-books-360x732.png') });
 
   await tab(page, 'Plan');
-  await expect(page.getByRole('button', { name: 'Edit next quarter — 2027-01-01', exact: true })).toBeVisible();
+  await expect(page.locator('#plan-actions-toggle')).toBeVisible();
   const restEnd = await page.locator('#rest-end').boundingBox();
   const addRange = await page.locator('#rest-form button').boundingBox();
   expect(restEnd.y + restEnd.height).toBeLessThan(nav.y);
@@ -220,15 +220,16 @@ test('populated chooser, group and history use native alert actions without losi
 test('quarter shortcut refreshes after save and rollover, including an empty saved plan', async ({ page }) => {
   await populate(page);
   await tab(page, 'Plan');
-  await page.getByRole('button', { name: 'Edit next quarter — 2027-01-01', exact: true }).click();
+  await page.getByRole('button', { name: 'Plan next quarter', exact: true }).click();
+  await page.getByRole('button', { name: 'Plan next quarter — 2027-01-01', exact: true }).click();
   await page.locator('#quarter-list button').click();
   await page.getByRole('button', { name: 'Remove selected', exact: true }).click();
   await page.locator('#save-quarter').click();
-  await expect(page.getByRole('button', { name: 'Edit next quarter — 2027-01-01', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Plan next quarter — 2027-01-01', exact: true })).toBeVisible();
   await page.clock.setFixedTime(new Date('2027-01-01T12:00:00Z'));
   await page.evaluate(() => checkRollover());
-  await expect(page.getByRole('button', { name: 'Plan next quarter', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: /Edit next quarter —/ })).toHaveCount(0);
+  await expect(page.locator('#plan-actions-toggle')).toBeVisible();
+  await expect(page.getByRole('button', { name: /Plan next quarter —/ })).toHaveCount(0);
 });
 
 test('360x732 populated sheets preserve native hierarchy, density and pinned chrome', async ({ page }, testInfo) => {

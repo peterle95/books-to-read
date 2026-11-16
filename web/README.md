@@ -44,7 +44,7 @@ After importing a bundle, **Reading projections** estimates when each book will 
 
 Each imported bundle can carry a next-quarter plan. Set the quarter start to 1 January, 1 April, 1 July or 1 October, then add planned books with a section, title and page or time range. **Edit** changes a planned book while retaining its stable ID; **Remove** deletes it. These actions write the plan into `books.json` and re-checksum the bundle; the other files keep their imported bytes.
 
-Rollover runs once, automatically, when the app opens or is used on or after the planned start date. Unfinished books carry forward first with their stable IDs and reading history, completed books leave the plan, and the baseline schedule is recalculated for the quarter containing today. Rest-day ranges that end before the new start date are dropped. The activated plan, its recalculated baseline and the trimmed rest days are written to the bundle, so an export after rollover transfers the activated plan to the desktop app.
+Planning the next quarter only stores it. Saving writes `planned_quarter` with the quarter's books and their start and end positions, and nothing else changes: the current plan keeps its dates, books, progress and baseline, and no activation happens automatically. The Plan screen shows the queued quarter with a button that deletes it. Activating a queued quarter is left to a later change, which will carry unfinished books forward with their stable IDs and history before recalculating the baseline.
 
 ## Deploy and install
 
