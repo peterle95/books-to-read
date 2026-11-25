@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
+const { confirmBundleImport } = require('./bundle-helper');
 
 const names = ['plan.json', 'books.json', 'sessions.json'];
 const fixture = () => {
@@ -83,9 +84,7 @@ test('New plan cancellation preserves the bundle; confirmed replacement clears o
     const download = await downloadPromise;
     execFileSync('python', ['-c', 'import sys,zipfile; zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])', await download.path(), directory]);
     await page.getByLabel('Bundle files').setInputFiles([...names, 'manifest.json'].map((name) => path.join(directory, name)));
-    page.once('dialog', (dialog) => dialog.accept());
-    await page.getByRole('button', { name: 'Import bundle' }).click();
-    await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
+    await confirmBundleImport(page);
     await page.reload();
     const restored = await page.evaluate(() => readBundleFiles());
     expect(restored.plan).toEqual(data.plan);

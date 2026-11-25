@@ -114,8 +114,12 @@ const readSelectedFile = async (file) => {
   }
 };
 
-document.querySelector('#bundle-form').addEventListener('submit', async (event) => {
+const bundleForm = document.querySelector('#bundle-form');
+const bundleImport = bundleForm.querySelector('button[type="submit"]');
+bundleForm.addEventListener('submit', async (event) => {
   event.preventDefault();
+  if (bundleImport.disabled) return;
+  bundleImport.disabled = true;
   bundleMessage.textContent = '';
   let imported = false;
   try {
@@ -196,6 +200,8 @@ document.querySelector('#bundle-form').addEventListener('submit', async (event) 
     imported = true;
   } catch (error) {
     bundleMessage.textContent = `Bundle could not be imported: ${error.message}`;
+  } finally {
+    bundleImport.disabled = false;
   }
   if (imported) {
     renderSchedule();

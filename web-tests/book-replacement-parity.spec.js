@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
+const { confirmBundleImport } = require('./bundle-helper');
 
 for (const audio of [false, true]) {
   for (const change of [
@@ -36,8 +37,7 @@ write_json_bundle(sys.argv[1], sections, today, today + timedelta(days=10), 'Qua
         await page.getByRole('button', { name: 'Settings', exact: true }).click();
         const importBundle = async () => {
           await page.getByLabel('Bundle files').setInputFiles(['plan.json', 'books.json', 'sessions.json', 'manifest.json'].map((name) => path.join(directory, name)));
-          page.once('dialog', (dialog) => dialog.accept());
-          await page.getByRole('button', { name: 'Import bundle' }).click();
+          await confirmBundleImport(page);
           await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
         };
         await importBundle();

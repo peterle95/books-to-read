@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const { confirmBundleImport } = require('./bundle-helper');
 
 test.use({ viewport: { width: 360, height: 732 }, deviceScaleFactor: 3, timezoneId: 'Europe/Berlin', locale: 'en-US' });
 
@@ -76,8 +77,7 @@ test.describe('mobile display-sized history', () => {
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await page.getByLabel('Bundle files').setInputFiles(['plan.json', 'books.json', 'sessions.json', 'manifest.json']
       .map((name) => `fixtures/issue-45-populated/${name}`));
-    page.once('dialog', (dialog) => dialog.accept());
-    await page.getByRole('button', { name: 'Import bundle', exact: true }).click();
+    await confirmBundleImport(page);
     await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
     const before = await stored(page);
     await tab(page, 'Session');

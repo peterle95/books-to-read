@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { chooseDate } = require('./calendar-helper');
+const { confirmBundleImport } = require('./bundle-helper');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -27,9 +28,7 @@ write_json_bundle(sys.argv[1], [BookSection(label, [], []) for label in ['Physic
     await page.goto('./');
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await page.getByLabel('Bundle files').setInputFiles(names.map((name) => path.join(directory, name)));
-    page.once('dialog', (dialog) => dialog.accept());
-    await page.getByRole('button', { name: 'Import bundle' }).click();
-    await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
+    await confirmBundleImport(page);
     await run(directory);
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
@@ -138,9 +137,7 @@ m['files']['sessions.json'] = hashlib.sha256((p/'sessions.json').read_bytes()).h
 (p/'manifest.json').write_text(json.dumps(m))
 `, directory]);
     await page.getByLabel('Bundle files').setInputFiles(names.map((name) => path.join(directory, name)));
-    page.once('dialog', (dialog) => dialog.accept());
-    await page.getByRole('button', { name: 'Import bundle' }).click();
-    await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
+    await confirmBundleImport(page);
     await page.reload();
     await tab(page, 'Session');
     await page.getByRole('button', { name: 'Entries', exact: true }).click();
@@ -167,9 +164,7 @@ m['files']['sessions.json'] = hashlib.sha256((p/'sessions.json').read_bytes()).h
 (p/'manifest.json').write_text(json.dumps(m))
 `, directory]);
     await page.getByLabel('Bundle files').setInputFiles(files);
-    page.once('dialog', (dialog) => dialog.accept());
-    await page.getByRole('button', { name: 'Import bundle' }).click();
-    await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
+    await confirmBundleImport(page);
     const download = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Export bundle ZIP' }).click();
     const zip = path.join(directory, 'ordered.zip'); await (await download).saveAs(zip);
@@ -195,9 +190,7 @@ b=json.loads((p/'books.json').read_text()); del b['sections'][0]['books'][0]['cu
 (p/'books.json').write_text(json.dumps(b)); m=json.loads((p/'manifest.json').read_text()); m['files']['books.json']=hashlib.sha256((p/'books.json').read_bytes()).hexdigest(); (p/'manifest.json').write_text(json.dumps(m))
 `, directory]);
     await page.getByLabel('Bundle files').setInputFiles(names.map((name) => path.join(directory, name)));
-    page.once('dialog', (dialog) => dialog.accept());
-    await page.getByRole('button', { name: 'Import bundle' }).click();
-    await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
+    await confirmBundleImport(page);
     await tab(page, 'Books');
     for (const title of ['Implicit paper', 'Implicit audio']) {
       await editBook(page, title);
@@ -310,9 +303,7 @@ assert [start, end, label, name, options, rest, planned] == details
 write_json_bundle(destination, sections, start, end, label, options, rest, planned_quarter=planned, metadata=read_json_bundle_metadata(destination))`);
     // Complete the second desktop → web leg using the desktop-written generation.
     await page.getByLabel('Bundle files').setInputFiles(names.map((name) => path.join(directory, 'exported', name)));
-    page.once('dialog', (dialog) => dialog.accept());
-    await page.getByRole('button', { name: 'Import bundle' }).click();
-    await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
+    await confirmBundleImport(page);
     await tab(page, 'Books');
     await editBook(page, `${first.title} — web transfer check`);
     await expect(page.locator('#book-title')).toHaveValue(`${first.title} — web transfer check`);

@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const { confirmBundleImport } = require('./bundle-helper');
 const { createHash } = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -20,8 +21,7 @@ const fixture = () => {
 };
 const importFiles = async (page, files) => {
   await page.getByLabel('Bundle files').setInputFiles(files);
-  page.once('dialog', (dialog) => dialog.accept());
-  await page.getByRole('button', { name: 'Import bundle', exact: true }).click();
+  await confirmBundleImport(page);
   await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
 };
 
