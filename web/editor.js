@@ -37,10 +37,10 @@ const resetBook = () => {
 document.querySelector('#cancel-book').addEventListener('click', resetBook);
 
 // Progress and title-only edits do not change what was originally scheduled.
-const scheduleInputs = (books) => JSON.stringify(books.sections.map((section) => [
+const scheduleInputs = (section) => JSON.stringify([
   section.simultaneous_groups,
   section.books.map((book) => [book.id, book.start_page, book.end_page, book.start_time_seconds, book.end_time_seconds]),
-]));
+]);
 
 const editorAction = async (change, status = editorStatus) => {
   status.textContent = '';
@@ -69,9 +69,12 @@ const editorAction = async (change, status = editorStatus) => {
         }),
       }));
     }
-    const previousScheduleInputs = scheduleInputs(current.books);
+    const previousScheduleInputs = new Map(current.books.sections.map((section) => [section.label, scheduleInputs(section)]));
     message = change(current);
-    if (scheduleInputs(current.books) !== previousScheduleInputs) current.books = withPlanBaselines(current.books, current.plan);
+    const changedLabels = current.books.sections
+      .filter((section) => scheduleInputs(section) !== previousScheduleInputs.get(section.label))
+      .map((section) => section.label);
+    if (changedLabels.length) current.books = withPlanBaselines(current.books, current.plan, changedLabels);
     await writeBundleFiles({ ...(legacy ? { 'plan.json': current.plan } : {}), 'books.json': current.books,
       ...(JSON.stringify(current.sessions) !== originalSessions ? { 'sessions.json': current.sessions } : {}) });
     if (legacy) localStorage.removeItem(scheduleKey);

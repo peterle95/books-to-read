@@ -50,7 +50,7 @@ test('Add, Update and Remove change only a copy; Cancel and Escape preserve raw 
   const original = await raw(page);
   for (const cancel of ['button', 'escape']) {
     await open(page);
-    await expect(page.locator('#quarter-dialog-heading')).toHaveText('Next quarter — 2030-04-01');
+    await expect(page.locator('#quarter-dialog-heading')).toHaveText('Next quarter — 2030-04-01 to 2030-06-30');
     await expect(page.locator('#quarter-dialog input[type="date"]')).toHaveCount(0);
     await fields(page);
     await page.getByRole('button', { name: 'Add', exact: true }).click();
@@ -209,15 +209,17 @@ test('a changed opening token refuses Save without overwriting another writer', 
   expect(await raw(page)).toBe(changed);
 });
 
-test('Save awaits due rollover then rejects the obsolete draft', async ({ page }) => {
+test('saving across the quarter boundary does not activate the queued plan', async ({ page }) => {
   await open(page);
+  const before = await read(page);
   await page.evaluate(() => { window.ReadingSchedule.today = () => '2030-04-01'; });
   await page.locator('#save-quarter').click();
-  await expect(page.locator('#quarter-draft-status')).toHaveText('The plan changed while you were editing. Reopen the editor before saving.');
+  await expect(page.locator('#quarter-dialog')).not.toBeVisible();
   const saved = await read(page);
-  expect(saved.books.planned_quarter).toBeNull();
-  expect(saved.plan.start_date).toBe('2030-04-01');
-  expect(saved.books.sections[0].books.map((book) => book.id)).toEqual(['First', 'Second', 'Third']);
+  expect(saved.books.planned_quarter.start_date).toBe('2030-04-01');
+  expect(saved.encoded['plan.json']).toBe(before.encoded['plan.json']);
+  expect(saved.books.sections).toEqual(before.books.sections);
+  expect(saved.encoded['sessions.json']).toBe(before.encoded['sessions.json']);
 });
 
 test('invalid fields and a conflict during hashing fail closed', async ({ page }) => {

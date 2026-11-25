@@ -95,7 +95,7 @@ for (const width of [360, 1440]) {
     await page.getByRole('button', { name: 'Plan', exact: true }).click();
     await page.getByRole('button', { name: 'Edit next-quarter plan', exact: true }).click();
     await page.evaluate(() => document.fonts.ready);
-    await expect(page.locator('#quarter-dialog-heading')).toHaveText('Next quarter — 2027-01-01');
+    await expect(page.locator('#quarter-dialog-heading')).toHaveText('Next quarter — 2027-01-01 to 2027-03-31');
     // Issue #49: paint the API35 decor approximation outside the verified box.
     // Chromium serializes .039 through its 8-bit alpha as .04; the backdrop stays
     // the dimmed page so the measured shadow band is comparable across captures.
@@ -222,9 +222,11 @@ for (const width of [360, 1440]) {
       return { text: button.textContent, weight: style.fontWeight, font: style.font, textBounds: range.getBoundingClientRect().toJSON() };
     })), null, 2), contentType: 'application/json' });
     if (width === 360) {
+      // The date range wraps onto a second line. The footer and scrolled body
+      // content stay put; only the heading and the visible scroll area change.
       const native = {
-        '#quarter-dialog': [25, 16, 310, 700], '#quarter-dialog-heading': [25, 16, 310, 45],
-        '#quarter-content': [25, 61, 310, 593], '#quarter-content-box': [25, 17, 310, 637],
+        '#quarter-dialog': [25, 16, 310, 700], '#quarter-dialog-heading': [25, 16, 310, 72],
+        '#quarter-content': [25, 88, 310, 566], '#quarter-content-box': [25, 17, 310, 637],
         '#quarter-list': [41, 72.3333, 278, 87.3333], '#quarter-list button': [57, 84.3333, 246, 55.3333],
         '#quarter-book-form label': [41, 159.6667, 278, 27],
         '#quarter-section-trigger': [41, 186.6667, 278, 48], '#quarter-book-form > button[type="submit"]': [41, 482, 88, 48],
@@ -236,7 +238,7 @@ for (const width of [360, 1440]) {
           expect(Math.abs(geometry[selector][key] - bounds[i]), `${selector} ${key}`).toBeLessThanOrEqual(1);
         }
       }
-      expect(geometry['#quarter-content'].scrollTop).toBe(44);
+      expect(geometry['#quarter-content'].scrollTop).toBe(71);
     } else {
       const wide = geometry['#quarter-dialog'];
       expect(wide.width).toBe(640);

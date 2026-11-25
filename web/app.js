@@ -271,10 +271,11 @@ const loadSchedule = (bundle) => {
   return defaults;
 };
 
-const saveSchedule = async () => {
+const saveSchedule = async (recalculated = false) => {
   try {
     const current = readBundleFiles();
     const sections = sectionsForState(readBundleData(), scheduleState);
+    const updateSectionSettings = recalculated || localStorage.getItem(scheduleKey);
     await writeBundleFiles({
       'plan.json': {
         ...current.plan,
@@ -286,8 +287,10 @@ const saveSchedule = async () => {
         ...current.books,
         sections: current.books.sections.map((section, index) => ({
           ...section,
-          baseline_needs_recalculation: scheduleState.needsRecalculation,
-          simultaneous_groups: sections[index].groups.map((group) => group.map((number) => section.books[number - 1].id)),
+          ...(updateSectionSettings ? {
+            baseline_needs_recalculation: scheduleState.needsRecalculation,
+            simultaneous_groups: sections[index].groups.map((group) => group.map((number) => section.books[number - 1].id)),
+          } : {}),
           books: section.books.map((book) => {
             const baseline = scheduleState.baselines[String(book.id).trim()];
             return { ...book, deadline_override: scheduleState.overrides[String(book.id).trim()] || null,
@@ -312,16 +315,28 @@ const calculatePlanBaselines = (sections, start, end, restDays) => {
   return baselines;
 };
 
-const withPlanBaselines = (books, plan) => {
-  const baselines = calculatePlanBaselines(window.ReadingSchedule.sectionsFromBooksFile(books), plan.start_date, plan.end_date, plan.rest_days);
-  return { ...books, sections: books.sections.map((section) => ({
+const withPlanBaselines = (books, plan, changedLabels = books.sections.map((section) => section.label)) => {
+  const sections = books.sections.filter((section) => changedLabels.includes(section.label));
+  const baselines = calculatePlanBaselines(window.ReadingSchedule.sectionsFromBooksFile({ ...books, sections }), plan.start_date, plan.end_date, plan.rest_days);
+  return { ...books, sections: books.sections.map((section) => changedLabels.includes(section.label) ? ({
     ...section, baseline_needs_recalculation: false,
     books: section.books.map((book) => {
       const baseline = baselines[String(book.id).trim()];
       return { ...book, baseline_schedule: baseline
         ? { start_date: baseline.startDate, deadline: baseline.deadline, daily_target: baseline.dailyTarget } : null };
     }),
-  })) };
+  }) : section) };
+};
+
+// Older bundles may not have a saved baseline. Fill only the entries an override needs.
+const overrideBaselines = (section, book, includeGroup = false) => {
+  const { baselines, startDate, endDate, restDays } = scheduleState;
+  const group = includeGroup && section.groups.find((members) => members.includes(book.number));
+  const affected = group ? section.books.filter((member) => group.includes(member.number)) : [book];
+  const missing = affected.filter((member) => !baselines[member.id]);
+  if (!missing.length) return { ...baselines };
+  const calculated = window.ReadingSchedule.calculateBaselines([section], startDate, endDate, restDays);
+  return { ...baselines, ...Object.fromEntries(missing.map(({ id }) => [id, calculated[id]])) };
 };
 
 const setOverride = async (bookId, value, status = scheduleStatus) => {
@@ -340,7 +355,7 @@ const setOverride = async (bookId, value, status = scheduleStatus) => {
       }
     }
     if (!book) throw new Error('That book is not part of the imported bundle.');
-    const baselines = { ...scheduleState.baselines };
+    const baselines = overrideBaselines(section, book, true);
     window.ReadingSchedule.applyDeadlineOverride(section, baselines, book, value || null, scheduleState.endDate, window.ReadingSchedule.today(), scheduleState.restDays);
     scheduleState.baselines = baselines;
     scheduleState.overrides = { ...scheduleState.overrides, [bookId]: value || null };
@@ -360,9 +375,12 @@ const setStartOverride = async (bookId, value, status = scheduleStatus) => {
     const bundle = readBundleData();
     if (!bundle) throw new Error('Import a bundle before scheduling its books.');
     scheduleState = loadSchedule(bundle);
-    const book = sectionsForState(bundle, scheduleState).flatMap((section) => section.books).find((item) => item.id === bookId);
-    if (!book) throw new Error('That book is not part of the imported bundle.');
-    window.ReadingSchedule.applyStartOverride(book, scheduleState.baselines, value, scheduleState.startDate, window.ReadingSchedule.today(), scheduleState.restDays);
+    const section = sectionsForState(bundle, scheduleState).find((item) => item.books.some((book) => book.id === bookId));
+    if (!section) throw new Error('That book is not part of the imported bundle.');
+    const book = section.books.find((item) => item.id === bookId);
+    const baselines = overrideBaselines(section, book);
+    window.ReadingSchedule.applyStartOverride(book, baselines, value, scheduleState.startDate, window.ReadingSchedule.today(), scheduleState.restDays);
+    scheduleState.baselines = baselines;
     scheduleState.startOverrides = { ...scheduleState.startOverrides, [book.id]: value || null };
     await saveSchedule();
     const message = value ? `Start date override saved for ${book.title}.` : `Start date override cleared for ${book.title}.`;
@@ -523,7 +541,7 @@ const scheduleChanged = async () => {
     const sections = sectionsForState(readBundleData(), scheduleState);
     scheduleState.baselines = calculatePlanBaselines(sections, scheduleState.startDate, scheduleState.endDate, scheduleState.restDays);
     scheduleState.needsRecalculation = false;
-    await saveSchedule();
+    await saveSchedule(true);
   } catch (error) {
     scheduleState = loadSchedule(readBundleData());
     throw error;

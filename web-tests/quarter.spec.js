@@ -198,6 +198,7 @@ print(json.dumps({
     'due': due.isoformat(),
     'dueEnd': period_end_from_start(due).isoformat(),
     'future': future.isoformat(),
+    'futureEnd': period_end_from_start(future).isoformat(),
     'beyond': next_quarter_start(future).isoformat(),
     'notBoundary': (future + timedelta(days=1)).isoformat(),
     'session': ongoing.reading_sessions[0].id,
@@ -207,54 +208,29 @@ print(json.dumps({
 const readFiles = (directory) => ['plan.json', 'books.json', 'sessions.json', 'manifest.json']
   .map((name) => ({ name, mimeType: 'application/json', buffer: fs.readFileSync(path.join(directory, name)) }));
 
-test('a due next-quarter plan activates on import, persists and exports to desktop', async ({ page }) => {
+test('a due next-quarter plan stays queued across import, reload and desktop export', async ({ page }) => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'reading-quarter-due-'));
   const output = path.join(directory, 'export');
   fs.mkdirSync(output);
   try {
     const dates = JSON.parse(generate(directory, 'due'));
     const files = readFiles(directory);
-    const row = (title) => page.locator('#schedule-rows tr').filter({ has: page.getByRole('cell', { name: title, exact: true }) });
-
     await page.goto('./');
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await page.getByLabel('Bundle files').setInputFiles(files);
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: 'Import bundle' }).click();
+    await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
     await page.getByRole('button', { name: 'Plan', exact: true }).click();
-    await expect(page.getByTestId('quarter-status')).toHaveText(`Next quarter activated: ${dates.due} to ${dates.dueEnd}.`);
-
-    // Unfinished books carry forward before the planned books; finished work is gone.
+    await expect(page.locator('#planned-quarter-summary')).toContainText(`Queued: ${dates.due} to ${dates.dueEnd}`);
     await page.getByRole('button', { name: 'Edit next-quarter plan' }).click();
-    await expect(page.locator('#quarter-dialog-heading')).toHaveText(`Next quarter — ${dates.future}`);
+    await expect(page.locator('#quarter-dialog-heading')).toHaveText(`Next quarter — ${dates.due} to ${dates.dueEnd}`);
     await page.getByRole('button', { name: 'Cancel', exact: true }).click();
-    await page.getByRole('button', { name: 'Reading schedule', exact: true }).click();
-    await expect(page.getByLabel('Plan start')).toHaveValue(dates.due);
-    await expect(row('Ongoing')).toHaveCount(1);
-    await expect(row('Paired')).toHaveCount(1);
-    await expect(row('Audio')).toHaveCount(1);
-    await expect(row('Next story')).toHaveCount(1);
-    await expect(row('Next audio')).toHaveCount(1);
-    await expect(row('Finished')).toHaveCount(0);
-    await expect(page.getByTestId('schedule-status')).toHaveText(`Next quarter activated: ${dates.due} to ${dates.dueEnd}.`);
-
-    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('reading-plan-bundle-v1')));
-    const decode = (name) => Buffer.from(stored[name], 'base64').toString('utf-8');
-    expect(JSON.parse(decode('plan.json')).start_date).toBe(dates.due);
-    expect(JSON.parse(decode('plan.json')).rest_days).toEqual([]);
-    expect(JSON.parse(decode('books.json')).planned_quarter).toBeNull();
-    expect(JSON.parse(decode('books.json')).sections[0].books.map((book) => book.id)).toEqual(['ongoing', 'paired', 'next-story']);
-    const sessions = JSON.parse(decode('sessions.json')).sessions;
-    expect(sessions.ongoing.map((session) => session.id)).toEqual([dates.session]);
-    expect(sessions.finished).toBeUndefined();
-
     await page.reload();
     await page.getByRole('button', { name: 'Plan', exact: true }).click();
-    await expect(page.getByTestId('quarter-status')).toHaveText('No books are planned for the next quarter yet.');
-    await page.getByRole('button', { name: 'Reading schedule', exact: true }).click();
-    await expect(row('Next story')).toHaveCount(1);
-    await expect(row('Finished')).toHaveCount(0);
-    await expect(page.getByLabel('Plan start')).toHaveValue(dates.due);
+    await expect(page.locator('#planned-quarter-summary')).toContainText(`Queued: ${dates.due} to ${dates.dueEnd}`);
+    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('reading-plan-bundle-v1')));
+    for (const { name, buffer } of files) expect(Buffer.from(stored[name], 'base64')).toEqual(buffer);
 
     const download = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
@@ -262,22 +238,16 @@ test('a due next-quarter plan activates on import, persists and exports to deskt
     const zip = path.join(directory, 'bundle.zip');
     await (await download).saveAs(zip);
     execFileSync('python', ['-c', `
+from pathlib import Path
 from reading_plan import load_json_bundle
 import sys, zipfile
 with zipfile.ZipFile(sys.argv[2]) as archive:
     archive.extractall(sys.argv[1])
-sections, start, end, label, name, options, rest, planned = load_json_bundle(sys.argv[1], include_planned=True)
-assert start.isoformat() == sys.argv[3] and end.isoformat() == sys.argv[4]
-assert [book.id for section in sections for book in section.books] == [
-    'ongoing', 'paired', 'next-story', 'audio', 'next-audio']
-assert sections[0].books[0].reading_sessions[0].id == sys.argv[5]
-assert sections[0].books[0].reading_sessions[0].pages_read == 40
-assert sections[0].books[0].current_page == 40
-assert all(book.baseline_schedule is not None for section in sections for book in section.books)
-assert sections[0].simultaneous_groups == [], sections[0].simultaneous_groups
-assert planned is None, planned
-assert rest == [], rest
-`, output, zip, dates.due, dates.dueEnd, dates.session]);
+expected = load_json_bundle(Path(sys.argv[1]).parent, include_planned=True)
+exported = load_json_bundle(sys.argv[1], include_planned=True)
+assert exported == expected
+assert exported[-1].start_date.isoformat() == sys.argv[3]
+`, output, zip, dates.due]);
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }
@@ -294,12 +264,11 @@ test('the next quarter can be planned, inspected, changed and removed before it 
     await page.getByLabel('Bundle files').setInputFiles(files);
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: 'Import bundle' }).click();
+    await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
     await page.getByRole('button', { name: 'Plan', exact: true }).click();
-    await expect(page.getByTestId('quarter-status')).toHaveText(
-      `Next-quarter plan saved: 2 books. Unfinished current books carry forward first, and the plan activates on ${dates.future}.`,
-    );
+    await expect(page.locator('#planned-quarter-summary')).toContainText(`Queued: ${dates.future} to ${dates.futureEnd} — 2 books.`);
     await page.getByRole('button', { name: 'Edit next-quarter plan' }).click();
-    await expect(page.locator('#quarter-dialog-heading')).toHaveText(`Next quarter — ${dates.future}`);
+    await expect(page.locator('#quarter-dialog-heading')).toHaveText(`Next quarter — ${dates.future} to ${dates.futureEnd}`);
     await expect(page.getByLabel('Next-quarter books').locator('li')).toHaveText([
       'Physical books — Next story', 'Audiobooks — Next audio',
     ]);
@@ -315,18 +284,18 @@ test('the next quarter can be planned, inspected, changed and removed before it 
     await page.getByRole('button', { name: 'Audiobooks — Next audio', exact: true }).click();
     await page.getByRole('button', { name: 'Remove selected', exact: true }).click();
     await page.locator('#save-quarter').click();
-    await expect(page.getByTestId('quarter-status')).toHaveText('Next-quarter plan saved.');
+    await expect(page.locator('#quarter-dialog')).not.toBeVisible();
 
     await page.reload();
     await page.getByRole('button', { name: 'Plan', exact: true }).click();
     await page.getByRole('button', { name: 'Edit next-quarter plan' }).click();
-    await expect(page.locator('#quarter-dialog-heading')).toHaveText(`Next quarter — ${dates.future}`);
+    await expect(page.locator('#quarter-dialog-heading')).toHaveText(`Next quarter — ${dates.future} to ${dates.futureEnd}`);
     await expect(page.getByLabel('Next-quarter books').locator('li')).toHaveText([
       'Physical books — Next story',
       'Digital books — Future read',
     ]);
     await page.getByRole('button', { name: 'Cancel', exact: true }).click();
-    await expect(page.getByLabel('Plan start')).not.toHaveValue(dates.future);
+    await expect(page.locator('#plan-period-dates')).not.toContainText(dates.future);
 
     // The planned books stay readable by the desktop app, with no progress or history.
     const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('reading-plan-bundle-v1')));
@@ -344,6 +313,13 @@ assert all(book.current_page is None for section in planned.sections for book in
 assert planned.sections[0].books[0].pages == 80
 assert len(rest) == 1
 `, directory, dates.future]);
+    await page.getByRole('button', { name: 'Delete queued quarter' }).click();
+    await expect(page.locator('#planned-quarter-summary')).toBeHidden();
+    const deleted = await page.evaluate(() => readBundleFiles().encoded);
+    for (const { name, buffer } of files.filter(({ name }) => ['plan.json', 'sessions.json'].includes(name))) {
+      expect(Buffer.from(deleted[name], 'base64')).toEqual(buffer);
+    }
+    expect(JSON.parse(Buffer.from(deleted['books.json'], 'base64')).planned_quarter).toBeNull();
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }

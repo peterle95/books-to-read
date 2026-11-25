@@ -72,16 +72,15 @@ test('visible ISO typing validates actual dates before writes and refreshes sess
   await expect(page.locator('#session-entry-dialog')).not.toBeVisible();
 });
 
-test('create-plan and plan date text reject impossible dates without changing the bundle', async ({ page }) => {
+test('new plan date fields reject impossible dates without changing the bundle', async ({ page }) => {
   await seed(page);
   await page.getByRole('button', { name: 'Plan', exact: true }).click();
   const before = await snapshot(page);
-  await page.getByRole('button', { name: 'Reading schedule', exact: true }).click();
-  await page.locator('#plan-start').fill('2028-02-30');
-  await page.getByRole('button', { name: 'Save plan dates', exact: true }).click();
-  expect(await snapshot(page)).toBe(before);
-  await page.getByRole('navigation', { name: 'Plan sections' }).getByRole('button', { name: 'Plan', exact: true }).click();
+  page.once('dialog', (dialog) => dialog.accept());
   await page.locator('#new-plan').click();
+  await page.locator('#create-plan-start').fill('2028-02-30');
+  await page.getByRole('button', { name: 'Create plan', exact: true }).click();
+  expect(await snapshot(page)).toBe(before);
   await page.locator('#create-plan-start').fill('2028-02-29');
   await page.locator('#create-plan-finish').fill('2028-04-31');
   await page.getByRole('button', { name: 'Create plan', exact: true }).click();

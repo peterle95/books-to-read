@@ -66,9 +66,15 @@ write_json_bundle(sys.argv[1], sections, today, today + timedelta(days=10), 'Qua
         expect(section.books.map((book) => book.id)).toEqual(before.books.sections[index].books.map((book) => book.id));
         expect(section.simultaneous_groups).toEqual(before.books.sections[index].simultaneous_groups);
         const book = section.books[0];
-        expect(book.baseline_schedule).toEqual(before.books.sections[index].books[0].baseline_schedule);
-        expect(section.books[1].baseline_schedule).toEqual(before.books.sections[index].books[1].baseline_schedule);
-        expect(section.baseline_needs_recalculation).toBe(true);
+        const rangeChanged = change.from !== 10 || change.to !== 30;
+        if (rangeChanged) {
+          expect(book.baseline_schedule.daily_target).not.toBe(before.books.sections[index].books[0].baseline_schedule.daily_target);
+          expect(book.baseline_schedule.deadline).toBe(section.books[1].baseline_schedule.deadline);
+        } else {
+          expect(section.books.map((entry) => entry.baseline_schedule)).toEqual(
+            before.books.sections[index].books.map((entry) => entry.baseline_schedule));
+        }
+        expect(section.baseline_needs_recalculation).toBe(false);
         expect(book).toMatchObject({ id: label, number: 1, title: change.blank ? label : 'Replacement', target_completed_date: before.books.sections[index].books[0].target_completed_date });
         expect(book[audio ? 'start_time_seconds' : 'start_page']).toBe(change.from);
         expect(book[audio ? 'end_time_seconds' : 'end_page']).toBe(change.to);

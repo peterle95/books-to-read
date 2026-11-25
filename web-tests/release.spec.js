@@ -17,6 +17,7 @@ async function editBook(page, title) {
 async function withPlan(page, run) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'reading-release-'));
   try {
+    await page.clock.setFixedTime(new Date('2026-11-25T12:00:00'));
     execFileSync('python', ['-c', `
 from datetime import date
 from reading_plan import Book, BookSection, SummaryStatsOptions, write_json_bundle
@@ -58,17 +59,19 @@ ${assertions}
 test('saved web plan dates and rest days transfer to desktop', async ({ page }) => {
   await withPlan(page, async (directory) => {
     await tab(page, 'Plan');
-    await tab(page, 'Reading schedule');
-    await page.getByLabel('Plan finish', { exact: true }).fill('2026-12-20');
-    await page.getByRole('button', { name: 'Save plan dates' }).click();
-    await page.getByRole('navigation', { name: 'Plan sections' }).getByRole('button', { name: 'Plan', exact: true }).click();
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.getByRole('button', { name: 'New plan', exact: true }).click();
+    await page.getByLabel('Start date', { exact: true }).fill('2026-10-01');
+    await page.getByLabel('Finish date', { exact: true }).fill('2026-12-20');
+    await page.getByRole('button', { name: 'Create plan' }).click();
+    await expect(page.locator('#new-plan-status')).toHaveText('New plan saved.');
     await chooseDate(page, page.getByLabel('Rest start date'), '2026-11-10');
     await chooseDate(page, page.getByLabel('Rest end date'), '2026-11-11');
     await page.getByRole('button', { name: 'Add rest-day range' }).click();
+    await expect(page.locator('#rest-list')).toContainText('2026-11-10');
     await page.reload();
     await tab(page, 'Plan');
-    await tab(page, 'Reading schedule');
-    await expect(page.getByLabel('Plan finish', { exact: true })).toHaveValue('2026-12-20');
+    await expect(page.locator('#plan-period-dates')).toHaveText('Oct 1 – Dec 20');
     await checkExport(page, directory, `assert end.isoformat() == '2026-12-20'
 assert len(rest) == 1 and rest[0].start_date.isoformat() == '2026-11-10'`);
   });
@@ -213,10 +216,6 @@ test('backdated history can be recorded, corrected and deleted without changing 
     await page.locator('#book-to').fill('100');
     await page.locator('#add-book').click();
     await expect(page.getByTestId('editor-status')).toHaveText('Book saved.');
-    await tab(page, 'Plan');
-    await tab(page, 'Reading schedule');
-    await page.getByRole('button', { name: 'Calculate schedule' }).click();
-    await expect(page.getByTestId('schedule-status')).toHaveText('Baseline schedule calculated on this device.');
     await page.evaluate(() => navigator.serviceWorker.ready);
     await context.setOffline(true);
     await tab(page, 'Session');
@@ -297,8 +296,6 @@ expected, *details = load_json_bundle(baseline, include_planned=True)
 assert sum(len(section.books) for section in expected) == 6
 assert sum(len(book.reading_sessions) for section in expected for book in section.books) == 4
 expected[0].books[0].title += ' — web transfer check'
-# Editing a book marks its section's baseline for recalculation.
-expected[0].baseline_needs_recalculation = True
 assert sections == expected
 assert [start, end, label, name, options, rest, planned] == details
 write_json_bundle(destination, sections, start, end, label, options, rest, planned_quarter=planned, metadata=read_json_bundle_metadata(destination))`);
@@ -324,19 +321,19 @@ test('clock input, start-date overrides, preserved summary settings and planned-
     await page.locator('#book-to').fill('2:00:30');
     await page.locator('#add-book').click();
     await expect(page.getByTestId('editor-status')).toHaveText('Book saved.');
-    await tab(page, 'Plan');
-    await tab(page, 'Reading schedule');
-    await page.getByRole('button', { name: 'Calculate schedule' }).click();
-    await expect(page.getByTestId('schedule-status')).toHaveText('Baseline schedule calculated on this device.');
-    await chooseDate(page, page.getByLabel('Start date override for Clock audio', { exact: true }), '2026-11-10');
-    await page.getByRole('button', { name: 'Save the start date for Clock audio', exact: true }).click();
-    await expect(page.getByTestId('schedule-status')).toContainText('Start date override saved');
+    await editBook(page, 'Clock audio');
+    await chooseDate(page, page.getByLabel('Start date override', { exact: true }), '2026-11-10');
+    await page.getByRole('button', { name: 'Set start date', exact: true }).click();
+    await expect(page.getByTestId('editor-status')).toContainText('Start date override saved');
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save summary settings' })).toHaveCount(0);
     await tab(page, 'Plan');
-    const expectedStart = await page.evaluate(() => ReadingQuarter.nextQuarterStart(ReadingSchedule.today()));
-    await page.getByRole('button', { name: 'Edit next-quarter plan' }).click();
-    await expect(page.locator('#quarter-dialog-heading')).toHaveText(`Next quarter — ${expectedStart}`);
+    const [expectedStart, expectedEnd] = await page.evaluate(() => {
+      const start = ReadingQuarter.nextQuarterStart(ReadingSchedule.today());
+      return [start, ReadingQuarter.periodEnd(start)];
+    });
+    await page.getByRole('button', { name: 'Plan next quarter', exact: true }).click();
+    await expect(page.locator('#quarter-dialog-heading')).toHaveText(`Next quarter — ${expectedStart} to ${expectedEnd}`);
     await page.locator('#quarter-dialog').getByRole('combobox', { name: 'Format', exact: true }).click();
     await page.getByRole('option', { name: 'Audiobooks', exact: true }).click();
     await page.locator('#quarter-title').fill('Next clock');
@@ -347,7 +344,7 @@ test('clock input, start-date overrides, preserved summary settings and planned-
     await page.locator('#quarter-title').fill('Next revised');
     await page.getByRole('button', { name: 'Update selected', exact: true }).click();
     await page.locator('#save-quarter').click();
-    await expect(page.getByTestId('quarter-status')).toHaveText('Next-quarter plan saved.');
+    await expect(page.locator('#planned-quarter-summary')).toContainText(`Queued: ${expectedStart} to ${expectedEnd}`);
     await page.reload();
     await checkExport(page, directory, `book = sections[2].books[0]
 assert book.end_page == 7230
@@ -402,10 +399,6 @@ test('charts default to unfinished reading, All includes finished books, and met
       await page.locator('#add-book').click();
       await expect(page.getByTestId('editor-status')).toHaveText('Book saved.');
     }
-    await tab(page, 'Plan');
-    await tab(page, 'Reading schedule');
-    await page.getByRole('button', { name: 'Calculate schedule' }).click();
-    await expect(page.getByTestId('schedule-status')).toHaveText('Baseline schedule calculated on this device.');
     await tab(page, 'Session');
     for (const [title, position] of [['Finished', '100'], ['Ongoing', '30']]) {
       await page.getByRole('button', { name: `Choose book ${title}`, exact: true }).click();

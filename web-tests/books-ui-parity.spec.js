@@ -78,7 +78,10 @@ for (const audio of [false, true]) {
         expect(saved).toEqual(before.books.sections[index].books[position]);
         expect(after.sessions).toEqual(before.sessions);
       } else {
-        expect(after.books.sections[index].books.filter((book) => book.id !== saved.id)).toEqual(before.books.sections[index].books.map((book, offset) => ({ ...book, number: offset + 1 + (action === 'Insert Before' && offset >= position ? 1 : 0) })));
+        expect(saved.baseline_schedule).not.toBeNull();
+        expect(after.books.sections[index].books.filter((book) => book.id !== saved.id)
+          .map(({ baseline_schedule, ...book }) => book)).toEqual(before.books.sections[index].books
+          .map(({ baseline_schedule, ...book }, offset) => ({ ...book, number: offset + 1 + (action === 'Insert Before' && offset >= position ? 1 : 0) })));
         expect(after.sessions.sessions[saved.id]).toEqual([]);
       }
       expect(after.books.sections.filter((section, offset) => offset !== index)).toEqual(before.books.sections.filter((section, offset) => offset !== index));
@@ -154,16 +157,12 @@ test('Books hierarchy uses a numbered current-format modal, restores cancel focu
 });
 
 test('Books overrides save fresh persisted data, preserve drafts and unrelated records on success and failure', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2030-01-01T12:00:00'));
   await openBooks(page);
   await expect(page.locator('#clear-book-start')).toBeHidden();
   await expect(page.locator('#clear-book-deadline')).toBeHidden();
   await expect(page.locator('#set-book-start')).toBeEnabled();
   await expect(page.locator('#set-book-deadline')).toBeEnabled();
-  await page.getByRole('button', { name: 'Plan', exact: true }).click();
-  await page.getByRole('button', { name: 'Reading schedule', exact: true }).click();
-  await page.locator('#calculate-schedule').click();
-  await expect(page.getByTestId('schedule-status')).toContainText('Baseline schedule calculated');
-  await page.getByRole('button', { name: 'Books', exact: true }).click();
   await choose(page, '1. First');
   await expect(page.locator('#clear-book-start')).toBeHidden();
   const setStart = await page.locator('#set-book-start').boundingBox();
@@ -180,6 +179,7 @@ test('Books overrides save fresh persisted data, preserve drafts and unrelated r
   });
   const snapshot = () => page.evaluate(() => readBundleFiles());
   const before = await snapshot();
+  expect(before.books.sections[0].books[0].baseline_schedule).toBeNull();
   const draft = () => page.locator('#book-title, #book-from, #book-to').evaluateAll((inputs) => inputs.map((input) => input.value));
   const originalDraft = await draft();
   await chooseDate(page, page.getByLabel('Start date override', { exact: true }), '2030-01-03');
@@ -217,4 +217,24 @@ test('Books overrides save fresh persisted data, preserve drafts and unrelated r
   const saved = (await snapshot()).books.sections[0].books[0];
   expect(saved.baseline_schedule.start_date).toBe('2030-01-01');
   expect(saved.baseline_schedule.deadline).toBe('2030-03-31');
+});
+
+test('a deadline override schedules an imported book without rewriting other books', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2030-01-01T12:00:00'));
+  await openBooks(page);
+  await choose(page, '1. First');
+  const snapshot = () => page.evaluate(() => readBundleFiles());
+  const before = await snapshot();
+  await chooseDate(page, page.getByLabel('Deadline override', { exact: true }), '2030-02-01');
+  await page.getByRole('button', { name: 'Set deadline', exact: true }).click();
+  await expect(page.getByTestId('editor-status')).toHaveText('Deadline override saved for First.');
+  const after = await snapshot();
+  expect(after.books.sections[0].books[0]).toMatchObject({
+    deadline_override: '2030-02-01',
+    baseline_schedule: { start_date: '2030-01-01', deadline: '2030-02-01' },
+  });
+  expect(after.books.sections[0].books[1]).toEqual(before.books.sections[0].books[1]);
+  expect(after.books.sections.slice(1)).toEqual(before.books.sections.slice(1));
+  expect(after.encoded['sessions.json']).toBe(before.encoded['sessions.json']);
+  expect(after.manifest.revision).toBe(before.manifest.revision + 1);
 });

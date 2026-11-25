@@ -26,24 +26,23 @@ const importFiles = async (page, files) => {
 };
 
 for (const width of [390, 1440]) {
-  test(`header actions open Settings idempotently and Done returns to each tab at ${width}px`, async ({ page }) => {
+  test(`the Settings button opens idempotently and Done returns to each tab at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 844 });
     await page.goto('./');
     for (const tab of ['Session', 'Plan', 'Books', 'Charts']) {
       await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: tab, exact: true }).click();
-      await page.locator('#json-status').focus();
-      await page.keyboard.press('Enter');
-      await page.getByRole('button', { name: 'Settings', exact: true }).click();
-      await page.locator('#json-status').click();
+      const settings = page.getByRole('button', { name: 'Settings', exact: true });
+      await settings.press('Enter');
+      await settings.click();
       await expect(page.locator('#screen-settings')).toBeVisible();
-      await expect(page.locator('.header-actions button[aria-expanded="true"]')).toHaveCount(2);
+      await expect(settings).toHaveAttribute('aria-expanded', 'true');
       await expect(page.locator('main > .screen:not([hidden])')).toHaveCount(1);
       const box = await page.locator('.header-actions').boundingBox();
       expect(box.x + box.width).toBeLessThanOrEqual(width);
       await page.getByRole('button', { name: 'Done', exact: true }).click();
       await expect(page.locator(`#screen-${tab.toLowerCase()}`)).toBeVisible();
       await expect(page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: tab, exact: true })).toHaveAttribute('aria-current', 'page');
-      await expect(page.locator('.header-actions button[aria-expanded="false"]')).toHaveCount(2);
+      await expect(settings).toHaveAttribute('aria-expanded', 'false');
     }
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     expect(await page.locator('#screen-settings').evaluate((screen) => {
@@ -56,14 +55,12 @@ for (const width of [390, 1440]) {
 
 test('JSON status validates stored data, survives failed imports and updates after writes and reload', async ({ page }) => {
   await page.goto('./');
-  const status = page.locator('#json-status');
-  await expect(status).toHaveAccessibleName('JSON not loaded. Open Settings');
-  await expect(status).toHaveText('JSON');
-  await expect(status).toHaveCSS('background-color', 'rgb(161, 46, 34)');
-  await status.click();
+  const openSettings = () => page.getByRole('button', { name: 'Settings', exact: true }).click();
+  const status = page.locator('#source-status');
+  await openSettings();
+  await expect(status).toHaveText('JSON not loaded in this browser. Transfers are manual.');
   await importFiles(page, fixture());
-  await expect(status).toHaveAccessibleName('JSON loaded. Open Settings');
-  await expect(status).toHaveCSS('background-color', 'rgb(59, 106, 80)');
+  await expect(status).toHaveText('JSON loaded in this browser. Transfers are manual.');
   const original = await page.evaluate(() => localStorage.getItem('reading-plan-bundle-v1'));
   const invalid = fixture();
   invalid[0].buffer = Buffer.from(JSON.stringify({ ...JSON.parse(invalid[0].buffer), end_label: 'Tampered' }));
@@ -71,10 +68,11 @@ test('JSON status validates stored data, survives failed imports and updates aft
   await page.getByRole('button', { name: 'Import bundle', exact: true }).click();
   await expect(page.getByTestId('bundle-status')).toContainText('Checksum mismatch');
   expect(await page.evaluate(() => localStorage.getItem('reading-plan-bundle-v1'))).toBe(original);
-  await expect(status).toHaveAttribute('data-loaded', 'true');
+  await expect(status).toHaveText('JSON loaded in this browser. Transfers are manual.');
   await page.evaluate(async () => { const current = readBundleFiles(); await writeBundleFiles({ 'plan.json': { ...current.plan, end_label: 'Target finish date' } }); });
   await page.reload();
-  await expect(status).toHaveAccessibleName('JSON loaded. Open Settings');
+  await openSettings();
+  await expect(status).toHaveText('JSON loaded in this browser. Transfers are manual.');
   for (const corrupt of ['checksum', 'json']) {
     await page.evaluate(({ original, corrupt }) => {
       const encoded = JSON.parse(original);
@@ -82,8 +80,8 @@ test('JSON status validates stored data, survives failed imports and updates aft
       localStorage.setItem('reading-plan-bundle-v1', JSON.stringify(encoded));
     }, { original, corrupt });
     await page.reload();
-    await expect(status).toHaveAccessibleName('JSON not loaded. Open Settings');
-    await expect(status).toHaveAttribute('data-loaded', 'false');
+    await openSettings();
+    await expect(status).toHaveText('JSON not loaded in this browser. Transfers are manual.');
   }
 });
 

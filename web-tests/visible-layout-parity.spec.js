@@ -136,11 +136,10 @@ test('populated 360x732 first fold preserves native page gutters and useful land
   await page.screenshot({ path: testInfo.outputPath('populated-books-360x732.png') });
 
   await tab(page, 'Plan');
-  await expect(page.locator('#plan-actions-toggle')).toBeVisible();
-  const restEnd = await page.locator('#rest-end').boundingBox();
-  const addRange = await page.locator('#rest-form button').boundingBox();
-  expect(restEnd.y + restEnd.height).toBeLessThan(nav.y);
-  expect(addRange.y + addRange.height).toBeLessThan(nav.y);
+  const quarter = await page.locator('#quarter-shortcut').boundingBox();
+  expect(quarter.y + quarter.height).toBeLessThan(nav.y);
+  await page.locator('#rest-form button').scrollIntoViewIfNeeded();
+  await expect(page.locator('#rest-form button')).toBeInViewport();
   expect(await page.locator('#rest-start').getAttribute('placeholder')).toBeNull();
   await expect(page.locator('#rest-list li').first()).toHaveText('2026-11-08 ? 2026-11-09 Remove');
   const range = await page.locator('#rest-list li').boundingBox();
