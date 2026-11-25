@@ -101,38 +101,47 @@
       </form>
     </dialog>
     <div id="screen-plan" class="screen" aria-label="Plan" hidden>
-    <div class="plan-heading"><h2>Plan</h2></div>
     <nav class="session-choices plan-sections" aria-label="Plan sections">
-      <button type="button" data-plan-section="setup" aria-pressed="true" aria-controls="plan-setup plan-rest">Plan</button>
+      <button type="button" data-plan-section="setup" aria-pressed="true" aria-controls="plan-setup">Plan</button>
       <button type="button" data-plan-section="schedule" aria-pressed="false" aria-controls="plan-schedule">Reading schedule</button>
       <button type="button" data-plan-section="projections" aria-pressed="false" aria-controls="plan-projections">Reading projections</button>
     </nav>
-    <p id="schedule-status" data-testid="schedule-status" role="status" aria-live="polite"></p>
     <section id="plan-setup" data-plan-panel="setup" aria-label="Plan actions">
+      <h2 class="plan-panel-title">Plan</h2>
+      <p class="plan-intro">Plan dates, rest days and next quarter at a glance.</p>
+      <div class="plan-overview">
+        <div class="plan-period-card"><p class="plan-kicker">Current plan</p><p id="plan-period-dates" class="plan-display">No active plan</p><p id="plan-book-count"></p></div>
+        <dl class="plan-facts">
+          <div><dt>Rest days</dt><dd id="plan-rest-count">None</dd></div>
+          <div><dt>Next quarter</dt><dd id="plan-next-quarter">Not planned</dd></div>
+          <div><dt>Simultaneous groups</dt><dd id="plan-group-count">None</dd></div>
+        </dl>
+      </div>
       <div id="plan-actions">
         <div class="plan-action-buttons">
           <button id="new-plan" type="button">New plan</button>
           <button id="quarter-shortcut" type="button" aria-haspopup="dialog" aria-controls="quarter-dialog">Plan next quarter</button>
         </div>
         <p id="active-plan-hint">New plan replaces the current plan. Plan next quarter stores the next quarter without replacing it.</p>
-        <button id="recalculate-plan" type="button">Recalculate current plan</button>
         <p id="planned-quarter-summary" hidden></p>
         <button id="delete-planned-quarter" type="button" hidden>Delete queued quarter</button>
-        <form id="create-plan-form" hidden>
+        <dialog id="create-plan-dialog" aria-labelledby="create-plan-heading">
+        <form id="create-plan-form">
+          <h2 id="create-plan-heading">New plan</h2>
           <label for="create-plan-start">Start date</label><input id="create-plan-start" type="text" data-date-mode="text" required>
           <label for="create-plan-finish">Finish date</label><input id="create-plan-finish" type="text" data-date-mode="text" required>
-          <fieldset id="new-plan-books-fieldset" hidden>
-            <legend>Books to keep</legend>
-            <p>Unticked books and their reading history are removed.</p>
-            <div id="new-plan-book-choices"></div>
-          </fieldset>
-          <button type="submit">Create plan</button>
+          <h3>Books</h3>
+          <p>Optional. Add books now or later in Books.</p>
+          <div id="new-plan-books"></div>
+          <button type="button" id="new-plan-add-book">Add a book</button>
+          <p id="new-plan-error" role="alert"></p>
+          <div class="dialog-actions"><button type="button" id="cancel-new-plan">Cancel</button><button type="submit">Create plan</button></div>
         </form>
+        </dialog>
         <p id="new-plan-status" role="status" aria-live="polite"></p>
         <p id="quarter-status" data-testid="quarter-status" role="status" aria-live="polite"></p>
       </div>
-    </section>
-    <section id="plan-rest" data-plan-panel="setup" aria-labelledby="rest-heading">
+    <section id="plan-rest" aria-labelledby="rest-heading">
       <h3 id="rest-heading">Rest-day ranges</h3>
       <ul id="rest-list" aria-label="Rest days"></ul>
       <form id="rest-form">
@@ -143,39 +152,37 @@
         <button type="submit">Add rest-day range</button>
       </form>
     </section>
+    </section>
     <section id="plan-schedule" data-plan-panel="schedule" aria-labelledby="schedule-heading" hidden>
-      <h2 id="schedule-heading">Reading schedule</h2>
-      <p>Set the plan dates and rest days, then calculate the baseline schedule. Rest days reduce the days available for reading, but they do not move the baseline dates. Books in a simultaneous group share a start and finish while their daily targets are split by remaining work. A deadline override gives one book an independent schedule until you clear it. The baseline schedule stays saved until you calculate it again.</p>
+      <h2 class="plan-panel-title" id="schedule-heading">Reading schedule</h2>
+      <p class="plan-intro">The baseline is the saved schedule. Required pace can change as you read.</p>
       <p id="schedule-empty">Import a bundle to schedule its books.</p>
-      <form id="schedule-form">
-        <label for="plan-start">Plan start</label>
-        <input id="plan-start" type="text" data-date-mode="text" required>
-        <label for="plan-finish">Plan finish</label>
-        <input id="plan-finish" type="text" data-date-mode="text" required>
-        <button type="submit">Save plan dates</button>
-      </form>
-      <ul id="group-list" aria-label="Simultaneous groups"></ul>
-      <button id="calculate-schedule" type="button">Calculate schedule</button>
-      <table id="schedule-table" hidden>
-        <caption>Baseline schedule and current required pace. Pages are used for physical and digital books; seconds are used for audiobooks. A deadline override applies immediately; clearing it returns the book to the plan finish or its group's deadline.</caption>
-        <thead>
-          <tr><th scope="col">Book</th><th scope="col">Left</th><th scope="col">Baseline start</th><th scope="col">Baseline finish</th><th scope="col">Baseline per day</th><th scope="col">Required now</th><th scope="col">Deadline override</th></tr>
+      <table id="schedule-table" class="plan-results" role="table" hidden>
+        <caption class="visually-hidden">Baseline schedule and current required pace. Pages are used for physical and digital books; seconds are used for audiobooks.</caption>
+        <thead class="visually-hidden" role="rowgroup">
+          <tr role="row"><th scope="col">Book</th><th scope="col">Left</th><th scope="col">Baseline start</th><th scope="col">Baseline finish</th><th scope="col">Baseline per day</th><th scope="col">Required now</th></tr>
         </thead>
-        <tbody id="schedule-rows"></tbody>
+        <tbody id="schedule-rows" role="rowgroup"></tbody>
       </table>
+      <details class="plan-help">
+        <summary>How the schedule works</summary>
+        <p>The schedule updates automatically when books, groups, or rest days change. Reading sessions update required pace without rewriting the baseline. Set individual start dates and deadlines in Books.</p>
+      </details>
+      <ul id="group-list" aria-label="Simultaneous groups"></ul>
     </section>
     <section id="plan-projections" data-plan-panel="projections" aria-labelledby="projection-heading" hidden>
-      <h2 id="projection-heading">Reading projections</h2>
-      <p>Each projection estimates when a book will be finished from its recorded reading history, separately from its baseline schedule and deadline. The estimated finish range shows how uncertain that estimate is; it is not a guarantee. Projections never change the baseline schedule or the required pace.</p>
+      <h2 class="plan-panel-title" id="projection-heading">Reading projections</h2>
+      <p class="plan-intro">Estimates come from reading history and never change the schedule. A finish range shows uncertainty; it is not a guarantee.</p>
       <p id="projection-empty" data-testid="projection-empty">Import a bundle to see its reading projections.</p>
-      <table id="projection-table" hidden>
-        <caption>History-based projection and estimated finish range for each book. Pages are used for physical and digital books; seconds are used for audiobooks.</caption>
-        <thead>
-          <tr><th scope="col">Book</th><th scope="col">Projection</th><th scope="col">Estimated finish range</th></tr>
+      <table id="projection-table" class="plan-results" role="table" hidden>
+        <caption class="visually-hidden">History-based projection and estimated finish range for each book.</caption>
+        <thead class="visually-hidden" role="rowgroup">
+          <tr role="row"><th scope="col">Book</th><th scope="col">Projection</th><th scope="col">Estimated finish range</th></tr>
         </thead>
-        <tbody id="projection-rows"></tbody>
+        <tbody id="projection-rows" role="rowgroup"></tbody>
       </table>
     </section>
+    <p id="schedule-status" data-testid="schedule-status" role="status" aria-live="polite"></p>
     <dialog id="quarter-dialog" aria-labelledby="quarter-dialog-heading">
       <h2 id="quarter-dialog-heading">Next quarter</h2>
       <div id="quarter-content">

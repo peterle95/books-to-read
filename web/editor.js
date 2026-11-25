@@ -36,6 +36,12 @@ const resetBook = () => {
 };
 document.querySelector('#cancel-book').addEventListener('click', resetBook);
 
+// Progress and title-only edits do not change what was originally scheduled.
+const scheduleInputs = (books) => JSON.stringify(books.sections.map((section) => [
+  section.simultaneous_groups,
+  section.books.map((book) => [book.id, book.start_page, book.end_page, book.start_time_seconds, book.end_time_seconds]),
+]));
+
 const editorAction = async (change, status = editorStatus) => {
   status.textContent = '';
   editorStatus.textContent = '';
@@ -63,7 +69,9 @@ const editorAction = async (change, status = editorStatus) => {
         }),
       }));
     }
+    const previousScheduleInputs = scheduleInputs(current.books);
     message = change(current);
+    if (scheduleInputs(current.books) !== previousScheduleInputs) current.books = withPlanBaselines(current.books, current.plan);
     await writeBundleFiles({ ...(legacy ? { 'plan.json': current.plan } : {}), 'books.json': current.books,
       ...(JSON.stringify(current.sessions) !== originalSessions ? { 'sessions.json': current.sessions } : {}) });
     if (legacy) localStorage.removeItem(scheduleKey);
@@ -159,7 +167,7 @@ const saveBook = async (mode) => {
       }
     }
     window.recalculateReadingHistory(book, current.sessions.sessions[book.id], section.label);
-    normalizeBookOrder(section);
+    if (!existing || rangeChanged) normalizeBookOrder(section);
     return 'Book saved.';
   });
   if (saved) resetBook();

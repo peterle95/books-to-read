@@ -26,15 +26,15 @@ Import a desktop CSV plan or export the current plan to CSV, including ranges, p
 
 The **Plan** screen opens on its **Plan** section each time you return. Use the buttons at the top to switch between **Plan**, **Reading schedule**, and **Reading projections**.
 
-After importing a bundle, add any rest-day ranges in **Plan**, then set the plan start and finish dates in **Reading schedule**. **Calculate schedule** stores a baseline schedule for every book in all three formats: physical and digital books are measured in pages, audiobooks in seconds. Rest days remove reading days from the pace without moving the baseline dates.
+In **Plan → New plan**, choose the start and finish dates and optionally add books. Replacing an existing plan clears its books, reading history, rest days, and queued quarter only after the new plan saves. **Reading schedule** shows the saved baseline in pages for physical and digital books and seconds for audiobooks.
 
-The table keeps two separate values. The **baseline per day** is the persisted target created when the schedule was calculated. **Required now** is the amount needed each reading day, from today to that book's baseline finish, to finish the remaining work; it never changes the baseline. Editing the plan dates or rest days marks the schedule as changed and leaves the saved baseline alone until you calculate again. Saved dates, rest days, groups, overrides and baselines are included in bundle exports. Importing a bundle replaces the previous plan and schedule.
+The **baseline per day** updates automatically when a plan is created or books, book ranges, book order, groups, or rest days change. **Required now** is what you need to read each reading day to reach the baseline finish; reading history updates this pace and projections without changing the baseline. Saved dates, rest days, groups, overrides and baselines are included in bundle exports. Importing a bundle replaces the previous plan and schedule.
 
-Simultaneous groups stored in a bundle are scheduled together, as in the desktop app. To plan one, choose a section, tick two or more adjacent books, and select **Group selected books**. The members share a start date and finish while their daily targets are split in proportion to their remaining work. A group change marks the schedule as changed and applies on the next calculation; removing a group returns its books to the ordinary order.
+Simultaneous groups stored in a bundle are scheduled together, as in the desktop app. To plan one, choose two or more adjacent books in **Books**. The members share a start date and finish, and the schedule updates as soon as you save or remove the group.
 
 A **deadline override** gives one book an independent schedule immediately: its baseline finish becomes the override date and its target is recalculated from its remaining work. When the book belongs to a group, the other members stay grouped with their shared schedule. **Clear** returns the book to the plan finish date, or to the group's shared finish when another group member still supplies one.
 
-Set or clear a **start-date override** in the schedule table to choose an independent start while retaining the book's deadline. Its target uses remaining work and available reading days. Overrides persist across recalculation and transfer. Summary settings control the optional metrics and are saved in `plan.json`.
+Set or clear deadline and start-date overrides in **Books**. A **start-date override** chooses an independent start while retaining the book's deadline. Its target uses remaining work and available reading days. Overrides persist across recalculation and transfer. Summary settings control the optional metrics and are saved in `plan.json`.
 
 ## Reading projections
 

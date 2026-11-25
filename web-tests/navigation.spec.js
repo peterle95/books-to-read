@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const path = require('node:path');
 
 test('four tabs show one screen at a time', async ({ page }) => {
   await page.goto('./');
@@ -25,6 +26,12 @@ for (const width of [320, 1440]) {
     await page.setViewportSize({ width, height: 844 });
     await page.goto('./');
     const main = page.getByRole('navigation', { name: 'Main navigation' });
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    await page.getByLabel('Bundle files').setInputFiles(['plan', 'books', 'sessions', 'manifest'].map((name) =>
+      path.join(__dirname, '..', 'fixtures', 'issue-45-populated', `${name}.json`)));
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.getByRole('button', { name: 'Import bundle' }).click();
+    await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
     const sections = page.getByRole('navigation', { name: 'Plan sections' });
     const plan = sections.getByRole('button', { name: 'Plan', exact: true });
     const schedule = sections.getByRole('button', { name: 'Reading schedule' });
@@ -32,16 +39,20 @@ for (const width of [320, 1440]) {
     await main.getByRole('button', { name: 'Plan' }).click();
     await expect(plan).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('#plan-rest')).toBeVisible();
+    await expect(page.locator('#plan-book-count')).toContainText('in progress');
     await schedule.focus();
     await page.keyboard.press('Enter');
     await expect(schedule).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('#plan-schedule')).toBeVisible();
+    await expect(page.locator('#schedule-table')).toBeVisible();
+    await expect(page.locator('#schedule-rows input, #schedule-rows button')).toHaveCount(0);
     await expect(page.locator('#plan-setup')).toBeHidden();
     await expect(page.locator('#plan-rest')).toBeHidden();
     await projections.click();
     await expect(projections).toHaveAttribute('aria-pressed', 'true');
     await expect(schedule).toHaveAttribute('aria-pressed', 'false');
     await expect(page.locator('#plan-projections')).toBeVisible();
+    await expect(page.locator('#projection-table')).toBeVisible();
     await expect(page.locator('#plan-schedule')).toBeHidden();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await main.getByRole('button', { name: 'Books' }).click();

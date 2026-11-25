@@ -60,15 +60,16 @@
     const scheduledStart = parseDate(baseline?.startDate || state.startDate);
     const deadline = parseDate(baseline?.deadline || state.endDate);
     const horizon = parseDate(forecast.horizon);
+    const ordered = sessions.filter((session) => !session.deleted && parseDate(session.date) <= day)
+      .sort((a, b) => parseDate(a.date) - parseDate(b.date));
+    const firstSession = ordered.length ? parseDate(ordered[0].date) : scheduledStart;
     // Reserve one supported day for the chart's nonzero-width x axis.
-    const start = Math.max(day - 3660, Math.min(scheduledStart, day, horizon - 1));
+    const start = Math.max(day - 3660, Math.min(scheduledStart, firstSession, horizon - 1));
     const end = Math.max(start + 1, Math.min(horizon, Math.max(deadline, day,
       forecast.projectedDeadline ? parseDate(forecast.projectedDeadline) : forecast.pace > 0 ? horizon : day,
       forecast.latestDeadline ? parseDate(forecast.latestDeadline) : day)));
     const rest = window.ReadingSchedule.normalizeRestDays(state.restDays);
     const isReadingDay = (day) => !rest.some((range) => range.start <= day && day <= range.end);
-    const ordered = sessions.filter((session) => !session.deleted && parseDate(session.date) <= day)
-      .sort((a, b) => parseDate(a.date) - parseDate(b.date));
     const from = Number(audio ? book.start_time_seconds || 0 : book.start_page ?? 1);
     const endPosition = Number(audio ? book.end_time_seconds ?? book.duration_seconds : book.end_page ?? book.pages);
     const actualOn = (date) => Math.max(0, ...ordered.filter((session) => parseDate(session.date) <= date).map((session) =>
@@ -76,7 +77,8 @@
     const dailyRead = new Map();
     for (const session of ordered) dailyRead.set(parseDate(session.date), (dailyRead.get(parseDate(session.date)) || 0) + Number(audio ? session.time_listened_seconds : session.pages_read));
     const initialDays = scheduledStart < start ? availableDayCount(iso(scheduledStart), iso(start - 1), state.restDays) : 0;
-    let plannedDays = initialDays, forecastDays = 0;
+    let plannedDays = initialDays;
+    let forecastDays = start > day + 1 ? availableDayCount(iso(day + 1), iso(start - 1), state.restDays) : 0;
     const data = [];
     let daysRemaining = availableDayCount(iso(Math.max(start, scheduledStart)), iso(Math.max(start, deadline)), state.restDays);
     for (let date = start; date <= end; date += 1) {
@@ -130,7 +132,8 @@
     }
     svg.append(svgElement('line', { x1: left, x2: left, y1: top, y2: bottom, stroke: '#3a241a', 'stroke-width': 2 }),
       svgElement('line', { x1: left, x2: right, y1: bottom, y2: bottom, stroke: '#3a241a', 'stroke-width': 2 }),
-      svgElement('line', { x1: right, x2: right, y1: top, y2: bottom, stroke: '#b56b3c', 'stroke-width': 2 }),
+      svgElement('line', { x1: right, x2: right, y1: top, y2: bottom, stroke: '#b56b3c', 'stroke-width': 2 }));
+    if (start <= day && day <= end) svg.append(
       svgElement('line', { x1: x(day), x2: x(day), y1: top, y2: bottom, stroke: '#9f3a2b', 'stroke-width': 2, 'stroke-dasharray': '6 4' }),
       svgElement('text', { x: Math.max(left, Math.min(right - 35, x(day) - 17)), y: top - 10, fill: '#9f3a2b', 'font-size': 11 }, 'Today'));
     const intervals = Math.min(4, end - start);
@@ -156,9 +159,12 @@
     if (bundle) {
       const state = scheduleState || loadSchedule(bundle);
       const baselines = { ...remainingBaselines(bundle), ...state.baselines };
+      const today = window.ReadingSchedule.today();
       for (const section of bundle.books.sections) for (const book of section.books) {
         const progress = units(book, section.label.trim() === 'Audiobooks');
-        if (progress.total > 0 && (all.getAttribute('aria-pressed') === 'true' || (progress.completed > 0 && progress.remaining > 0))) {
+        const baseline = baselines[String(book.id).trim()];
+        const readingToday = progress.remaining > 0 && baseline && baseline.startDate <= today && today <= baseline.deadline;
+        if (progress.total > 0 && (all.getAttribute('aria-pressed') === 'true' || readingToday)) {
           choices.push({ book, label: section.label, sessions: bundle.sessions[String(book.id).trim()] || [], state, baselines });
         }
       }
