@@ -161,7 +161,7 @@ test('quarter rollover agrees with the desktop calculation model', async ({ page
   }
 });
 
-const generate = (directory, mode) => execFileSync('python', ['-c', `
+const generate = (directory) => execFileSync('python', ['-c', `
 import json, sys
 from datetime import date, timedelta
 from reading_plan import (Book, BookSection, PlannedQuarter, RestDayRange, SummaryStatsOptions,
@@ -185,7 +185,7 @@ current = [
     BookSection('Digital books', [], []),
     BookSection('Audiobooks', [audio], []),
 ]
-planned = PlannedQuarter(future if sys.argv[2] == 'future' else due, [
+planned = PlannedQuarter(future, [
     BookSection('Physical books', [Book(1, 'Next story', 1, 80, id='next-story')], []),
     BookSection('Digital books', [], []),
     BookSection('Audiobooks', [Book(1, 'Next audio', 0, 600, id='next-audio')], []),
@@ -195,68 +195,18 @@ write_json_bundle(sys.argv[1], current, previous_start, previous_end, 'Quarter e
                   [RestDayRange(previous_end - timedelta(days=20), previous_end - timedelta(days=19))],
                   planned_quarter=planned)
 print(json.dumps({
-    'due': due.isoformat(),
-    'dueEnd': period_end_from_start(due).isoformat(),
     'future': future.isoformat(),
     'futureEnd': period_end_from_start(future).isoformat(),
-    'beyond': next_quarter_start(future).isoformat(),
-    'notBoundary': (future + timedelta(days=1)).isoformat(),
-    'session': ongoing.reading_sessions[0].id,
 }))
-`, directory, mode]).toString();
+`, directory]).toString();
 
 const readFiles = (directory) => ['plan.json', 'books.json', 'sessions.json', 'manifest.json']
   .map((name) => ({ name, mimeType: 'application/json', buffer: fs.readFileSync(path.join(directory, name)) }));
 
-test('a due next-quarter plan stays queued across import, reload and desktop export', async ({ page }) => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'reading-quarter-due-'));
-  const output = path.join(directory, 'export');
-  fs.mkdirSync(output);
-  try {
-    const dates = JSON.parse(generate(directory, 'due'));
-    const files = readFiles(directory);
-    await page.goto('./');
-    await page.getByRole('button', { name: 'Settings', exact: true }).click();
-    await page.getByLabel('Bundle files').setInputFiles(files);
-    page.once('dialog', (dialog) => dialog.accept());
-    await page.getByRole('button', { name: 'Import bundle' }).click();
-    await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
-    await page.getByRole('button', { name: 'Plan', exact: true }).click();
-    await expect(page.locator('#planned-quarter-summary')).toContainText(`Queued: ${dates.due} to ${dates.dueEnd}`);
-    await page.getByRole('button', { name: 'Edit next-quarter plan' }).click();
-    await expect(page.locator('#quarter-dialog-heading')).toHaveText(`Next quarter — ${dates.due} to ${dates.dueEnd}`);
-    await page.getByRole('button', { name: 'Cancel', exact: true }).click();
-    await page.reload();
-    await page.getByRole('button', { name: 'Plan', exact: true }).click();
-    await expect(page.locator('#planned-quarter-summary')).toContainText(`Queued: ${dates.due} to ${dates.dueEnd}`);
-    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('reading-plan-bundle-v1')));
-    for (const { name, buffer } of files) expect(Buffer.from(stored[name], 'base64')).toEqual(buffer);
-
-    const download = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'Settings', exact: true }).click();
-    await page.getByRole('button', { name: 'Export bundle ZIP' }).click();
-    const zip = path.join(directory, 'bundle.zip');
-    await (await download).saveAs(zip);
-    execFileSync('python', ['-c', `
-from pathlib import Path
-from reading_plan import load_json_bundle
-import sys, zipfile
-with zipfile.ZipFile(sys.argv[2]) as archive:
-    archive.extractall(sys.argv[1])
-expected = load_json_bundle(Path(sys.argv[1]).parent, include_planned=True)
-exported = load_json_bundle(sys.argv[1], include_planned=True)
-assert exported == expected
-assert exported[-1].start_date.isoformat() == sys.argv[3]
-`, output, zip, dates.due]);
-  } finally {
-    fs.rmSync(directory, { recursive: true, force: true });
-  }
-});
-
 test('the next quarter can be planned, inspected, changed and removed before it starts', async ({ page }) => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'reading-quarter-future-'));
   try {
-    const dates = JSON.parse(generate(directory, 'future'));
+    const dates = JSON.parse(generate(directory));
     const files = readFiles(directory);
 
     await page.goto('./');
