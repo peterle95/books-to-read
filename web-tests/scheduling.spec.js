@@ -177,8 +177,8 @@ write_json_bundle(sys.argv[1], [
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: 'Import bundle' }).click();
     await page.getByRole('button', { name: 'Plan', exact: true }).click();
-    await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
-    await expect(page.getByTestId('schedule-status')).toHaveText('Baseline schedule saved. Required pace reflects today.');
+    await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
+    await expect(page.getByTestId('schedule-status')).toBeEmpty();
     await page.getByRole('button', { name: 'Reading schedule', exact: true }).click();
     const storedBundle = await page.evaluate(() => readBundleFiles().encoded);
     for (const { name, buffer } of files) expect(Buffer.from(storedBundle[name], 'base64')).toEqual(buffer);
@@ -372,7 +372,7 @@ write_json_bundle(sys.argv[1], [
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: 'Import bundle' }).click();
     await page.getByRole('button', { name: 'Plan', exact: true }).click();
-    await expect(page.getByTestId('schedule-status')).toHaveText('Baseline schedule saved. Required pace reflects today.');
+    await expect(page.getByTestId('schedule-status')).toBeEmpty();
     await page.getByRole('button', { name: 'Reading schedule', exact: true }).click();
     await expect(row('First').locator('td').nth(3)).toHaveText('2030-01-26');
 
@@ -411,7 +411,8 @@ write_json_bundle(sys.argv[1], [
     await expect(status).toHaveText('A deadline override cannot be after the plan finish date.');
     await chooseDate(page, deadline, '2030-02-14');
     await setDeadline.click();
-    await expect(status).toHaveText('Deadline override saved for First.');
+    await expect(status).toBeEmpty();
+    await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
     await showSchedule();
     await expect(row('First').locator('td').nth(3)).toHaveText('2030-02-14');
     await expect(row('First').locator('td').nth(4)).toHaveText('0.44');
@@ -427,7 +428,8 @@ write_json_bundle(sys.argv[1], [
     await selectFirst();
     await expect(deadline).toHaveValue('2030-02-14');
     await page.getByRole('button', { name: 'Clear deadline', exact: true }).click();
-    await expect(status).toHaveText('Deadline override cleared for First.');
+    await expect(status).toBeEmpty();
+    await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
     await expect(deadline).toHaveValue('');
     await showSchedule();
     await expect(row('First').locator('td').nth(3)).toHaveText('2030-03-06');

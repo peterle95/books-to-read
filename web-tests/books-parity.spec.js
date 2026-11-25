@@ -26,7 +26,7 @@ write_json_bundle(sys.argv[1], sections, today, today + timedelta(days=3), 'Quar
     await page.getByLabel('Bundle files').setInputFiles(['plan.json', 'books.json', 'sessions.json', 'manifest.json'].map((name) => path.join(directory, name)));
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: 'Import bundle' }).click();
-    await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+    await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
     await page.getByRole('button', { name: 'Books', exact: true }).click();
     await expect(page.locator('#today-reading section')).toHaveCount(3);
     await expect(page.locator('#today-reading')).toContainText('Audiobooks');
@@ -36,7 +36,8 @@ write_json_bundle(sys.argv[1], sections, today, today + timedelta(days=3), 'Quar
     await expect(page.getByTestId('editor-status')).toContainText('simultaneous group');
     expect((await snapshot()).books.sections[0].books.map((book) => book.id)).toEqual(['a', 'b', 'c']);
     await page.getByRole('button', { name: 'Move Down' }).click();
-    await expect(page.getByTestId('editor-status')).toHaveText('Book moved.');
+    await expect(page.getByTestId('editor-status')).toBeEmpty();
+    await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
     expect((await snapshot()).books.sections[0]).toMatchObject({ simultaneous_groups: [['a', 'b']] });
     expect((await snapshot()).books.sections[0].books.map((book) => book.id)).toEqual(['c', 'a', 'b']);
     await chooseBook(page, 'a');
@@ -47,7 +48,8 @@ write_json_bundle(sys.argv[1], sections, today, today + timedelta(days=3), 'Quar
     await page.getByRole('option', { name: 'Audiobooks', exact: true }).click();
     await chooseBook(page, 'audio');
     await page.getByRole('button', { name: 'Complete Selected' }).click();
-    await expect(page.getByTestId('editor-status')).toHaveText('Book completed.');
+    await expect(page.getByTestId('editor-status')).toBeEmpty();
+    await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
     const data = await snapshot();
     expect(data.books.sections[2].books[0].remaining_time_seconds).toBe(0);
     expect(data.sessions.sessions.audio.at(-1)).toMatchObject({ remaining_time_seconds: 0, date: await page.evaluate(() => ReadingSchedule.today()) });
@@ -60,7 +62,8 @@ write_json_bundle(sys.argv[1], sections, today, today + timedelta(days=3), 'Quar
     await page.getByRole('button', { name: 'Clear groups' }).click();
     expect((await snapshot()).books.sections[0].simultaneous_groups).toEqual([]);
     await page.getByRole('button', { name: 'Insert Before' }).click();
-    await expect(page.getByTestId('editor-status')).toHaveText('Book saved.');
+    await expect(page.getByTestId('editor-status')).toBeEmpty();
+    await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
     expect((await snapshot()).books.sections[0].books.map((book) => book.id).slice(1)).toEqual(['a', 'b', 'c']);
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     const downloadPromise = page.waitForEvent('download');

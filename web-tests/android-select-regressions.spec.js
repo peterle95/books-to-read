@@ -22,7 +22,7 @@ write_json_bundle(sys.argv[1], sections, today, today + timedelta(days=30), 'Qua
     await page.getByLabel('Bundle files').setInputFiles(['plan.json', 'books.json', 'sessions.json', 'manifest.json'].map((name) => path.join(directory, name)));
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: 'Import bundle', exact: true }).click();
-    await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+    await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
     await page.getByRole('button', { name: 'Session', exact: true }).click();
     await page.evaluate(() => document.fonts.ready);
   } finally {
@@ -124,7 +124,8 @@ test('session book is internal state, not an extra accessible combobox', async (
   await expect(page.locator('#session-book')).toHaveValue('short');
   await page.locator('#session-position').fill('10');
   await page.getByRole('button', { name: 'Add session', exact: true }).click();
-  await expect(page.getByTestId('editor-status')).toHaveText('Reading session saved.');
+  await expect(page.getByTestId('editor-status')).toBeEmpty();
+  await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
   await page.reload();
   await page.getByRole('button', { name: 'Entries', exact: true }).click();
   const combo = page.getByRole('combobox', { name: 'Book', exact: true });

@@ -55,7 +55,7 @@ test('retries a file read that fails once, then imports the bundle', async ({ pa
   await failReads(page, 1);
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: 'Import bundle' }).click();
-  await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+  await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
   expect(Object.keys(JSON.parse(await page.evaluate(() => localStorage.getItem('reading-plan-bundle-v1')))))
     .toEqual(['plan.json', 'books.json', 'sessions.json', 'manifest.json']);
 });
@@ -65,7 +65,7 @@ test('reports a persistent read failure and keeps the stored bundle', async ({ p
   await page.getByLabel('Bundle files').setInputFiles(bundleFiles());
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: 'Import bundle' }).click();
-  await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+  await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
   const before = await storage(page);
 
   await page.getByLabel('Bundle files').setInputFiles(bundleFiles());

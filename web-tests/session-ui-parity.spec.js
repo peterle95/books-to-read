@@ -53,7 +53,8 @@ write_json_bundle(sys.argv[1], sections, today, today + timedelta(days=30), 'Qua
     await expect(editor).toBeVisible();
     await editor.getByLabel('Session current page', { exact: true }).fill('21');
     await editor.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(page.getByTestId('editor-status')).toHaveText('Reading session saved.');
+    await expect(page.getByTestId('editor-status')).toBeEmpty();
+    await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
     await expect(sheet.locator('#history-list details')).toHaveAttribute('open', '');
     await sheet.getByRole('combobox', { name: 'Book', exact: true }).click();
     await sheet.getByRole('option', { name: 'Audiobooks - 1. Audio', exact: true }).click();
@@ -100,7 +101,7 @@ write_json_bundle(sys.argv[1], [BookSection('Physical books', [paper], []), Book
     await page.getByLabel('Bundle files').setInputFiles(['plan.json', 'books.json', 'sessions.json', 'manifest.json'].map((name) => path.join(directory, name)));
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: 'Import bundle' }).click();
-    await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+    await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
     await page.getByRole('button', { name: 'Session', exact: true }).click();
     let draftDate = '2026-10-15';
     await page.locator('#session-date').fill(draftDate);

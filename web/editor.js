@@ -45,7 +45,6 @@ const scheduleInputs = (section) => JSON.stringify([
 const editorAction = async (change, status = editorStatus) => {
   status.textContent = '';
   editorStatus.textContent = '';
-  let message;
   try {
     const current = readBundleFiles();
     if (!current) throw new Error('Import a bundle first.');
@@ -70,7 +69,7 @@ const editorAction = async (change, status = editorStatus) => {
       }));
     }
     const previousScheduleInputs = new Map(current.books.sections.map((section) => [section.label, scheduleInputs(section)]));
-    message = change(current);
+    change(current);
     const changedLabels = current.books.sections
       .filter((section) => scheduleInputs(section) !== previousScheduleInputs.get(section.label))
       .map((section) => section.label);
@@ -87,9 +86,8 @@ const editorAction = async (change, status = editorStatus) => {
   try {
     renderSchedule();
     renderQuarter();
-    editorStatus.textContent = message;
   } catch (error) {
-    editorStatus.textContent = `${message} Unable to refresh the display: ${error.message}. Reload to view the saved change.`;
+    editorStatus.textContent = `Unable to refresh the display: ${error.message}. Reload to view the saved change.`;
   }
   return true;
 };
@@ -171,7 +169,6 @@ const saveBook = async (mode) => {
     }
     window.recalculateReadingHistory(book, current.sessions.sessions[book.id], section.label);
     if (!existing || rangeChanged) normalizeBookOrder(section);
-    return 'Book saved.';
   });
   if (saved) resetBook();
 };
@@ -381,7 +378,6 @@ const saveReadingSession = (current, bookId, dateValue, positionValue, sessionId
   window.recalculateReadingHistory(book, sessions, section.label);
   if (completedBefore) book.target_completed_date = today;
   if (existing) window.clearReadingTargetCompletion(current.plan, current.books, section.label, book, today);
-  return 'Reading session saved.';
 };
 sessionForm.addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -427,7 +423,6 @@ document.querySelector('#session-entry-form').addEventListener('submit', async (
     existing.deleted = true;
     window.recalculateReadingHistory(book, sessions, section.label);
     window.clearReadingTargetCompletion(current.plan, current.books, section.label, book);
-    return 'Reading session deleted.';
   }, document.querySelector('#session-entry-status'));
   if (saved) entryDialog.close();
 });
@@ -547,7 +542,6 @@ document.querySelector('#delete-book').addEventListener('click', async () => {
     section.simultaneous_groups = section.simultaneous_groups.map((group) => group.filter((id) => id !== book.id));
     delete current.sessions.sessions[book.id];
     normalizeBookOrder(section);
-    return 'Book deleted.';
   });
   if (saved) resetBook();
 });
@@ -576,7 +570,6 @@ document.querySelector('#complete-book').addEventListener('click', async () => {
     current.sessions.sessions[book.id].push({ id: crypto.randomUUID(), date: window.ReadingSchedule.today(), ...(audio
       ? { current_time_seconds: end, remaining_time_seconds: 0 } : { current_page: end }) });
     window.recalculateReadingHistory(book, current.sessions.sessions[book.id], section.label);
-    return 'Book completed.';
   });
 });
 for (const [id, offset] of [['#move-book-up', -1], ['#move-book-down', 1]]) {
@@ -587,13 +580,12 @@ for (const [id, offset] of [['#move-book-up', -1], ['#move-book-down', 1]]) {
       return group ? [section.books.findIndex((book) => book.id === group[0]), section.books.findIndex((book) => book.id === group.at(-1))] : [at, at];
     };
     const [start, end] = block(index);
-    if (offset < 0 && start === 0 || offset > 0 && end === section.books.length - 1) return 'Book is already at the edge.';
+    if (offset < 0 && start === 0 || offset > 0 && end === section.books.length - 1) return;
     const [otherStart, otherEnd] = block(offset < 0 ? start - 1 : end + 1);
     const from = Math.min(start, otherStart), to = Math.max(end, otherEnd);
     const moving = section.books.slice(start, end + 1), adjacent = section.books.slice(otherStart, otherEnd + 1);
     section.books.splice(from, to - from + 1, ...(offset < 0 ? [...moving, ...adjacent] : [...adjacent, ...moving]));
     normalizeBookOrder(section);
-    return 'Book moved.';
   }));
 }
 const bookGroupDialog = document.querySelector('#book-group-dialog');
@@ -652,7 +644,6 @@ document.querySelector('#book-group-form').addEventListener('submit', async (eve
       const validated = window.ReadingSchedule.validateGroups(section.books, groups.map((group) => group.map((id) => section.books.findIndex((book) => book.id === id) + 1)));
       section.simultaneous_groups = validated.map((group) => group.map((number) => section.books[number - 1].id));
       section.baseline_needs_recalculation = true;
-      return 'Simultaneous books saved.';
     }, bookGroupStatus);
     if (saved) bookGroupDialog.close();
   } catch (error) { bookGroupStatus.textContent = error.message; }
@@ -661,6 +652,5 @@ document.querySelector('#clear-book-groups').addEventListener('click', async () 
   const section = current.books.sections.find((item) => item.label.trim() === bookFormat.value);
   section.simultaneous_groups = [];
   section.baseline_needs_recalculation = true;
-  return 'Groups cleared.';
 }));
 window.renderEditor();

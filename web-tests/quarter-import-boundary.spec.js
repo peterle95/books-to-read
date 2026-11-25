@@ -25,7 +25,7 @@ test('off-boundary planned quarter imports fail without replacing the stored bun
   await page.getByLabel('Bundle files').setInputFiles(fixture('2030-04-01'));
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: 'Import bundle' }).click();
-  await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+  await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
   const original = await page.evaluate(() => localStorage.getItem('reading-plan-bundle-v1'));
 
   for (const startDate of ['2030-04-02', '2030-05-01']) {

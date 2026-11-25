@@ -50,7 +50,8 @@ test('visible ISO typing validates actual dates before writes and refreshes sess
   expect(await snapshot(page)).toBe(before);
   await date.fill('2028-02-29');
   await page.locator('#save-session').click();
-  await expect(page.getByTestId('editor-status')).toHaveText('Reading session saved.');
+  await expect(page.getByTestId('editor-status')).toBeEmpty();
+  await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
   expect(await page.evaluate(() => readBundleFiles().sessions.sessions.paper[0].date)).toBe('2028-02-29');
 
   await page.locator('#open-entries').click();
@@ -87,7 +88,8 @@ test('new plan date fields reject impossible dates without changing the bundle',
   expect(await snapshot(page)).toBe(before);
   await page.locator('#create-plan-finish').fill('2028-03-31');
   await page.getByRole('button', { name: 'Create plan', exact: true }).click();
-  await expect(page.locator('#new-plan-status')).toHaveText('New plan saved.');
+  await expect(page.locator('#new-plan-status')).toBeEmpty();
+  await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
 });
 
 test('ISO control preserves required, disabled, ID and form values; sync handles programmatic loads', async ({ page }) => {
@@ -118,7 +120,8 @@ test('legacy ISO years are preserved, while year zero has explicit invalid feedb
   await page.locator('#session-date').fill('0099-02-28');
   await page.locator('#session-position').fill('10');
   await page.locator('#save-session').click();
-  await expect(page.getByTestId('editor-status')).toHaveText('Reading session saved.');
+  await expect(page.getByTestId('editor-status')).toBeEmpty();
+  await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
   expect(await page.evaluate(() => readBundleFiles().sessions.sessions.paper[0].date)).toBe('0099-02-28');
   const before = await snapshot(page);
   // Match the existing bundle/Python date contract, not JavaScript's year-zero support.

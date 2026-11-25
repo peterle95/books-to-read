@@ -94,7 +94,7 @@ test('a long-range bundle renders charts, metrics and schedules without unbounde
   page.once('dialog', (dialog) => dialog.accept());
   const started = Date.now();
   await page.getByRole('button', { name: 'Import bundle' }).click();
-  await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+  await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
 
   await page.getByRole('button', { name: 'Charts', exact: true }).click();
   const svg = page.getByRole('img', { name: 'Reading chart for Long range' });

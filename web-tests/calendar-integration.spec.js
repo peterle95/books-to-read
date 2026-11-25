@@ -31,7 +31,7 @@ async function load(page) {
   await page.getByLabel('Bundle files').setInputFiles(payloads);
   page.once('dialog', (dialog) => dialog.accept());
   await tab(page, 'Import bundle');
-  await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+  await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
 }
 
 // Choose exclusively through the visible calendar, never by filling a readonly field.
@@ -120,7 +120,8 @@ test('Books OK only changes draft/events; Cancel, Set and Clear retain unrelated
   expect(await page.evaluate(() => dateEvents)).toEqual(['input', 'change']);
   expect(await rawBundle(page)).toBe(raw);
   await page.locator('#set-book-deadline').click();
-  await expect(page.getByTestId('editor-status')).toContainText('Deadline override saved');
+  await expect(page.getByTestId('editor-status')).toBeEmpty();
+  await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
   const saved = await snapshot(page);
   expect(saved.books.sections[0].books[0].deadline_override).toBe('2030-12-10');
   expect(saved.books.sections[0].books[1]).toEqual(before.books.sections[0].books[1]);
@@ -129,7 +130,8 @@ test('Books OK only changes draft/events; Cancel, Set and Clear retain unrelated
   await expect(page.locator('#book-title')).toHaveValue('Unsaved title');
   await expect(page.locator('#book-to')).toHaveValue('999');
   await page.locator('#clear-book-deadline').click();
-  await expect(page.getByTestId('editor-status')).toContainText('Deadline override cleared');
+  await expect(page.getByTestId('editor-status')).toBeEmpty();
+  await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
   await expect(input).toHaveValue('');
   const cleared = await rawBundle(page);
   await page.locator('#set-book-deadline').click();
@@ -183,7 +185,8 @@ test('Books override calendars reopen saved values and require explicit Set', as
   await chooseDate(page, input, '2030-02-12');
   expect(await rawBundle(page)).toBe(raw);
   await tab(page, 'Set start date');
-  await expect(status).toContainText('Start date override saved for Second');
+  await expect(status).toBeEmpty();
+  await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
   await expect(input).toHaveValue('2030-02-12');
   await input.click();
   await expect(page.locator('#reading-calendar-month')).toHaveText('February 2030');
@@ -191,7 +194,8 @@ test('Books override calendars reopen saved values and require explicit Set', as
   const deadline = page.getByLabel('Deadline override', { exact: true });
   await chooseDate(page, deadline, '2030-10-20');
   await tab(page, 'Set deadline');
-  await expect(status).toContainText('Deadline override saved for Second');
+  await expect(status).toBeEmpty();
+  await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
   await expect(deadline).toHaveValue('2030-10-20');
 });
 
@@ -232,7 +236,8 @@ test('nested history editor types ISO dates without a calendar; Cancel retains r
   await tab(page, 'Session');
   await page.locator('#session-position').fill('10');
   await tab(page, 'Add session');
-  await expect(page.getByTestId('editor-status')).toHaveText('Reading session saved.');
+  await expect(page.getByTestId('editor-status')).toBeEmpty();
+  await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
   await tab(page, 'Entries');
   await page.getByRole('button', { name: /Edit session First/ }).click();
   const input = page.locator('#session-entry-date'), raw = await rawBundle(page);
@@ -265,7 +270,8 @@ for (const timezoneId of ['America/Los_Angeles', 'Pacific/Auckland']) {
       }
       await page.locator('#session-position').fill('10');
       await tab(page, 'Add session');
-      await expect(page.getByTestId('editor-status')).toHaveText('Reading session saved.');
+      await expect(page.getByTestId('editor-status')).toBeEmpty();
+      await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
       expect((await snapshot(page)).sessions.sessions.first[0].date).toBe('2028-11-05');
     });
   });

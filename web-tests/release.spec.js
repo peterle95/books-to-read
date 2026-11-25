@@ -29,7 +29,7 @@ write_json_bundle(sys.argv[1], [BookSection(label, [], []) for label in ['Physic
     await page.getByLabel('Bundle files').setInputFiles(names.map((name) => path.join(directory, name)));
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: 'Import bundle' }).click();
-    await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+    await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
     await run(directory);
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
@@ -64,7 +64,8 @@ test('saved web plan dates and rest days transfer to desktop', async ({ page }) 
     await page.getByLabel('Start date', { exact: true }).fill('2026-10-01');
     await page.getByLabel('Finish date', { exact: true }).fill('2026-12-20');
     await page.getByRole('button', { name: 'Create plan' }).click();
-    await expect(page.locator('#new-plan-status')).toHaveText('New plan saved.');
+    await expect(page.locator('#new-plan-status')).toBeEmpty();
+    await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
     await chooseDate(page, page.getByLabel('Rest start date'), '2026-11-10');
     await chooseDate(page, page.getByLabel('Rest end date'), '2026-11-11');
     await page.getByRole('button', { name: 'Add rest-day range' }).click();
@@ -91,7 +92,8 @@ test('books in all formats can be created and edited offline, then opened on des
       await page.locator('#book-from').fill(from);
       await page.locator('#book-to').fill(to);
       await page.locator('#add-book').click();
-      await expect(page.getByTestId('editor-status')).toHaveText('Book saved.');
+      await expect(page.getByTestId('editor-status')).toBeEmpty();
+      await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
     }
     await editBook(page, 'Paper');
     await page.locator('#book-title').fill('Paper revised');
@@ -105,7 +107,8 @@ test('books in all formats can be created and edited offline, then opened on des
     await page.locator('#session-date').fill('2026-11-01');
     await page.getByLabel('Time left', { exact: true }).fill('3000');
     await page.getByRole('button', { name: 'Add session', exact: true }).click();
-    await expect(page.getByTestId('editor-status')).toHaveText('Reading session saved.');
+    await expect(page.getByTestId('editor-status')).toBeEmpty();
+    await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
     await checkExport(page, directory, `assert [s.books[0].title for s in sections] == ['Paper revised', 'Digital', 'Audio']
 assert sections[1].books[0].start_page == 10
 assert sections[2].books[0].end_page == 3600
@@ -137,7 +140,7 @@ m['files']['sessions.json'] = hashlib.sha256((p/'sessions.json').read_bytes()).h
     await page.getByLabel('Bundle files').setInputFiles(names.map((name) => path.join(directory, name)));
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: 'Import bundle' }).click();
-    await expect(page.getByTestId('bundle-status')).toContainText('repaired');
+    await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
     await page.reload();
     await tab(page, 'Session');
     await page.getByRole('button', { name: 'Entries', exact: true }).click();
@@ -166,7 +169,7 @@ m['files']['sessions.json'] = hashlib.sha256((p/'sessions.json').read_bytes()).h
     await page.getByLabel('Bundle files').setInputFiles(files);
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: 'Import bundle' }).click();
-    await expect(page.getByTestId('bundle-status')).toContainText('repaired');
+    await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
     const download = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Export bundle ZIP' }).click();
     const zip = path.join(directory, 'ordered.zip'); await (await download).saveAs(zip);
@@ -194,13 +197,14 @@ b=json.loads((p/'books.json').read_text()); del b['sections'][0]['books'][0]['cu
     await page.getByLabel('Bundle files').setInputFiles(names.map((name) => path.join(directory, name)));
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: 'Import bundle' }).click();
-    await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+    await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
     await tab(page, 'Books');
     for (const title of ['Implicit paper', 'Implicit audio']) {
       await editBook(page, title);
       await page.locator('#book-title').fill(`${title} revised`);
       await page.locator('#replace-book').click();
-      await expect(page.getByTestId('editor-status')).toHaveText('Book saved.');
+      await expect(page.getByTestId('editor-status')).toBeEmpty();
+      await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
     }
     await page.reload();
     await checkExport(page, directory, `assert sections[0].books[0].current_page == 40
@@ -215,7 +219,8 @@ test('backdated history can be recorded, corrected and deleted without changing 
     await page.locator('#book-from').fill('1');
     await page.locator('#book-to').fill('100');
     await page.locator('#add-book').click();
-    await expect(page.getByTestId('editor-status')).toHaveText('Book saved.');
+    await expect(page.getByTestId('editor-status')).toBeEmpty();
+    await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
     await page.evaluate(() => navigator.serviceWorker.ready);
     await context.setOffline(true);
     await tab(page, 'Session');
@@ -223,13 +228,15 @@ test('backdated history can be recorded, corrected and deleted without changing 
       await page.locator('#session-date').fill(date);
       await page.getByLabel('Current page', { exact: true }).fill(position);
       await page.getByRole('button', { name: 'Add session', exact: true }).click();
-      await expect(page.getByTestId('editor-status')).toHaveText('Reading session saved.');
+      await expect(page.getByTestId('editor-status')).toBeEmpty();
+      await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
     }
     await page.getByRole('button', { name: 'Entries', exact: true }).click();
     await page.getByRole('button', { name: 'Edit session History 2026-11-01', exact: true }).click();
     await page.locator('#session-entry-position').fill('15');
     await page.locator('#session-entry-save').click();
-    await expect(page.getByTestId('editor-status')).toHaveText('Reading session saved.');
+    await expect(page.getByTestId('editor-status')).toBeEmpty();
+    await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
     await page.reload();
     await page.getByRole('button', { name: 'Entries', exact: true }).click();
     await expect(page.getByRole('list', { name: 'Reading history', exact: true })).toContainText('contribution 15');
@@ -248,7 +255,8 @@ assert book.baseline_schedule.daily_target == 100 / 92`);
     await page.getByRole('button', { name: 'Entries', exact: true }).click();
     await page.getByRole('button', { name: 'Delete session History 2026-11-01', exact: true }).click();
     await page.getByRole('dialog', { name: 'Delete entry?', exact: true }).getByRole('button', { name: 'Delete', exact: true }).click();
-    await expect(page.getByTestId('editor-status')).toHaveText('Reading session deleted.');
+    await expect(page.getByTestId('editor-status')).toBeEmpty();
+    await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
     await page.getByRole('button', { name: 'Close', exact: true }).click();
     await checkExport(page, directory, `book = sections[0].books[0]
 assert book.current_page == 30
@@ -280,12 +288,13 @@ write_json_bundle(sys.argv[1], sections, date(2026, 10, 1), date(2026, 12, 31), 
     await page.getByLabel('Bundle files').setInputFiles(names.map((name) => ({ name, mimeType: 'application/json', buffer: original[name] })));
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: 'Import bundle' }).click();
-    await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+    await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
     await tab(page, 'Books');
     await editBook(page, first.title);
     await page.locator('#book-title').fill(`${first.title} — web transfer check`);
     await page.locator('#replace-book').click();
-    await expect(page.getByTestId('editor-status')).toHaveText('Book saved.');
+    await expect(page.getByTestId('editor-status')).toBeEmpty();
+    await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
     await checkExport(page, directory, `from shutil import copy2
 from reading_plan import write_json_bundle, read_json_bundle_metadata
 source = Path(sys.argv[1]) / 'source'
@@ -303,7 +312,7 @@ write_json_bundle(destination, sections, start, end, label, options, rest, plann
     await page.getByLabel('Bundle files').setInputFiles(names.map((name) => path.join(directory, 'exported', name)));
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: 'Import bundle' }).click();
-    await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+    await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
     await tab(page, 'Books');
     await editBook(page, `${first.title} — web transfer check`);
     await expect(page.locator('#book-title')).toHaveValue(`${first.title} — web transfer check`);
@@ -320,11 +329,13 @@ test('clock input, start-date overrides, preserved summary settings and planned-
     await page.locator('#book-from').fill('0:00');
     await page.locator('#book-to').fill('2:00:30');
     await page.locator('#add-book').click();
-    await expect(page.getByTestId('editor-status')).toHaveText('Book saved.');
+    await expect(page.getByTestId('editor-status')).toBeEmpty();
+    await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
     await editBook(page, 'Clock audio');
     await chooseDate(page, page.getByLabel('Start date override', { exact: true }), '2026-11-10');
     await page.getByRole('button', { name: 'Set start date', exact: true }).click();
-    await expect(page.getByTestId('editor-status')).toContainText('Start date override saved');
+    await expect(page.getByTestId('editor-status')).toBeEmpty();
+    await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save summary settings' })).toHaveCount(0);
     await tab(page, 'Plan');
@@ -371,8 +382,10 @@ write_csv(sys.argv[1], plans, date(2026,10,1), date(2026,12,31), total, pace, st
 `, csv]);
     await page.getByLabel('CSV plan file').setInputFiles(csv);
     page.once('dialog', (dialog) => dialog.accept());
+    const csvRevision = await page.evaluate(() => readBundleFiles()?.manifest.revision ?? -1);
     await page.getByRole('button', { name: 'Import CSV plan', exact: true }).click();
-    await expect(page.getByTestId('csv-status')).toHaveText('CSV plan imported. Reading history is not included in CSV.');
+    await expect(page.getByTestId('csv-status')).toBeEmpty();
+    await expect.poll(() => page.evaluate(() => readBundleFiles()?.manifest.revision)).toBeGreaterThan(csvRevision);
     const download = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Export CSV plan', exact: true }).click();
     const exported = path.join(directory, 'web.csv');
@@ -397,7 +410,8 @@ test('charts default to unfinished reading, All includes finished books, and met
       await page.locator('#book-from').fill('1');
       await page.locator('#book-to').fill('100');
       await page.locator('#add-book').click();
-      await expect(page.getByTestId('editor-status')).toHaveText('Book saved.');
+      await expect(page.getByTestId('editor-status')).toBeEmpty();
+      await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
     }
     await tab(page, 'Session');
     for (const [title, position] of [['Finished', '100'], ['Ongoing', '30']]) {
@@ -405,7 +419,8 @@ test('charts default to unfinished reading, All includes finished books, and met
       await page.locator('#session-date').fill('2026-11-01');
       await page.getByLabel('Current page', { exact: true }).fill(position);
       await page.getByRole('button', { name: 'Add session', exact: true }).click();
-      await expect(page.getByTestId('editor-status')).toHaveText('Reading session saved.');
+      await expect(page.getByTestId('editor-status')).toBeEmpty();
+      await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
     }
     await tab(page, 'Charts');
     const selector = page.getByRole('combobox', { name: 'Book', exact: true });
@@ -442,11 +457,13 @@ test('book positions and deletion persist, while invalid range edits leave the s
       await page.locator('#book-from').fill('1');
       await page.locator('#book-to').fill('50');
       await page.locator('#add-book').click();
-      await expect(page.getByTestId('editor-status')).toHaveText('Book saved.');
+      await expect(page.getByTestId('editor-status')).toBeEmpty();
+      await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
     }
     await editBook(page, 'Second');
     await page.getByRole('button', { name: 'Move Up', exact: true }).click();
-    await expect(page.getByTestId('editor-status')).toHaveText('Book moved.');
+    await expect(page.getByTestId('editor-status')).toBeEmpty();
+    await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
     await checkExport(page, directory, `assert [b.title for b in sections[0].books] == ['Second', 'First']`);
     await tab(page, 'Books');
     await editBook(page, 'Second');
@@ -457,7 +474,8 @@ test('book positions and deletion persist, while invalid range edits leave the s
     await tab(page, 'Books');
     await editBook(page, 'First');
     await page.getByRole('button', { name: 'Delete Selected', exact: true }).click();
-    await expect(page.getByTestId('editor-status')).toHaveText('Book deleted.');
+    await expect(page.getByTestId('editor-status')).toBeEmpty();
+    await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
     await checkExport(page, directory, `assert len(sections[0].books) == 1
 assert sections[0].books[0].title == 'Second' and sections[0].books[0].end_page == 50`);
   });

@@ -23,7 +23,7 @@ write_json_bundle(sys.argv[1], sections, date(2030,1,1), date(2030,3,31), 'Quart
       await page.getByLabel('Bundle files').setInputFiles(names.map((name) => path.join(directory, name)));
       page.once('dialog', (dialog) => dialog.accept());
       await page.getByRole('button', { name: 'Import bundle', exact: true }).click();
-      await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+      await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
     };
     await importFiles();
     await page.getByRole('button', { name: 'Books', exact: true }).click();

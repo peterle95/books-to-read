@@ -22,7 +22,7 @@ write_json_bundle(sys.argv[1], books, today, today + timedelta(days=3), 'Quarter
     await page.getByLabel('Bundle files').setInputFiles(['plan.json', 'books.json', 'sessions.json', 'manifest.json'].map((name) => path.join(directory, name)));
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: 'Import bundle' }).click();
-    await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+    await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
     await page.getByRole('button', { name: 'Session', exact: true }).click();
     const today = await page.evaluate(() => window.ReadingSchedule.today());
     const getBook = (id) => page.evaluate((bookId) => readBundleFiles().books.sections.flatMap((section) => section.books).find((book) => book.id === bookId), id);
@@ -48,7 +48,8 @@ write_json_bundle(sys.argv[1], books, today, today + timedelta(days=3), 'Quarter
     await expect(page.locator('#session-form')).toContainText(/Pages per day\s*2/);
     await position.fill('2');
     await page.getByRole('button', { name: 'Add session' }).click();
-    await expect(page.getByTestId('editor-status')).toHaveText('Reading session saved.');
+    await expect(page.getByTestId('editor-status')).toBeEmpty();
+    await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
     expect((await getBook('paper')).target_completed_date).toBe(today);
 
     await edit('paper', today);

@@ -33,7 +33,7 @@ test('New plan cancellation preserves the bundle; confirmed replacement clears o
     await page.getByLabel('Bundle files').setInputFiles(fixture());
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: 'Import bundle' }).click();
-    await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+    await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
     await page.getByRole('button', { name: 'Plan', exact: true }).click();
     const original = await page.evaluate(() => localStorage.getItem('reading-plan-bundle-v1'));
     const open = page.getByRole('button', { name: 'New plan', exact: true });
@@ -67,7 +67,8 @@ test('New plan cancellation preserves the bundle; confirmed replacement clears o
     await page.getByLabel('Start date', { exact: true }).fill('2028-01-01');
     await page.getByLabel('Finish date', { exact: true }).fill('2028-02-14');
     await page.getByRole('button', { name: 'Create plan' }).click();
-    await expect(page.locator('#new-plan-status')).toHaveText('New plan saved.');
+    await expect(page.locator('#new-plan-status')).toBeEmpty();
+    await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
     const data = await page.evaluate(() => readBundleFiles());
     expect(data.plan).toMatchObject({ start_date: '2028-01-01', end_date: '2028-02-14', end_label: 'Target finish date', rest_days: [] });
     expect(data.books.sections.map((section) => [section.label, section.books, section.simultaneous_groups])).toEqual([
@@ -84,7 +85,7 @@ test('New plan cancellation preserves the bundle; confirmed replacement clears o
     await page.getByLabel('Bundle files').setInputFiles([...names, 'manifest.json'].map((name) => path.join(directory, name)));
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: 'Import bundle' }).click();
-    await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+    await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
     await page.reload();
     const restored = await page.evaluate(() => readBundleFiles());
     expect(restored.plan).toEqual(data.plan);
@@ -101,6 +102,7 @@ test('New plan creates a complete bundle without prior import', async ({ page })
   await page.getByRole('button', { name: 'Plan next quarter', exact: true }).click();
   await page.getByRole('button', { name: 'New plan', exact: true }).click();
   await page.getByRole('button', { name: 'Create plan', exact: true }).click();
-  await expect(page.locator('#new-plan-status')).toHaveText('New plan saved.');
+  await expect(page.locator('#new-plan-status')).toBeEmpty();
+  await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
   expect((await page.evaluate(() => readBundleFiles())).manifest.files).toHaveProperty(['sessions.json']);
 });
