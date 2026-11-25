@@ -83,7 +83,6 @@ button:disabled { opacity: .55; cursor: wait; }
 .tab-bar button { flex: 1; margin: 0; min-width: 0; min-height: 2.875rem; padding: .65rem .15rem; box-shadow: 0 2px 3px #3a241a26; }
 .tab-bar button[aria-current="page"] { background: #3a241a; border-color: #3a241a; color: #fff8f0; }
 #screen-charts > section { background: transparent; border: 0; box-shadow: none; padding: 0; }
-#screen-charts > section > p { max-width: 65rem; }
 #screen-charts figure { margin: .75rem 0; padding: 0; background: #fff8f0; overflow-x: auto; }
 #screen-charts svg { min-width: 0; }
 .charts-heading { display: flex; align-items: center; gap: 2px; }

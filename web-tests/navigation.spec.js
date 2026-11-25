@@ -1,6 +1,6 @@
 const { test, expect } = require('@playwright/test');
 
-test('four tabs show one screen at a time and preserve an unsaved plan draft', async ({ page }) => {
+test('four tabs show one screen at a time', async ({ page }) => {
   await page.goto('./');
   const tabs = page.getByRole('navigation', { name: 'Main navigation' });
   await expect(page.locator('main > .screen:not([hidden])')).toHaveCount(1);
@@ -8,19 +8,16 @@ test('four tabs show one screen at a time and preserve an unsaved plan draft', a
   await tabs.getByRole('button', { name: 'Plan' }).click();
   await expect(page.getByRole('heading', { name: 'Reading schedule' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Next quarter' })).toBeVisible();
-  await page.getByLabel('Reading plan').fill('Unsaved draft');
   await tabs.getByRole('button', { name: 'Books' }).click();
   await expect(page.locator('#screen-plan')).toBeHidden();
   await expect(page.locator('#screen-books')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Reading schedule' })).toBeHidden();
   await tabs.getByRole('button', { name: 'Charts' }).click();
+  await expect(page.locator('#screen-charts')).toBeVisible();
   await tabs.getByRole('button', { name: 'Plan' }).click();
-  await expect(page.getByLabel('Reading plan')).toHaveValue('Unsaved draft');
+  await expect(page.locator('#screen-plan')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Reading schedule' })).toBeVisible();
   await expect(page.locator('main > .screen:not([hidden])')).toHaveCount(1);
-  await page.getByRole('button', { name: 'Save plan' }).click();
-  await page.reload();
-  await tabs.getByRole('button', { name: 'Plan' }).click();
-  await expect(page.getByLabel('Reading plan')).toHaveValue('Unsaved draft');
 });
 
 test('settings remain accessible by keyboard and return to the previous tab', async ({ page }) => {

@@ -170,7 +170,6 @@ test('populated 360x732 first fold preserves native page gutters and useful land
   expect(plot.height).toBe(500);
   expect(plot.width).toBeLessThanOrEqual(328);
   expect(nav.y - plot.y).toBeGreaterThan(350);
-  expect(await page.locator('#screen-charts > section > p').evaluate((node) => node.getBoundingClientRect().top)).toBeGreaterThanOrEqual(plot.y + plot.height);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(360);
   await page.screenshot({ path: testInfo.outputPath('populated-charts-360x732.png') });
   expect(await page.evaluate(() => localStorage.getItem(bundleKey))).toBe(original);

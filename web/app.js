@@ -1,7 +1,3 @@
-const form = document.querySelector('#plan-form');
-const plan = document.querySelector('#plan');
-const status = document.querySelector('#status');
-const storageKey = 'reading-plan-draft-v1';
 const bundleKey = 'reading-plan-bundle-v1';
 const bundleNames = ['plan.json', 'books.json', 'sessions.json', 'manifest.json'];
 const bundleMessage = document.querySelector('#bundle-status');
@@ -78,25 +74,10 @@ function showExports() {
 }
 
 try {
-  plan.value = localStorage.getItem(storageKey) || '';
   showExports();
 } catch {
-  status.textContent = 'Unable to read storage on this device.';
+  document.querySelector('#editor-status').textContent = 'Unable to read storage on this device.';
 }
-
-form.addEventListener('submit', (event) => {
-  event.preventDefault();
-  try {
-    localStorage.setItem(storageKey, plan.value);
-    status.textContent = 'Plan saved on this device.';
-  } catch {
-    status.textContent = 'Unable to save. Your plan has not been stored.';
-  }
-});
-
-plan.addEventListener('input', () => {
-  status.textContent = '';
-});
 
 // The browser reads a selected file from disk when the import asks for bytes,
 // not when the input changes. Antivirus, indexing or sync software can hold a
@@ -179,7 +160,7 @@ document.querySelector('#bundle-form').addEventListener('submit', async (event) 
       manifest.files['sessions.json'] = await digest(buffers['sessions.json']);
       buffers['manifest.json'] = encoder.encode(JSON.stringify(manifest));
     }
-    if (!window.confirm('Replace the stored reading-plan bundle with these files? The text draft will not change.')) {
+    if (!window.confirm('Replace the stored reading-plan bundle with these files?')) {
       bundleMessage.textContent = 'Import cancelled. Stored bundle unchanged.';
       return;
     }
@@ -1057,6 +1038,6 @@ if ('serviceWorker' in navigator) {
       if (!document.hidden) checkForUpdate();
     });
   }).catch(() => {
-    status.textContent = 'Offline access is unavailable. Please reconnect and reload.';
+    document.querySelector('#editor-status').textContent = 'Offline access is unavailable. Please reconnect and reload.';
   });
 }

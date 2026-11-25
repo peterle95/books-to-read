@@ -40,7 +40,7 @@ test('active plan actions expose next quarter and explicit recalculation; rest a
   await page.goto('./');
   await page.getByRole('button', { name: 'Plan', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Plan', exact: true })).toBeVisible();
-  expect(await page.locator('#rest-heading').evaluate((element) => !!(element.compareDocumentPosition(document.querySelector('#plan-form')) & Node.DOCUMENT_POSITION_FOLLOWING))).toBe(true);
+  expect(await page.locator('#rest-heading').evaluate((element) => !!(element.compareDocumentPosition(document.querySelector('#schedule-heading')) & Node.DOCUMENT_POSITION_FOLLOWING))).toBe(true);
   await expect(page.getByRole('button', { name: 'Recalculate current plan' })).toBeHidden();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByLabel('Bundle files').setInputFiles(fixture());

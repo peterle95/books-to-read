@@ -1,10 +1,10 @@
 # Reading Plan web app
 
-An offline web app for structured reading plans, books, reading history, schedules and projections. It also keeps a separate text draft. There is no automatic synchronization. Clearing site data or losing the device can erase saved data; keep exported backups outside the browser.
+An offline web app for structured reading plans, books, reading history, schedules and projections. There is no automatic synchronization. Clearing site data or losing the device can erase saved data; keep exported backups outside the browser.
 
 ## Transfer a bundle
 
-Select `plan.json`, `books.json`, `sessions.json`, and `manifest.json` together, then import. Validation runs before confirmation; confirming replaces the previously stored bundle, not the text draft. To transfer back, download the bundle ZIP, extract its four files into a new empty folder, and open that folder in the desktop app. Unedited files retain their original bytes. Structured edits update the affected files and manifest checksums. Positive session-chain amount mismatches are repaired in canonical session order; invalid or regressing progress is rejected before replacement.
+Select `plan.json`, `books.json`, `sessions.json`, and `manifest.json` together, then import. Validation runs before confirmation; confirming replaces the previously stored bundle. To transfer back, download the bundle ZIP, extract its four files into a new empty folder, and open that folder in the desktop app. Unedited files retain their original bytes. Structured edits update the affected files and manifest checksums. Positive session-chain amount mismatches are repaired in canonical session order; invalid or regressing progress is rejected before replacement.
 
 There is no merge or automatic sync. Use one active editor at a time, including browser tabs: finish saves and export from one app before importing into the other, and keep a backup before replacement. Changes made independently in two places cannot be combined here. The native Android and desktop apps remain available.
 
@@ -20,7 +20,7 @@ Import a desktop CSV plan or export the current plan to CSV, including ranges, p
 
 ## Back up
 
-**Export bundle ZIP** backs up the complete structured plan using the four desktop-compatible files, including web edits. It does not include the separate text draft or unsaved form fields; copy those separately if needed. The reminder appears when no backup has been requested on this device or the last request was more than a week ago; exporting resets it. Verify the download completed and keep the ZIP somewhere other than this browser. Installation does not protect browser storage from eviction or deletion.
+**Export bundle ZIP** backs up the complete structured plan using the four desktop-compatible files, including web edits. It does not include unsaved form fields; re-enter those if needed. The reminder appears when no backup has been requested on this device or the last request was more than a week ago; exporting resets it. Verify the download completed and keep the ZIP somewhere other than this browser. Installation does not protect browser storage from eviction or deletion.
 
 ## Schedule the plan
 
@@ -54,7 +54,7 @@ In the repository's **Settings → Pages**, select **GitHub Actions** as the bui
 
 Every deployment publishes a new app version. The app looks for an update when it opens or regains focus, but discovery timing is a browser decision and is not promised. When an update is found, a notice at the top of the page says so and the app keeps running: nothing reloads on its own, so an edit in progress is not interrupted. **Reload to update** applies the update when you choose.
 
-Updates replace only the cached app files. The text draft, reading schedule and imported bundle stay in this browser across versions, so no migration step is needed between current versions.
+Updates replace only the cached app files. The reading schedule and imported bundle stay in this browser across versions, so no migration step is needed between current versions.
 
 ## Release verification
 

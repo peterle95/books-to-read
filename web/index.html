@@ -137,13 +137,6 @@
         <button type="submit">Add rest-day range</button>
       </form>
     </section>
-    <p>Write a separate text draft to keep on this device, even when you're offline.</p>
-    <form id="plan-form">
-      <label for="plan">Reading plan</label>
-      <textarea id="plan" rows="8" placeholder="What would you like to read?"></textarea>
-      <button type="submit">Save plan</button>
-    </form>
-    <p id="status" role="status" aria-live="polite"></p>
     <section aria-labelledby="schedule-heading">
       <h2 id="schedule-heading">Reading schedule</h2>
       <p>Set the plan dates and rest days, then calculate the baseline schedule. Rest days reduce the days available for reading, but they do not move the baseline dates. Books in a simultaneous group share a start and finish while their daily targets are split by remaining work. A deadline override gives one book an independent schedule until you clear it. The baseline schedule stays saved until you calculate it again.</p>
@@ -207,7 +200,6 @@
     <section aria-labelledby="charts-heading">
       <div class="charts-heading"><h2 id="charts-heading">Charts</h2><button id="charts-all" type="button" aria-pressed="false">All</button><button id="metrics-open" type="button">Metrics</button></div>
       <div id="charts"></div>
-      <p>All is off by default: charts show books with progress that are not finished. Plan and actual use the left axis; read/required per day uses the right axis. Projection ranges are estimates, not guarantees.</p>
     </section>
     <dialog id="metrics-dialog" aria-label="Reading metrics">
       <div class="metrics-heading"><h2>Metrics</h2><button id="metrics-close" type="button">Close</button></div>
@@ -223,7 +215,7 @@
     </section>
     <section aria-labelledby="bundle-heading">
       <h2 id="bundle-heading">Transfer desktop bundle</h2>
-      <p>Manual transfer is the browser exception: select all four JSON files (plan.json, books.json, sessions.json and manifest.json) to validate and replace the stored bundle. ZIP import is not supported here; extract the four files first. This does not change the text draft, and importing a bundle replaces the reading schedule saved for the previous bundle. Export a ZIP to transfer the bundle back to desktop. Keep only one active editor, including browser tabs.</p>
+      <p>Manual transfer is the browser exception: select all four JSON files (plan.json, books.json, sessions.json and manifest.json) to validate and replace the stored bundle. ZIP import is not supported here; extract the four files first. Importing a bundle replaces the reading schedule saved for the previous bundle. Export a ZIP to transfer the bundle back to desktop. Keep only one active editor, including browser tabs.</p>
       <form id="bundle-form">
         <label for="bundle-files">Bundle files</label>
         <input id="bundle-files" type="file" accept=".json,application/json" multiple required>
