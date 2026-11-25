@@ -201,10 +201,13 @@ dialog:not(#entries-dialog):not(#metrics-dialog) h2 { font-size: 1.25rem; font-w
 #screen-books button { font-size: .9375rem; }
 #screen-plan .plan-heading { margin-bottom: .25rem; }
 #screen-plan .plan-heading h2 { margin: 0; }
+.plan-sections { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-block: .5rem; }
+#screen-plan .plan-sections button { margin: 0; padding-inline: .25rem; }
+#schedule-status:empty { display: none; }
 .plan-action-buttons { display: flex; flex-wrap: wrap; gap: .5rem; margin: .25rem 0 .5rem; }
 .plan-action-buttons button { flex: 1 1 auto; margin: 0; }
 #planned-quarter-summary { font-size: .875rem; line-height: 1.2; margin: .25rem 0; color: #6f4e37; }
-#screen-plan > section:first-child > p:not([role="status"]), #screen-plan #plan-actions > p:not([role="status"]) { font-size: .875rem; line-height: 1.2; margin: .375rem 0 .25rem; color: #6f4e37; }
+#screen-plan #plan-actions > p:not([role="status"]) { font-size: .875rem; line-height: 1.2; margin: .375rem 0 .25rem; color: #6f4e37; }
 #screen-plan #plan-actions { padding-top: .5rem; }
 #new-plan-books-fieldset { box-sizing: border-box; margin: .75rem 0 .25rem; padding: .5rem .75rem; border: 1px solid #d6baa1; border-radius: .875rem; background: #f7ede2; }
 #new-plan-books-fieldset legend { padding: 0 .25rem; font-size: .875rem; }

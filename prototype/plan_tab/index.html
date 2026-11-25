@@ -1,0 +1,218 @@
+<!doctype html>
+<!-- Throwaway prototype: which layout makes a long reading plan easiest to navigate? -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Three responsive layouts for the Books to Read Plan tab.">
+<title>Plan tab prototype · Books to Read</title>
+<style>
+  :root{color-scheme:light;--paper:#f6f4ee;--white:#fffefa;--ink:#1d2c26;--muted:#51635a;--line:#d7ddd3;--green:#205440;--wash:#e6efe6;--gold:#f5ebd4;--radius:16px}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font:1rem/1.5 system-ui,sans-serif}
+  button,select{font:inherit;color:inherit}
+  button,select,summary{cursor:pointer;min-height:44px}
+  button,select{border:1px solid var(--line);background:var(--white);border-radius:9px;padding:.55rem .8rem}
+  button:hover,summary:hover{background:var(--wash)}
+  :focus-visible{outline:3px solid #a1532e;outline-offset:3px}
+  h1,h2,h3,p{margin:0}
+  h1,h2,.date{font-family:Georgia,serif;font-weight:normal;line-height:1.12}
+  h1{font-size:clamp(2.7rem,7vw,4.7rem);letter-spacing:-.05em}
+  h2{font-size:clamp(1.65rem,4vw,2.35rem);letter-spacing:-.035em}
+  h3{font-size:1rem}
+  .wrap{width:min(100% - 2rem,68rem);margin-inline:auto}
+  header{border-bottom:1px solid var(--line);background:var(--white)}
+  .brand,.intro,.heading,.summary-line{display:flex;align-items:center;justify-content:space-between;gap:1rem}
+  .brand{min-height:64px}
+  .brand strong::before{content:"";display:inline-block;width:.75rem;height:.95rem;margin-right:.55rem;vertical-align:-.1rem;border-radius:2px 4px 4px 2px;background:var(--green);box-shadow:inset 3px 0 #a9c6ab}
+  .eyebrow{font-size:.73rem;font-weight:750;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+  main{padding-block:clamp(1.5rem,5vw,3.5rem) 7rem}
+  .intro{align-items:end;margin-bottom:1.5rem}
+  .intro p,.muted{color:var(--muted)}
+  .intro h1{margin:.25rem 0 .35rem}
+  .stamp{white-space:nowrap;border:1px solid var(--line);padding:.45rem .7rem;border-radius:99px;font-size:.8rem}
+  .tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:.35rem;padding:.35rem;border:1px solid var(--line);border-radius:13px;background:var(--white);margin-bottom:1rem}
+  .tabs button{border-color:transparent;line-height:1.2}
+  .tabs [aria-pressed=true],.shelf [aria-pressed=true]{background:var(--green);color:white}
+  .panel{border:1px solid var(--line);border-radius:var(--radius);background:var(--white);padding:clamp(1rem,3vw,1.65rem)}
+  .panel>p,.heading+p{margin-top:.45rem}
+  .plan-grid,.compare{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;margin-top:1.15rem}
+  .quarter{background:var(--wash);border-radius:12px;padding:1rem}
+  .date{font-size:clamp(1.55rem,4vw,2rem);margin:.35rem 0}
+  dl{margin:0}
+  .facts>div,.book-row{display:grid;align-items:center;border-top:1px solid var(--line);padding:.7rem 0;gap:.5rem}
+  .facts>div{grid-template-columns:1fr 1fr}
+  dt{color:var(--muted)}
+  dd{margin:0;font-weight:650}
+  .rows{margin-top:1.15rem}
+  .book-row{grid-template-columns:minmax(0,1.35fr) minmax(0,1fr) minmax(0,1fr)}
+  .book-row small,.metric small{display:block;color:var(--muted)}
+  .book-row>div,.facts dd{overflow-wrap:anywhere}
+  .accordion{display:grid;gap:.65rem}
+  .accordion>details{border:1px solid var(--line);border-radius:var(--radius);background:var(--white);overflow:hidden}
+  .accordion summary{list-style:none;display:grid;grid-template-columns:2rem minmax(0,1fr) auto 1rem;align-items:center;gap:.65rem;padding:.9rem 1rem}
+  .accordion summary::-webkit-details-marker{display:none}
+  .accordion summary:focus-visible{outline-offset:-4px}
+  .accordion summary::after{content:"+";font-size:1.15rem}
+  .accordion [open]>summary::after{content:"−"}
+  .accordion [open]>summary{background:var(--wash)}
+  .accordion .panel{border:0}
+  .workspace{display:grid;grid-template-columns:minmax(13rem,1fr) minmax(0,3fr);gap:1rem;align-items:start}
+  .shelf{display:grid;gap:.45rem;margin:1rem 0}
+  .shelf button{text-align:left}
+  .shelf small{display:block;opacity:.9}
+  .mobile-picker{display:none}
+  .compare>section{border-top:3px solid var(--green);padding-top:.7rem}
+  .compare>section+section{border-color:#ab763f}
+  .metric{margin:.7rem 0;padding:.8rem;background:var(--wash);border-radius:10px}
+  .metric.forecast{background:var(--gold)}
+  .compact-plan{margin-top:1rem}
+  .compact-plan summary{padding:.65rem 0}
+  .switcher{position:fixed;bottom:max(.75rem,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);max-width:calc(100% - 1rem);display:flex;align-items:center;gap:.4rem;padding:.25rem;background:#172620;color:white;border-radius:99px;box-shadow:0 6px 18px #15221836}
+  .switcher button{border:0;border-radius:99px;background:#35473e;color:white;min-width:44px}
+  .switcher button:hover{background:#496454}
+  .switcher output{text-align:center;min-width:9rem;font-size:.85rem}
+  @media(max-width:650px){
+    .workspace,.plan-grid{grid-template-columns:1fr}
+    .workspace>.panel:first-child{padding-block:.65rem}
+    .shelf,.desktop-picker{display:none}
+    .mobile-picker{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:.55rem}
+    .mobile-picker select{width:100%}
+  }
+  @media(max-width:460px){
+    .intro{align-items:start;flex-direction:column;gap:.65rem}
+    .tabs button{font-size:.84rem;padding:.45rem .2rem}
+    .book-row{grid-template-columns:repeat(2,minmax(0,1fr));font-size:.9rem}
+    .book-row>div:first-child{grid-column:1/-1}
+    .accordion summary{grid-template-columns:1.4rem minmax(0,1fr) 1rem}
+    .summary-hint{display:none}
+    .compare{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<header><div class="wrap brand"><strong>Books to Read</strong><span class="eyebrow">Prototype</span></div></header>
+<main class="wrap">
+  <div class="intro">
+    <div><div class="eyebrow">Reading notebook</div><h1>Plan</h1><p id="intro"></p></div>
+    <span class="stamp">Oct–Dec 2026 · Sample data</span>
+  </div>
+  <div id="layout"></div>
+</main>
+<nav class="switcher" aria-label="Prototype layout">
+  <button type="button" id="previous" aria-label="Previous layout">←</button>
+  <output id="variant-label" aria-live="polite"></output>
+  <button type="button" id="next" aria-label="Next layout">→</button>
+</nav>
+<script>
+  const books = [
+    { title: 'The Living Mountain', format: 'Paperback', left: '70 pages left', baseline: 'Dec 6', pace: '3 pages/day', finish: 'Nov 29', range: 'Nov 26–Dec 4', override: 'Dec 1' },
+    { title: 'Braiding Sweetgrass', format: 'E-book', left: '118 pages left', baseline: 'Dec 16', pace: '6 pages/day', finish: 'Dec 13', range: 'Dec 9–20' },
+    { title: 'The Anthropocene Reviewed', format: 'Audiobook', left: '2 hr 40 min left', baseline: 'Dec 20', pace: '7 min/day', finish: 'Not enough history', range: 'No range yet' },
+  ];
+  const sections = ['Plan', 'Reading schedule', 'Reading projections'];
+  const hints = ['Oct 1–Dec 20', '3 books', '2 estimates'];
+  const descriptions = [
+    'Choose a section to focus on one part of your plan.',
+    'Open a section for details without leaving the overview.',
+    'Compare the schedule and forecast for one book at a time.',
+  ];
+  const names = ['Top tabs', 'Accordion', 'Book focus'];
+  const layout = document.querySelector('#layout');
+  const getVariant = () => Math.max(0, ['A', 'B', 'C'].indexOf(new URL(location.href).searchParams.get('variant')));
+  let variant = getVariant();
+  let section = 0;
+  let selected = 0;
+
+  const facts = (pairs) => `<dl class="facts">${pairs.map(([label, value]) => `<div><dt>${label}</dt><dd>${value}</dd></div>`).join('')}</dl>`;
+  const plan = () => `<div class="plan-grid">
+    <div class="quarter"><div class="eyebrow">Current quarter</div><div class="date">Oct 1 – Dec 20</div><p>3 books in progress</p></div>
+    ${facts([['Rest days', 'Nov 27–28'], ['Next quarter', 'Not planned'], ['Simultaneous groups', 'None']])}
+  </div>`;
+  const rows = (projection) => `<div class="rows">${books.map((book) => `<div class="book-row">
+    <div><h3>${book.title}</h3><small>${projection ? book.format : `${book.format} · ${book.left}`}</small></div>
+    <div><small>${projection ? 'Estimated finish' : 'Baseline finish'}</small><strong>${projection ? book.finish : book.baseline}</strong></div>
+    <div><small>${projection ? 'Estimated range' : 'Required pace'}</small><strong>${projection ? book.range : book.pace}</strong>
+    ${!projection && book.override ? `<small>Deadline override: ${book.override}</small>` : ''}</div>
+  </div>`).join('')}</div>`;
+  const content = (index) => [
+    ['Plan dates, rest days and next quarter at a glance.', plan],
+    ['The baseline is the saved schedule. Required pace can change as you read.', () => rows(false)],
+    ['Estimates come from reading history and never change the schedule.', () => rows(true)],
+  ][index];
+  function panel(index, heading) {
+    const [description, body] = content(index);
+    return `<section class="panel" id="section-panel">${heading ? `<h2>${heading}</h2>` : ''}<p class="muted">${description}</p>${body()}</section>`;
+  }
+  function bookDetail() {
+    const book = books[selected];
+    return `<div class="eyebrow">${book.format} · ${book.left}</div><h2>${book.title}</h2>
+      <div class="compare">
+        <section><h3>Reading schedule</h3><div class="metric"><small>Baseline finish</small><strong class="date">${book.baseline}</strong></div>
+          ${facts([['Required pace', book.pace], ['Deadline override', book.override || 'None']])}
+        </section>
+        <section><h3>Reading projections</h3><div class="metric forecast"><small>Estimated finish</small><strong class="date">${book.finish}</strong></div>
+          ${facts([['Estimated range', book.range]])}
+          <p class="muted">Based on reading history, not your deadline.</p>
+        </section>
+      </div>`;
+  }
+  function chooseBook(index) {
+    selected = index;
+    layout.querySelector('#book-detail').innerHTML = bookDetail();
+    layout.querySelector('#book-picker').value = index;
+    layout.querySelectorAll('[data-book]').forEach((button, i) => button.setAttribute('aria-pressed', String(i === index)));
+  }
+  function chooseSection(index) {
+    section = index;
+    layout.querySelector('#section-panel').outerHTML = panel(index, sections[index]);
+    layout.querySelectorAll('[data-section]').forEach((button, i) => button.setAttribute('aria-pressed', String(i === index)));
+  }
+  function render() {
+    document.querySelector('#intro').textContent = descriptions[variant];
+    document.querySelector('#variant-label').textContent = `${'ABC'[variant]} / ${names[variant]}`;
+    if (variant === 0) {
+      layout.innerHTML = `<nav class="tabs" aria-label="Plan sections">${sections.map((name, i) =>
+        `<button type="button" data-section="${i}" aria-controls="section-panel" aria-pressed="${i === section}">${name}</button>`).join('')}</nav>${panel(section, sections[section])}`;
+    } else if (variant === 1) {
+      layout.innerHTML = `<div class="accordion">${sections.map((name, i) =>
+        `<details name="plan-sections"${i === 0 ? ' open' : ''}><summary><span class="eyebrow">0${i + 1}</span><strong>${name}</strong><span class="muted summary-hint">${hints[i]}</span></summary>${panel(i).replace(' id="section-panel"', '')}</details>`).join('')}</div>`;
+    } else {
+      layout.innerHTML = `<div class="workspace">
+        <aside class="panel"><h2 class="desktop-picker">Your books</h2><div class="shelf" role="group" aria-label="Choose a book">
+          ${books.map((book, i) => `<button type="button" data-book="${i}" aria-pressed="${i === selected}">${book.title}<small>${book.format}</small></button>`).join('')}
+        </div><div class="mobile-picker"><label for="book-picker">Book</label><select id="book-picker">${books.map((book, i) =>
+          `<option value="${i}"${i === selected ? ' selected' : ''}>${book.title}</option>`).join('')}</select></div></aside>
+        <section class="panel" id="book-detail" aria-live="polite">${bookDetail()}</section>
+      </div><details class="panel compact-plan"><summary><strong>Quarter plan</strong> · Oct 1–Dec 20</summary>${plan()}</details>`;
+    }
+  }
+  function cycle(delta) {
+    variant = (variant + delta + names.length) % names.length;
+    const url = new URL(location.href);
+    url.searchParams.set('variant', 'ABC'[variant]);
+    history.replaceState(null, '', url);
+    render();
+  }
+  layout.addEventListener('click', (event) => {
+    const button = event.target.closest('button');
+    if (button?.hasAttribute('data-section')) chooseSection(Number(button.dataset.section));
+    if (button?.hasAttribute('data-book')) chooseBook(Number(button.dataset.book));
+  });
+  layout.addEventListener('change', (event) => {
+    if (event.target.id === 'book-picker') chooseBook(Number(event.target.value));
+  });
+  document.querySelector('#previous').onclick = () => cycle(-1);
+  document.querySelector('#next').onclick = () => cycle(1);
+  document.addEventListener('keydown', (event) => {
+    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey ||
+        event.target.closest('input, select, textarea, [contenteditable]')) return;
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+      event.preventDefault();
+      cycle(event.key === 'ArrowLeft' ? -1 : 1);
+    }
+  });
+  render();
+</script>
+</body>
+</html>

@@ -16,10 +16,24 @@ window.addEventListener('resize', sizeNativeSheets);
 
 const screens = [...document.querySelectorAll('main > .screen')];
 const tabs = [...document.querySelectorAll('.tab-bar button')];
+const planScreen = document.querySelector('#screen-plan');
+const planSections = [...planScreen.querySelectorAll('[data-plan-section]')];
+const planPanels = [...planScreen.querySelectorAll('[data-plan-panel]')];
+const scheduleStatus = document.querySelector('#schedule-status');
+function showPlanSection(name) {
+  for (const button of planSections) button.setAttribute('aria-pressed', String(button.dataset.planSection === name));
+  for (const panel of planPanels) panel.hidden = panel.dataset.planPanel !== name;
+  scheduleStatus.hidden = name === 'projections';
+}
+planSections.forEach((button) => button.addEventListener('click', () => showPlanSection(button.dataset.planSection)));
+
 let previousScreen = 'session';
 function showScreen(name) {
+  const enteringPlan = name === 'plan' && planScreen.hidden;
+  if (enteringPlan) showPlanSection('setup');
   if (name !== 'settings') previousScreen = name;
   for (const screen of screens) screen.hidden = screen.id !== `screen-${name}`;
+  if (enteringPlan) window.scrollTo(0, 0);
   for (const tab of tabs) {
     if (tab.dataset.screen === name) tab.setAttribute('aria-current', 'page');
     else tab.removeAttribute('aria-current');
@@ -216,7 +230,6 @@ window.ReadingCalendar.attach(restStart);
 window.ReadingCalendar.attach(restEnd);
 const restList = document.querySelector('#rest-list');
 const calculateButton = document.querySelector('#calculate-schedule');
-const scheduleStatus = document.querySelector('#schedule-status');
 const scheduleTable = document.querySelector('#schedule-table');
 const scheduleRows = document.querySelector('#schedule-rows');
 const scheduleEmpty = document.querySelector('#schedule-empty');

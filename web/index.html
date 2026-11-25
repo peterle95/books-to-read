@@ -101,8 +101,14 @@
       </form>
     </dialog>
     <div id="screen-plan" class="screen" aria-label="Plan" hidden>
-    <section aria-labelledby="new-plan-heading">
-      <div class="plan-heading"><h2 id="new-plan-heading">Plan</h2></div>
+    <div class="plan-heading"><h2>Plan</h2></div>
+    <nav class="session-choices plan-sections" aria-label="Plan sections">
+      <button type="button" data-plan-section="setup" aria-pressed="true" aria-controls="plan-setup plan-rest">Plan</button>
+      <button type="button" data-plan-section="schedule" aria-pressed="false" aria-controls="plan-schedule">Reading schedule</button>
+      <button type="button" data-plan-section="projections" aria-pressed="false" aria-controls="plan-projections">Reading projections</button>
+    </nav>
+    <p id="schedule-status" data-testid="schedule-status" role="status" aria-live="polite"></p>
+    <section id="plan-setup" data-plan-panel="setup" aria-label="Plan actions">
       <div id="plan-actions">
         <div class="plan-action-buttons">
           <button id="new-plan" type="button">New plan</button>
@@ -126,7 +132,7 @@
         <p id="quarter-status" data-testid="quarter-status" role="status" aria-live="polite"></p>
       </div>
     </section>
-    <section aria-labelledby="rest-heading">
+    <section id="plan-rest" data-plan-panel="setup" aria-labelledby="rest-heading">
       <h3 id="rest-heading">Rest-day ranges</h3>
       <ul id="rest-list" aria-label="Rest days"></ul>
       <form id="rest-form">
@@ -137,7 +143,7 @@
         <button type="submit">Add rest-day range</button>
       </form>
     </section>
-    <section aria-labelledby="schedule-heading">
+    <section id="plan-schedule" data-plan-panel="schedule" aria-labelledby="schedule-heading" hidden>
       <h2 id="schedule-heading">Reading schedule</h2>
       <p>Set the plan dates and rest days, then calculate the baseline schedule. Rest days reduce the days available for reading, but they do not move the baseline dates. Books in a simultaneous group share a start and finish while their daily targets are split by remaining work. A deadline override gives one book an independent schedule until you clear it. The baseline schedule stays saved until you calculate it again.</p>
       <p id="schedule-empty">Import a bundle to schedule its books.</p>
@@ -150,7 +156,6 @@
       </form>
       <ul id="group-list" aria-label="Simultaneous groups"></ul>
       <button id="calculate-schedule" type="button">Calculate schedule</button>
-      <p id="schedule-status" data-testid="schedule-status" role="status" aria-live="polite"></p>
       <table id="schedule-table" hidden>
         <caption>Baseline schedule and current required pace. Pages are used for physical and digital books; seconds are used for audiobooks. A deadline override applies immediately; clearing it returns the book to the plan finish or its group's deadline.</caption>
         <thead>
@@ -159,7 +164,7 @@
         <tbody id="schedule-rows"></tbody>
       </table>
     </section>
-    <section aria-labelledby="projection-heading">
+    <section id="plan-projections" data-plan-panel="projections" aria-labelledby="projection-heading" hidden>
       <h2 id="projection-heading">Reading projections</h2>
       <p>Each projection estimates when a book will be finished from its recorded reading history, separately from its baseline schedule and deadline. The estimated finish range shows how uncertain that estimate is; it is not a guarantee. Projections never change the baseline schedule or the required pace.</p>
       <p id="projection-empty" data-testid="projection-empty">Import a bundle to see its reading projections.</p>

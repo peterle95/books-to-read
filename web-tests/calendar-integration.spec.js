@@ -71,10 +71,11 @@ test('six ISO fields remain editable; only rest and override fields attach reado
     await expect(input).not.toHaveAttribute('aria-haspopup', 'dialog');
   }
   await tab(page, 'Plan');
+  await tab(page, 'Reading schedule');
   await expect(page.locator('#plan-start')).toHaveValue('2030-01-01');
   await page.locator('#plan-start').click();
   await expect(calendar(page)).not.toBeVisible();
-  await page.getByRole('button', { name: 'Plan next quarter', exact: true }).click();
+  await page.getByRole('navigation', { name: 'Plan sections' }).getByRole('button', { name: 'Plan', exact: true }).click();
   await page.locator('#new-plan').click();
   // New plan opens the period form without replacing anything yet.
   const today = await page.evaluate(() => ReadingSchedule.today());
@@ -174,6 +175,7 @@ test('rest ranges reject absent, invalid and reversed drafts; calendar OK never 
 test('dynamic schedule override calendars reopen saved values and require explicit Set', async ({ page }) => {
   await load(page);
   await tab(page, 'Plan');
+  await tab(page, 'Reading schedule');
   const input = () => page.getByLabel('Start date override for Second', { exact: true });
   const raw = await rawBundle(page);
   await page.getByRole('button', { name: 'Save the start date for Second', exact: true }).click();
@@ -198,6 +200,7 @@ test('editable ISO fields and readonly overrides validate real and required date
   await load(page);
   const raw = await rawBundle(page);
   await tab(page, 'Plan');
+  await tab(page, 'Reading schedule');
   for (const [id, value] of [['plan-start', ''], ['plan-start', '2030-02-30'], ['plan-finish', '2030-13-01']]) {
     await page.locator('#plan-start').evaluate((field) => { field.value = '2030-01-01'; });
     await page.locator(`#${id}`).evaluate((field, next) => { field.value = next; }, value);
@@ -205,7 +208,7 @@ test('editable ISO fields and readonly overrides validate real and required date
     expect(await page.locator(`#${id}`).evaluate((field) => field.checkValidity())).toBe(false);
     expect(await rawBundle(page)).toBe(raw);
   }
-  await page.getByRole('button', { name: 'Plan next quarter', exact: true }).click();
+  await page.getByRole('navigation', { name: 'Plan sections' }).getByRole('button', { name: 'Plan', exact: true }).click();
   await page.locator('#new-plan').click();
   for (const value of ['', '2030-02-30']) {
     await page.locator('#create-plan-start').evaluate((field, next) => { field.value = next; }, value);
@@ -283,7 +286,7 @@ test('calendar assets are precached and actual controls survive network-blocked 
     if (!navigator.serviceWorker.controller) await new Promise((resolve) => navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true }));
   });
   const assets = await page.evaluate(async () => {
-    const keys = await caches.keys(), name = keys.find((key) => key.endsWith('-android-calendar-v1'));
+    const keys = await caches.keys(), name = keys.find((key) => key.startsWith('reading-plan-'));
     return (await (await caches.open(name)).keys()).map((request) => new URL(request.url).pathname.split('/').at(-1));
   });
   expect(assets).toEqual(expect.arrayContaining(['android-calendar.js', 'android-calendar.css', 'android-controls.js']));

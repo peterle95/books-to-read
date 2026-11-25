@@ -24,7 +24,9 @@ Import a desktop CSV plan or export the current plan to CSV, including ranges, p
 
 ## Schedule the plan
 
-After importing a bundle, set the plan start and finish dates and add any rest-day ranges. **Calculate schedule** stores a baseline schedule for every book in all three sections: physical and digital books are measured in pages, audiobooks in seconds. Rest days remove reading days from the pace without moving the baseline dates.
+The **Plan** screen opens on its **Plan** section each time you return. Use the buttons at the top to switch between **Plan**, **Reading schedule**, and **Reading projections**.
+
+After importing a bundle, add any rest-day ranges in **Plan**, then set the plan start and finish dates in **Reading schedule**. **Calculate schedule** stores a baseline schedule for every book in all three formats: physical and digital books are measured in pages, audiobooks in seconds. Rest days remove reading days from the pace without moving the baseline dates.
 
 The table keeps two separate values. The **baseline per day** is the persisted target created when the schedule was calculated. **Required now** is the amount needed each reading day, from today to that book's baseline finish, to finish the remaining work; it never changes the baseline. Editing the plan dates or rest days marks the schedule as changed and leaves the saved baseline alone until you calculate again. Saved dates, rest days, groups, overrides and baselines are included in bundle exports. Importing a bundle replaces the previous plan and schedule.
 

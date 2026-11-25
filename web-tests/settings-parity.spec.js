@@ -30,7 +30,7 @@ for (const width of [390, 1440]) {
     await page.setViewportSize({ width, height: 844 });
     await page.goto('./');
     for (const tab of ['Session', 'Plan', 'Books', 'Charts']) {
-      await page.getByRole('navigation').getByRole('button', { name: tab, exact: true }).click();
+      await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: tab, exact: true }).click();
       await page.locator('#json-status').focus();
       await page.keyboard.press('Enter');
       await page.getByRole('button', { name: 'Settings', exact: true }).click();
@@ -42,7 +42,7 @@ for (const width of [390, 1440]) {
       expect(box.x + box.width).toBeLessThanOrEqual(width);
       await page.getByRole('button', { name: 'Done', exact: true }).click();
       await expect(page.locator(`#screen-${tab.toLowerCase()}`)).toBeVisible();
-      await expect(page.getByRole('navigation').getByRole('button', { name: tab, exact: true })).toHaveAttribute('aria-current', 'page');
+      await expect(page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: tab, exact: true })).toHaveAttribute('aria-current', 'page');
       await expect(page.locator('.header-actions button[aria-expanded="false"]')).toHaveCount(2);
     }
     await page.getByRole('button', { name: 'Settings', exact: true }).click();

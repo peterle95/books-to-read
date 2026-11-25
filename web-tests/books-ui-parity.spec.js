@@ -160,6 +160,7 @@ test('Books overrides save fresh persisted data, preserve drafts and unrelated r
   await expect(page.locator('#set-book-start')).toBeEnabled();
   await expect(page.locator('#set-book-deadline')).toBeEnabled();
   await page.getByRole('button', { name: 'Plan', exact: true }).click();
+  await page.getByRole('button', { name: 'Reading schedule', exact: true }).click();
   await page.locator('#calculate-schedule').click();
   await expect(page.getByTestId('schedule-status')).toContainText('Baseline schedule calculated');
   await page.getByRole('button', { name: 'Books', exact: true }).click();
