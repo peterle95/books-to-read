@@ -73,8 +73,13 @@ write_json_bundle(sys.argv[1], sections, date(2030,1,1), date(2030,3,31), 'Quart
     await expect(dialog).not.toBeVisible();
     expect(await groups()).toEqual([['e', 'f'], ['b', 'c']]);
     const after = await snapshot();
-    expect(after.books.sections[0].books).toEqual(before.books.sections[0].books);
-    expect(after.books.sections[0].baseline_needs_recalculation).toBe(true);
+    const withoutBaselines = (section) => section.books.map(({ baseline_schedule, ...book }) => book);
+    expect(withoutBaselines(after.books.sections[0])).toEqual(withoutBaselines(before.books.sections[0]));
+    const [, b, c] = after.books.sections[0].books;
+    expect(b.baseline_schedule).not.toBeNull();
+    expect(b.baseline_schedule.start_date).toBe(c.baseline_schedule.start_date);
+    expect(b.baseline_schedule.deadline).toBe(c.baseline_schedule.deadline);
+    expect(after.books.sections[0].baseline_needs_recalculation).toBe(false);
     expect(after.books.sections.slice(1)).toEqual(before.books.sections.slice(1));
     expect(after.encoded['sessions.json']).toBe(before.encoded['sessions.json']);
     expect(after.encoded['plan.json']).toBe(before.encoded['plan.json']);

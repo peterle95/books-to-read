@@ -25,11 +25,11 @@ const fixture = (today) => {
 };
 
 for (const [today, paceLabels, quietLabels] of [
-  ['9999-12-29', ['12-29', '12-30', '12-31'], ['12-29', '12-30']],
-  ['9999-12-30', ['12-30', '12-31'], ['12-30', '12-31']],
-  ['9999-12-31', ['12-30', '12-31'], ['12-30', '12-31']],
+  ['9999-12-29', ['12-21', '12-24', '12-26', '12-29', '12-31'], ['12-29', '12-30']],
+  ['9999-12-30', ['12-22', '12-24', '12-27', '12-29', '12-31'], ['12-30', '12-31']],
+  ['9999-12-31', ['12-23', '12-25', '12-27', '12-29', '12-31'], ['12-30', '12-31']],
   ['0001-01-01', ['01-01', '01-02'], ['01-01', '01-02']],
-  ...['0001', '0099', '0100', '2026'].map((year) => [`${year}-10-01`, ['10-01', '10-10', '10-19', '10-27', '11-05'], ['10-01', '10-02']]),
+  ...['0001', '0099', '0100', '2026'].map((year) => [`${year}-10-01`, ['09-23', '10-04', '10-15', '10-25', '11-05'], ['10-01', '10-02']]),
 ]) {
   test(`chart keeps dates and coordinates valid on ${today} without writes`, async ({ page }) => {
     const errors = [];
@@ -43,10 +43,9 @@ for (const [today, paceLabels, quietLabels] of [
     await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
     if (today.startsWith('9999')) {
       await expect(page.getByTestId('quarter-status')).toHaveText('Quarter date must be within years 0001–9999.');
-      await expect(page.locator('#open-quarter')).toBeDisabled();
-      await expect(page.locator('#plan-actions-toggle')).toBeDisabled();
+      await expect(page.locator('#quarter-shortcut')).toBeDisabled();
     } else {
-      await expect(page.locator('#open-quarter')).toBeEnabled();
+      await expect(page.locator('#quarter-shortcut')).toBeEnabled();
     }
     const storage = () => page.evaluate(() => Object.fromEntries(Object.entries(localStorage)));
     const original = await storage();
@@ -78,8 +77,7 @@ for (const [today, paceLabels, quietLabels] of [
       page.once('dialog', (dialog) => dialog.accept());
       await page.getByRole('button', { name: 'Import bundle' }).click();
       await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
-      await expect(page.locator('#open-quarter')).toBeEnabled();
-      await expect(page.locator('#plan-actions-toggle')).toBeEnabled();
+      await expect(page.locator('#quarter-shortcut')).toBeEnabled();
       expect(errors).toEqual([]);
     }
   });

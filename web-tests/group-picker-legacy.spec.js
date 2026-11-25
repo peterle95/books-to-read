@@ -62,7 +62,7 @@ test('unchanged legacy token allows a pair and migrates all settings in one revi
   expect(after.plan.end_date).toBe('2030-04-05');
   expect(after.plan.rest_days).toEqual([{ start_date: '2030-02-01', end_date: '2030-02-02' }]);
   expect(after.books.sections[0].simultaneous_groups).toEqual([['c', 'd'], ['a', 'b']]);
-  expect(after.books.sections[0].books[0]).toMatchObject({ deadline_override: '2030-03-01', start_date_override: '2030-01-02', baseline_schedule: { start_date: '2030-01-01', deadline: '2030-03-31', daily_target: 2 } });
+  expect(after.books.sections[0].books[0]).toMatchObject({ deadline_override: '2030-03-01', start_date_override: '2030-01-02', baseline_schedule: { start_date: '2030-01-02', deadline: '2030-03-01' } });
   expect(after.sessions).toEqual(before.sessions);
   expect(after.encoded['sessions.json']).toBe(before.encoded['sessions.json']);
   expect(after.manifest.files['sessions.json']).toBe(before.manifest.files['sessions.json']);

@@ -36,7 +36,7 @@ test('rest-day controls use the native labels without changing the imported bund
   expect(await page.evaluate(() => localStorage.getItem(bundleKey))).toBe(before);
 });
 
-test('active plan actions expose next quarter and explicit recalculation; rest and date edits preserve baseline', async ({ page }) => {
+test('active plan actions expose next quarter and rest edits rebuild the baseline automatically', async ({ page }) => {
   await page.goto('./');
   await page.getByRole('button', { name: 'Plan', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Plan', exact: true })).toBeVisible();
@@ -53,21 +53,13 @@ test('active plan actions expose next quarter and explicit recalculation; rest a
   await expect(page.locator('#quarter-dialog-heading')).toHaveText('Next quarter — 2030-04-01 to 2030-06-30');
   await expect(page.locator('#quarter-dialog-heading')).toBeInViewport();
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
-  await page.getByRole('button', { name: 'Reading schedule', exact: true }).click();
-  await page.getByRole('button', { name: 'Calculate schedule' }).click();
-  const baseline = await page.evaluate(() => readBundleFiles().books.sections[0].books[0].baseline_schedule);
-  await page.getByLabel('Plan finish').fill('2030-03-30');
-  await page.getByRole('button', { name: 'Save plan dates' }).click();
-  await page.getByRole('navigation', { name: 'Plan sections' }).getByRole('button', { name: 'Plan', exact: true }).click();
   await chooseDate(page, page.getByLabel('Rest start date'), '2030-02-01');
   await chooseDate(page, page.getByLabel('Rest end date'), '2030-02-02');
   await page.getByRole('button', { name: 'Add rest-day range' }).click();
-  await expect(page.getByTestId('schedule-status')).toHaveText(/baseline stays unchanged/);
-  expect(await page.evaluate(() => readBundleFiles().books.sections[0].books[0].baseline_schedule)).toEqual(baseline);
+  await expect(page.locator('#rest-list')).toContainText('2030-02-01');
+  const baseline = await page.evaluate(() => readBundleFiles().books.sections[0].books[0].baseline_schedule);
+  expect(baseline).toEqual({ start_date: '2030-01-01', deadline: '2030-03-31', daily_target: 90 / 88 });
   await page.reload();
   await page.getByRole('button', { name: 'Plan', exact: true }).click();
   expect(await page.evaluate(() => readBundleFiles().books.sections[0].books[0].baseline_schedule)).toEqual(baseline);
-  await page.getByRole('button', { name: 'Recalculate current plan' }).click();
-  await expect(page.getByTestId('schedule-status')).toHaveText('Baseline schedule calculated on this device.');
-  expect(await page.evaluate(() => readBundleFiles().books.sections[0].books[0].baseline_schedule)).not.toEqual(baseline);
 });

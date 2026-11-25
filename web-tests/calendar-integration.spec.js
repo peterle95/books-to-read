@@ -60,9 +60,9 @@ async function selectFirst(page) {
   await page.getByRole('radio', { name: '1. First', exact: true }).click();
 }
 
-test('six ISO fields remain editable; only rest and override fields attach readonly calendars', async ({ page }) => {
+test('four ISO fields remain editable; only rest and override fields attach readonly calendars', async ({ page }) => {
   await load(page);
-  for (const id of ['session-date', 'session-entry-date', 'create-plan-start', 'create-plan-finish', 'plan-start', 'plan-finish']) {
+  for (const id of ['session-date', 'session-entry-date', 'create-plan-start', 'create-plan-finish']) {
     const input = page.locator(`#${id}`);
     await expect(input).toHaveAttribute('type', 'text');
     await expect(input).toHaveAttribute('data-date-mode', 'text');
@@ -71,11 +71,7 @@ test('six ISO fields remain editable; only rest and override fields attach reado
     await expect(input).not.toHaveAttribute('aria-haspopup', 'dialog');
   }
   await tab(page, 'Plan');
-  await tab(page, 'Reading schedule');
-  await expect(page.locator('#plan-start')).toHaveValue('2030-01-01');
-  await page.locator('#plan-start').click();
-  await expect(calendar(page)).not.toBeVisible();
-  await page.getByRole('navigation', { name: 'Plan sections' }).getByRole('button', { name: 'Plan', exact: true }).click();
+  page.once('dialog', (dialog) => dialog.accept());
   await page.locator('#new-plan').click();
   // New plan opens the period form without replacing anything yet.
   const today = await page.evaluate(() => ReadingSchedule.today());
@@ -84,6 +80,7 @@ test('six ISO fields remain editable; only rest and override fields attach reado
   await page.locator('#create-plan-finish').click();
   await expect(page.locator('#create-plan-finish')).toHaveValue(finish);
   await expect(calendar(page)).not.toBeVisible();
+  await tab(page, 'Cancel');
   for (const id of ['rest-start', 'rest-end']) {
     await page.locator(`#${id}`).click();
     await expect(calendar(page)).toBeVisible();
@@ -101,7 +98,7 @@ test('six ISO fields remain editable; only rest and override fields attach reado
     await expect(input).toHaveAttribute('type', 'text');
     await expect(input).toHaveAttribute('aria-haspopup', 'dialog');
   }
-  expect(await page.locator('input[aria-controls="reading-calendar"]').count()).toBe(8);
+  await expect(page.locator('input[aria-controls="reading-calendar"]')).toHaveCount(4);
 });
 
 test('Books OK only changes draft/events; Cancel, Set and Clear retain unrelated drafts and records', async ({ page }) => {
@@ -172,43 +169,37 @@ test('rest ranges reject absent, invalid and reversed drafts; calendar OK never 
   expect((await snapshot(page)).plan.rest_days).toEqual([{ start_date: '2030-03-12', end_date: '2030-03-13' }]);
 });
 
-test('dynamic schedule override calendars reopen saved values and require explicit Set', async ({ page }) => {
+test('Books override calendars reopen saved values and require explicit Set', async ({ page }) => {
   await load(page);
-  await tab(page, 'Plan');
-  await tab(page, 'Reading schedule');
-  const input = () => page.getByLabel('Start date override for Second', { exact: true });
+  await tab(page, 'Books');
+  await tab(page, 'Choose book to edit');
+  await page.getByRole('radio', { name: '2. Second', exact: true }).click();
+  const input = page.getByLabel('Start date override', { exact: true });
+  const status = page.getByTestId('editor-status');
   const raw = await rawBundle(page);
-  await page.getByRole('button', { name: 'Save the start date for Second', exact: true }).click();
-  await expect(page.getByTestId('schedule-status')).toContainText('real date');
+  await tab(page, 'Set start date');
+  await expect(status).toContainText('real date');
   expect(await rawBundle(page)).toBe(raw);
-  await chooseDate(page, input(), '2030-02-12');
+  await chooseDate(page, input, '2030-02-12');
   expect(await rawBundle(page)).toBe(raw);
-  await page.getByRole('button', { name: 'Save the start date for Second', exact: true }).click();
-  await expect(page.getByTestId('schedule-status')).toContainText('Start date override saved for Second');
-  await expect(input()).toHaveValue('2030-02-12');
-  await input().click();
+  await tab(page, 'Set start date');
+  await expect(status).toContainText('Start date override saved for Second');
+  await expect(input).toHaveValue('2030-02-12');
+  await input.click();
   await expect(page.locator('#reading-calendar-month')).toHaveText('February 2030');
   await page.keyboard.press('Escape');
-  const deadline = page.getByLabel('Deadline override for Second', { exact: true });
+  const deadline = page.getByLabel('Deadline override', { exact: true });
   await chooseDate(page, deadline, '2030-10-20');
-  await page.getByRole('button', { name: 'Save the deadline for Second', exact: true }).click();
-  await expect(page.getByTestId('schedule-status')).toContainText('Deadline override saved for Second');
-  await expect(page.getByLabel('Deadline override for Second', { exact: true })).toHaveValue('2030-10-20');
+  await tab(page, 'Set deadline');
+  await expect(status).toContainText('Deadline override saved for Second');
+  await expect(deadline).toHaveValue('2030-10-20');
 });
 
 test('editable ISO fields and readonly overrides validate real and required dates before saves', async ({ page }) => {
   await load(page);
   const raw = await rawBundle(page);
   await tab(page, 'Plan');
-  await tab(page, 'Reading schedule');
-  for (const [id, value] of [['plan-start', ''], ['plan-start', '2030-02-30'], ['plan-finish', '2030-13-01']]) {
-    await page.locator('#plan-start').evaluate((field) => { field.value = '2030-01-01'; });
-    await page.locator(`#${id}`).evaluate((field, next) => { field.value = next; }, value);
-    await tab(page, 'Save plan dates');
-    expect(await page.locator(`#${id}`).evaluate((field) => field.checkValidity())).toBe(false);
-    expect(await rawBundle(page)).toBe(raw);
-  }
-  await page.getByRole('navigation', { name: 'Plan sections' }).getByRole('button', { name: 'Plan', exact: true }).click();
+  page.once('dialog', (dialog) => dialog.accept());
   await page.locator('#new-plan').click();
   for (const value of ['', '2030-02-30']) {
     await page.locator('#create-plan-start').evaluate((field, next) => { field.value = next; }, value);
@@ -216,6 +207,7 @@ test('editable ISO fields and readonly overrides validate real and required date
     expect(await page.locator('#create-plan-start').evaluate((field) => field.checkValidity())).toBe(false);
     expect(await rawBundle(page)).toBe(raw);
   }
+  await tab(page, 'Cancel');
   await selectFirst(page);
   for (const kind of ['start', 'deadline']) {
     for (const value of ['', '2030-02-30', '0000-02-29']) {

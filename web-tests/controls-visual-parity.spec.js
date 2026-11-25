@@ -108,8 +108,8 @@ test.describe('mobile display-sized history', () => {
       await page.setViewportSize({ width: 360, height });
       await expect.poll(async () => { const box = await sheet.boundingBox(); return box.y + box.height; }).toBe(height);
       const box = await sheet.boundingBox();
-      expect(box.height).toBeGreaterThan(height * 0.8);
-      expect(box.height).toBeLessThan(height);
+      const displayCap = await page.evaluate(() => screen.height * 0.86);
+      near(box.height, Math.min(height * 0.92, displayCap));
       near(box.y + box.height, height);
       await expect(sheet.getByRole('button', { name: 'Close', exact: true })).toBeVisible();
     }
