@@ -682,9 +682,11 @@ const showPlanActions = () => {
   deletePlannedQuarter.hidden = !planned;
   if (!planned) {
     plannedQuarterSummary.textContent = '';
+    quarterShortcut.textContent = 'Plan next quarter';
     return;
   }
   const count = planned.sections.reduce((total, section) => total + section.books.length, 0);
+  quarterShortcut.textContent = count > 0 ? 'Edit next-quarter plan' : 'Plan next quarter';
   const end = window.ReadingQuarter.periodEnd(planned.startDate);
   plannedQuarterSummary.textContent = `Queued: ${planned.startDate} to ${end} — ${count} ${count === 1 ? 'book' : 'books'}. The current plan is unchanged.`;
 };

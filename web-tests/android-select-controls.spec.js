@@ -73,7 +73,7 @@ test('all screens and selection dialogs expose no visible native select', async 
   await expect(page.getByRole('dialog', { name: 'Reading history' }).getByRole('combobox', { name: 'Book', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Close', exact: true }).click();
   await page.getByRole('navigation').getByRole('button', { name: 'Plan', exact: true }).click();
-  await page.getByRole('button', { name: 'Edit next-quarter plan', exact: true }).click();
+  await page.getByRole('button', { name: 'Plan next quarter', exact: true }).click();
   await noNativeSelect();
   await expect(page.locator('#quarter-dialog').getByRole('combobox', { name: 'Format', exact: true })).toBeVisible();
 });
