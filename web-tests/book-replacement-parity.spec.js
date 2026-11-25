@@ -38,7 +38,7 @@ write_json_bundle(sys.argv[1], sections, today, today + timedelta(days=10), 'Qua
           await page.getByLabel('Bundle files').setInputFiles(['plan.json', 'books.json', 'sessions.json', 'manifest.json'].map((name) => path.join(directory, name)));
           page.once('dialog', (dialog) => dialog.accept());
           await page.getByRole('button', { name: 'Import bundle' }).click();
-          await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+          await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
         };
         await importBundle();
         const snapshot = () => page.evaluate(() => readBundleFiles());
@@ -58,7 +58,8 @@ write_json_bundle(sys.argv[1], sections, today, today + timedelta(days=10), 'Qua
         const dismissDialog = async (dialog) => { dialogs.push(dialog.message()); await dialog.dismiss(); };
         page.on('dialog', dismissDialog);
         await page.getByRole('button', { name: 'Replace Selected', exact: true }).click();
-        await expect(page.getByTestId('editor-status')).toHaveText('Book saved.');
+        await expect(page.getByTestId('editor-status')).toBeEmpty();
+        await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
         page.off('dialog', dismissDialog);
         expect(dialogs).toEqual([]);
         const after = await snapshot();

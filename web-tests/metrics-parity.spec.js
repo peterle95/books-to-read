@@ -25,7 +25,7 @@ test('metrics sheet shows format schedules and focused detail tables, and closes
   await page.getByLabel('Bundle files').setInputFiles(files);
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: 'Import bundle' }).click();
-  await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+  await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
   await page.getByRole('button', { name: 'Charts', exact: true }).click();
   await page.getByRole('button', { name: 'Metrics', exact: true }).click();
   const sheet = page.locator('#metrics-dialog');
@@ -104,7 +104,7 @@ test('current daily pace uses remaining work and saved windows without changing 
   await page.getByLabel('Bundle files').setInputFiles(files);
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: 'Import bundle' }).click();
-  await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+  await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
   const storage = () => page.evaluate(() => ({ bundle: localStorage.getItem('reading-plan-bundle-v1'), schedule: localStorage.getItem('reading-plan-schedule-v1') }));
   const original = await storage();
   await page.getByRole('button', { name: 'Charts', exact: true }).click();

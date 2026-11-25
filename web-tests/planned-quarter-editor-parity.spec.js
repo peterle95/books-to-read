@@ -42,7 +42,7 @@ test.beforeEach(async ({ page }) => {
   await page.getByLabel('Bundle files').setInputFiles(fixture());
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: 'Import bundle' }).click();
-  await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+  await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
   await page.getByRole('button', { name: 'Plan', exact: true }).click();
 });
 
@@ -142,7 +142,7 @@ for (const group of [[3, 2, 1], ['Third', 'Second', 'First']]) {
     }));
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: 'Import bundle' }).click();
-    await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+    await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
     await page.getByRole('button', { name: 'Plan', exact: true }).click();
     const original = await raw(page);
     await open(page);
@@ -180,7 +180,7 @@ for (const group of [[3, 2, 1], ['Third', 'Second', 'First']]) {
       await page.getByLabel('Bundle files').setInputFiles(fixture(group));
       page.once('dialog', (dialog) => dialog.accept());
       await page.getByRole('button', { name: 'Import bundle' }).click();
-      await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+      await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
       await page.getByRole('button', { name: 'Plan', exact: true }).click();
       await open(page);
       if (action !== 'save') {

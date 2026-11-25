@@ -78,7 +78,7 @@ test.describe('mobile display-sized history', () => {
       .map((name) => `fixtures/issue-45-populated/${name}`));
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: 'Import bundle', exact: true }).click();
-    await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+    await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
     const before = await stored(page);
     await tab(page, 'Session');
     await page.getByRole('button', { name: 'Entries', exact: true }).click();

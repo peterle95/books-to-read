@@ -220,7 +220,7 @@ test('a due next-quarter plan stays queued across import, reload and desktop exp
     await page.getByLabel('Bundle files').setInputFiles(files);
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: 'Import bundle' }).click();
-    await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+    await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
     await page.getByRole('button', { name: 'Plan', exact: true }).click();
     await expect(page.locator('#planned-quarter-summary')).toContainText(`Queued: ${dates.due} to ${dates.dueEnd}`);
     await page.getByRole('button', { name: 'Edit next-quarter plan' }).click();
@@ -264,7 +264,7 @@ test('the next quarter can be planned, inspected, changed and removed before it 
     await page.getByLabel('Bundle files').setInputFiles(files);
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: 'Import bundle' }).click();
-    await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+    await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
     await page.getByRole('button', { name: 'Plan', exact: true }).click();
     await expect(page.locator('#planned-quarter-summary')).toContainText(`Queued: ${dates.future} to ${dates.futureEnd} — 2 books.`);
     await page.getByRole('button', { name: 'Edit next-quarter plan' }).click();

@@ -27,7 +27,7 @@ test('rest-day controls use the native labels without changing the imported bund
   await page.getByLabel('Bundle files').setInputFiles(fixture());
   page.once('dialog', dialog => dialog.accept());
   await page.getByRole('button', { name: 'Import bundle', exact: true }).click();
-  await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+  await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
   const before = await page.evaluate(() => localStorage.getItem(bundleKey));
   await page.getByRole('button', { name: 'Plan', exact: true }).click();
   await expect(page.getByLabel('Rest start date', { exact: true })).toBeVisible();
@@ -46,7 +46,7 @@ test('active plan actions expose next quarter and rest edits rebuild the baselin
   await page.getByLabel('Bundle files').setInputFiles(fixture());
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: 'Import bundle' }).click();
-  await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+  await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
   await page.getByRole('button', { name: 'Plan', exact: true }).click();
   await expect(page.locator('#active-plan-hint')).toBeVisible();
   await page.locator('#plan-actions').getByRole('button', { name: 'Plan next quarter', exact: true }).click();

@@ -23,7 +23,7 @@ const importBundle = async (page) => {
   await page.getByLabel('Bundle files').setInputFiles(bundleFiles());
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: 'Import bundle' }).click();
-  await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+  await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
 };
 
 test('an update is offered without interrupting the reader and saved data survives it', async ({ page }) => {

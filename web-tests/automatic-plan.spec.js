@@ -20,7 +20,8 @@ test('new plan books are scheduled on save and replacement stays atomic', async 
   await audio.getByLabel('End time').fill('2:30');
   await dialog.getByRole('button', { name: 'Create plan' }).click();
   await expect(dialog).toBeHidden();
-  await expect(page.locator('#new-plan-status')).toHaveText('New plan saved.');
+  await expect(page.locator('#new-plan-status')).toBeEmpty();
+  await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
   const bundle = () => page.evaluate(() => readBundleFiles());
   const saved = await bundle();
   expect(saved.books.sections[0].books[0].baseline_schedule.deadline).toBe('2026-12-31');
@@ -39,7 +40,8 @@ test('new plan books are scheduled on save and replacement stays atomic', async 
   await books.getByLabel('Title', { exact: true }).fill('New paper');
   await books.getByLabel('End page', { exact: true }).fill('120');
   await books.getByRole('button', { name: 'Add', exact: true }).click();
-  await expect(page.getByTestId('editor-status')).toHaveText('Book saved.');
+  await expect(page.getByTestId('editor-status')).toBeEmpty();
+  await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
   const updated = await bundle();
   expect(updated.books.sections[0].books).toHaveLength(2);
   expect(updated.books.sections[0].books[0].baseline_schedule.deadline).not.toBe('2026-12-31');

@@ -21,7 +21,7 @@ async function openBooks(page) {
   await page.getByLabel('Bundle files').setInputFiles(payloads);
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: 'Import bundle', exact: true }).click();
-  await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+  await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
   await page.getByRole('button', { name: 'Books', exact: true }).click();
 }
 const choose = async (page, title) => {
@@ -40,7 +40,8 @@ for (const audio of [false, true]) {
       await choose(page, `${audio ? 1 : 2}. ${title}`);
       if (action === 'Replace Selected') {
         await page.getByRole('button', { name: 'Complete Selected', exact: true }).click();
-        await expect(page.getByTestId('editor-status')).toHaveText('Book completed.');
+        await expect(page.getByTestId('editor-status')).toBeEmpty();
+        await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
       }
       const snapshot = () => page.evaluate(() => readBundleFiles());
       const before = await snapshot();
@@ -67,7 +68,8 @@ for (const audio of [false, true]) {
       // Replacement defaults both endpoints; new books still require an end.
       await fill('   ', action === 'Replace Selected' ? '   ' : audio ? '0:1:2' : '10');
       await page.getByRole('button', { name: action, exact: true }).click();
-      await expect(page.getByTestId('editor-status')).toHaveText('Book saved.');
+      await expect(page.getByTestId('editor-status')).toBeEmpty();
+      await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
       const after = await snapshot();
       const position = action === 'Add' ? before.books.sections[index].books.length : audio ? 0 : 1;
       const saved = after.books.sections[index].books[position];
@@ -100,7 +102,8 @@ test('Books accepts native page zero and equal endpoints', async ({ page }) => {
   await page.getByLabel('Start page', { exact: true }).fill('0');
   await page.getByLabel('End page', { exact: true }).fill('0');
   await page.getByRole('button', { name: 'Add', exact: true }).click();
-  await expect(page.getByTestId('editor-status')).toHaveText('Book saved.');
+  await expect(page.getByTestId('editor-status')).toBeEmpty();
+  await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
   expect(await page.evaluate(() => readBundleFiles().books.sections[0].books.at(-1))).toMatchObject({ start_page: 0, end_page: 0, pages: 1 });
 });
 
@@ -151,7 +154,8 @@ test('Books hierarchy uses a numbered current-format modal, restores cancel focu
   await expect(page.getByLabel('End time', { exact: true })).toHaveValue('1:00:30');
   await page.locator('#book-title').fill('Audio copy');
   await page.locator('#add-book').click();
-  await expect(page.getByTestId('editor-status')).toHaveText('Book saved.');
+  await expect(page.getByTestId('editor-status')).toBeEmpty();
+  await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
   expect(await page.evaluate(() => readBundleFiles().books.sections[2].books.map((book) => book.title))).toEqual(['Audio', 'Audio copy']);
   await expect(page.locator('#today-reading section')).toHaveCount(3);
 });
@@ -185,10 +189,12 @@ test('Books overrides save fresh persisted data, preserve drafts and unrelated r
   await chooseDate(page, page.getByLabel('Start date override', { exact: true }), '2030-01-03');
   await expect(page.locator('#clear-book-start')).toBeVisible();
   await page.locator('#set-book-start').click();
-  await expect(page.getByTestId('editor-status')).toHaveText('Start date override saved for Fresh saved title.');
+  await expect(page.getByTestId('editor-status')).toBeEmpty();
+  await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
   await chooseDate(page, page.getByLabel('Deadline override', { exact: true }), '2030-02-01');
   await page.locator('#set-book-deadline').click();
-  await expect(page.getByTestId('editor-status')).toHaveText('Deadline override saved for Fresh saved title.');
+  await expect(page.getByTestId('editor-status')).toBeEmpty();
+  await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
   const after = await snapshot();
   expect(after.books.sections[0].books[0]).toMatchObject({ title: 'Fresh saved title', start_page: 1, end_page: 100, start_date_override: '2030-01-03', deadline_override: '2030-02-01' });
   expect(after.books.sections[0].books[1]).toEqual(before.books.sections[0].books[1]);
@@ -203,10 +209,12 @@ test('Books overrides save fresh persisted data, preserve drafts and unrelated r
   expect(await page.evaluate(() => localStorage.getItem(bundleKey))).toBe(raw);
   expect(await draft()).toEqual(originalDraft);
   await page.locator('#clear-book-start').click();
-  await expect(page.getByTestId('editor-status')).toContainText('Start date override cleared');
+  await expect(page.getByTestId('editor-status')).toBeEmpty();
+  await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
   await expect(page.locator('#clear-book-start')).toBeHidden();
   await page.locator('#clear-book-deadline').click();
-  await expect(page.getByTestId('editor-status')).toContainText('Deadline override cleared');
+  await expect(page.getByTestId('editor-status')).toBeEmpty();
+  await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
   await expect(page.locator('#clear-book-deadline')).toBeHidden();
   expect(await draft()).toEqual(originalDraft);
   await page.reload();
@@ -227,7 +235,8 @@ test('a deadline override schedules an imported book without rewriting other boo
   const before = await snapshot();
   await chooseDate(page, page.getByLabel('Deadline override', { exact: true }), '2030-02-01');
   await page.getByRole('button', { name: 'Set deadline', exact: true }).click();
-  await expect(page.getByTestId('editor-status')).toHaveText('Deadline override saved for First.');
+  await expect(page.getByTestId('editor-status')).toBeEmpty();
+  await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
   const after = await snapshot();
   expect(after.books.sections[0].books[0]).toMatchObject({
     deadline_override: '2030-02-01',

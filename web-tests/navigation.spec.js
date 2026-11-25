@@ -31,7 +31,7 @@ for (const width of [320, 1440]) {
       path.join(__dirname, '..', 'fixtures', 'issue-45-populated', `${name}.json`)));
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: 'Import bundle' }).click();
-    await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+    await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
     const sections = page.getByRole('navigation', { name: 'Plan sections' });
     const plan = sections.getByRole('button', { name: 'Plan', exact: true });
     const schedule = sections.getByRole('button', { name: 'Reading schedule' });

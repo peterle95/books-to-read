@@ -86,7 +86,7 @@
     try {
       const file = document.querySelector('#csv-file').files[0];
       const result = parsePlan(await file.text());
-      if (!window.confirm('Replace current books and reading history with this CSV plan? Export a bundle backup first. The next-quarter plan is retained.')) { message.textContent = 'CSV import cancelled.'; return; }
+      if (!window.confirm('Replace current books and reading history with this CSV plan? Export a bundle backup first. The next-quarter plan is retained.')) return;
       const current = readBundleFiles();
       await writeBundleFiles({
         'plan.json': { ...(current?.plan || { schema_version: 2 }), start_date: result.start, end_date: result.end, end_label: result.endLabel,
@@ -98,7 +98,6 @@
       scheduleState = null;
       resetBook(); resetSession(); cancelPlannedEdit();
       renderSchedule(); renderQuarter();
-      message.textContent = 'CSV plan imported. Reading history is not included in CSV.';
     } catch (error) { message.textContent = `CSV could not be imported: ${error.message}`; }
   });
 

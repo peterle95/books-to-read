@@ -33,7 +33,7 @@ test.beforeEach(async ({ page }) => {
   await page.goto('./');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await importBundle(page, baseline, { confirm: true });
-  await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+  await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
 });
 
 test('book IDs that collide only after trimming are rejected in one section', async ({ page }) => {
@@ -81,7 +81,7 @@ test('normal distinct book IDs still import and keep their histories', async ({ 
     books: sections({ 'Physical books': [book('paper', 'Paper')], 'Digital books': [book('digital', 'Digital')] }),
     sessions: { paper: [], digital: [] },
   }), { confirm: true });
-  await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+  await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
   const stored = await page.evaluate(() => {
     const current = readBundleData();
     return {
@@ -97,7 +97,7 @@ test('a single padded book ID without a collision still imports unchanged', asyn
     books: sections({ 'Physical books': [book(' padded ', 'Padded')] }),
     sessions: { padded: [] },
   }), { confirm: true });
-  await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+  await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
   const stored = await page.evaluate(() => {
     const current = readBundleData();
     return {

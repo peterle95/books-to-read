@@ -26,7 +26,7 @@ test.beforeEach(async ({ page }) => {
   await page.getByLabel('Bundle files').setInputFiles(['plan.json', 'books.json', 'sessions.json', 'manifest.json'].map((name) => path.join(directory, name)));
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: 'Import bundle' }).click();
-  await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+  await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
   await page.getByRole('button', { name: 'Session', exact: true }).click();
   await page.getByRole('button', { name: 'Entries', exact: true }).click();
   await expect(page.locator('#history-list details').first()).toHaveAttribute('open', '');
@@ -119,7 +119,7 @@ test('postcommit renderer failure reports a saved change and closes the dialog',
   await page.evaluate(() => { window.renderEditor = () => { throw new Error('Injected render failure'); }; });
   await dialog.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(dialog).not.toBeVisible();
-  await expect(page.getByTestId('editor-status')).toContainText('Reading session saved. Unable to refresh the display: Injected render failure');
+  await expect(page.getByTestId('editor-status')).toContainText('Unable to refresh the display: Injected render failure');
   expect(await page.evaluate(() => readBundleFiles().sessions.sessions.paper[0].current_page)).toBe(21);
   expect(await page.evaluate(() => localStorage.getItem(scheduleKey))).toBeNull();
 });

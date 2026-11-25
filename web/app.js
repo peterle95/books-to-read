@@ -181,7 +181,6 @@ document.querySelector('#bundle-form').addEventListener('submit', async (event) 
       buffers['manifest.json'] = encoder.encode(JSON.stringify(manifest));
     }
     if (!window.confirm('Replace the stored reading-plan bundle with these files?')) {
-      bundleMessage.textContent = 'Import cancelled. Stored bundle unchanged.';
       return;
     }
     const encoded = Object.fromEntries(names.map((name) => {
@@ -194,7 +193,6 @@ document.querySelector('#bundle-form').addEventListener('submit', async (event) 
     localStorage.removeItem(scheduleKey);
     scheduleState = null;
     showExports();
-    bundleMessage.textContent = repaired ? 'Bundle imported on this device; reading session chain repaired.' : 'Bundle imported on this device.';
     imported = true;
   } catch (error) {
     bundleMessage.textContent = `Bundle could not be imported: ${error.message}`;
@@ -340,6 +338,7 @@ const overrideBaselines = (section, book, includeGroup = false) => {
 };
 
 const setOverride = async (bookId, value, status = scheduleStatus) => {
+  status.textContent = '';
   try {
     const bundle = readBundleData();
     if (!bundle) throw new Error('Import a bundle before scheduling its books.');
@@ -360,9 +359,7 @@ const setOverride = async (bookId, value, status = scheduleStatus) => {
     scheduleState.baselines = baselines;
     scheduleState.overrides = { ...scheduleState.overrides, [bookId]: value || null };
     await saveSchedule();
-    const message = value ? `Deadline override saved for ${book.title}.` : `Deadline override cleared for ${book.title}.`;
-    renderSchedule(message);
-    status.textContent = message;
+    renderSchedule();
     return true;
   } catch (error) {
     status.textContent = error.message;
@@ -371,6 +368,7 @@ const setOverride = async (bookId, value, status = scheduleStatus) => {
 };
 
 const setStartOverride = async (bookId, value, status = scheduleStatus) => {
+  status.textContent = '';
   try {
     const bundle = readBundleData();
     if (!bundle) throw new Error('Import a bundle before scheduling its books.');
@@ -383,9 +381,7 @@ const setStartOverride = async (bookId, value, status = scheduleStatus) => {
     scheduleState.baselines = baselines;
     scheduleState.startOverrides = { ...scheduleState.startOverrides, [book.id]: value || null };
     await saveSchedule();
-    const message = value ? `Start date override saved for ${book.title}.` : `Start date override cleared for ${book.title}.`;
-    renderSchedule(message);
-    status.textContent = message;
+    renderSchedule();
     return true;
   } catch (error) {
     status.textContent = error.message;
@@ -445,7 +441,7 @@ const renderProjections = (bundle) => {
   projectionTable.hidden = !rows.length;
 };
 
-const renderSchedule = (message = '') => {
+const renderSchedule = () => {
   if (window.renderEditor) window.renderEditor();
   if (window.renderCharts) window.renderCharts();
   document.querySelector('#csv-export').hidden = !localStorage.getItem(bundleKey);
@@ -532,7 +528,7 @@ const renderSchedule = (message = '') => {
   } else if (scheduleState.needsRecalculation) {
     scheduleStatus.textContent = 'The imported schedule will update when books or rest days change.';
   } else {
-    scheduleStatus.textContent = message || 'Baseline schedule saved. Required pace reflects today.';
+    scheduleStatus.textContent = '';
   }
 };
 
@@ -546,7 +542,7 @@ const scheduleChanged = async () => {
     scheduleState = loadSchedule(readBundleData());
     throw error;
   }
-  renderSchedule('Reading schedule updated.');
+  renderSchedule();
 };
 
 restForm.addEventListener('submit', async (event) => {
@@ -618,7 +614,7 @@ const digest = async (bytes) => Array.from(
 // Rewrite the changed files, keep the rest byte for byte, and re-checksum the bundle.
 let bundleWritePending = false;
 const writeBundleFiles = async (updates) => {
-  if (bundleWritePending) throw new Error('A save is already in progress. Wait for its saved message.');
+  if (bundleWritePending) throw new Error('A save is already in progress. Wait for it to finish.');
   bundleWritePending = true;
   const controls = [...document.querySelectorAll('button, input, select')].filter((control) => !control.disabled);
   controls.forEach((control) => { control.disabled = true; });
@@ -690,7 +686,6 @@ deletePlannedQuarter.addEventListener('click', async () => {
     const current = readBundleFiles();
     if (!current) throw new Error('Import a bundle before changing its next-quarter plan.');
     await writeBundleFiles({ 'books.json': { ...current.books, planned_quarter: null } });
-    quarterStatus.textContent = 'Queued quarter deleted.';
     renderQuarter();
   } catch (error) {
     quarterStatus.textContent = error.message;
@@ -787,7 +782,6 @@ newPlanForm.addEventListener('submit', async (event) => {
     if (typeof resetSession === 'function') resetSession();
     renderSchedule();
     renderQuarter();
-    newPlanStatus.textContent = 'New plan saved.';
   } catch (error) {
     (newPlanDialog.open ? newPlanError : newPlanStatus).textContent = error.message;
   } finally {
@@ -814,11 +808,11 @@ const plannedDraft = () => {
 };
 
 // The queued quarter is only stored: the current plan keeps running until a later change uses it.
-const renderQuarter = (message = '') => {
+const renderQuarter = () => {
   showPlanActions();
   const current = readBundleFiles();
   if (!current) {
-    quarterStatus.textContent = message || 'Import a bundle to plan the next quarter.';
+    quarterStatus.textContent = 'Import a bundle to plan the next quarter.';
     return;
   }
   try {
@@ -830,7 +824,7 @@ const renderQuarter = (message = '') => {
     quarterStatus.textContent = error.message;
     return;
   }
-  quarterStatus.textContent = message;
+  quarterStatus.textContent = '';
 };
 
 const openQuarterDialog = async () => {
@@ -940,7 +934,7 @@ const storePlannedBook = (replace) => {
     editingPlannedBook = book.id;
     normalizePlannedSections();
     renderQuarterDraft();
-    quarterDraftStatus.textContent = 'Draft updated. Save plan to keep these changes.';
+    quarterDraftStatus.textContent = '';
   } catch (error) {
     quarterDraftStatus.textContent = error.message;
   }
@@ -957,7 +951,7 @@ document.querySelector('#remove-planned-book').addEventListener('click', () => {
   normalizePlannedSections();
   cancelPlannedEdit();
   renderQuarterDraft();
-  quarterDraftStatus.textContent = 'Draft updated. Save plan to keep these changes.';
+  quarterDraftStatus.textContent = '';
 });
 document.querySelector('#save-quarter').addEventListener('click', async () => {
   try {
@@ -969,7 +963,7 @@ document.querySelector('#save-quarter').addEventListener('click', async () => {
     normalizePlannedSections();
     await writeBundleFiles({ 'books.json': { ...current.books, planned_quarter: window.ReadingQuarter.plannedToJson(quarterDraft) } });
     quarterDialog.close();
-    renderQuarter('Next-quarter plan saved.');
+    renderQuarter();
   } catch (error) {
     quarterDraftStatus.textContent = error.message;
   }

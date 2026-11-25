@@ -34,7 +34,7 @@ for (const width of [360, 1440]) {
     await page.getByLabel('Bundle files').setInputFiles(fixture());
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: 'Import bundle', exact: true }).click();
-    await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+    await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
     const original = await page.evaluate(() => localStorage.getItem('reading-plan-bundle-v1'));
     await page.getByRole('button', { name: 'Plan', exact: true }).click();
     await page.getByRole('button', { name: 'Edit next-quarter plan', exact: true }).click();
@@ -90,7 +90,7 @@ for (const width of [360, 1440]) {
     await page.getByLabel('Bundle files').setInputFiles(files);
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: 'Import bundle', exact: true }).click();
-    await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+    await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
     const original = await page.evaluate(() => localStorage.getItem('reading-plan-bundle-v1'));
     await page.getByRole('button', { name: 'Plan', exact: true }).click();
     await page.getByRole('button', { name: 'Edit next-quarter plan', exact: true }).click();

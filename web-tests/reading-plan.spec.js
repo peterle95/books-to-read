@@ -77,7 +77,7 @@ write_json_bundle(sys.argv[1], [BookSection('Physical books', [book], []), BookS
     await page.getByLabel('Bundle files').setInputFiles(files);
     page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: 'Import bundle' }).click();
-    await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+    await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
     const stored = await page.evaluate(() => localStorage.getItem('reading-plan-bundle-v1'));
     const planData = JSON.parse(files[0].buffer), bookData = JSON.parse(files[1].buffer), sessionData = JSON.parse(files[2].buffer);
     expect(planData.rest_days).toHaveLength(1);
@@ -87,7 +87,7 @@ write_json_bundle(sys.argv[1], [BookSection('Physical books', [book], []), BookS
     expect(sessionData.sessions['book-stable'][0].id).toBe('session-stable');
     page.once('dialog', (dialog) => dialog.dismiss());
     await page.getByRole('button', { name: 'Import bundle' }).click();
-    await expect(page.getByTestId('bundle-status')).toHaveText(/cancelled/);
+    await expect(page.getByTestId('bundle-status')).toBeEmpty();
     expect(await page.evaluate(() => localStorage.getItem('reading-plan-bundle-v1'))).toBe(stored);
     const corrupt = files.map((file) => ({ ...file }));
     corrupt[1].buffer = Buffer.concat([files[1].buffer, Buffer.from(' ')]);
@@ -191,7 +191,8 @@ write_json_bundle(sys.argv[1], [BookSection('Physical books', [Book(1, 'Title', 
       await page.getByLabel('Bundle files').setInputFiles(names.map((name) => ({ name, mimeType: 'application/json', buffer: Buffer.from(values[name]) })));
       if (accepted) page.once('dialog', (dialog) => dialog.accept());
       await page.getByRole('button', { name: 'Import bundle' }).click();
-      await expect(page.getByTestId('bundle-status'), label).toHaveText(accepted ? 'Bundle imported on this device.' : /^Bundle could not be imported: .+$/);
+      if (accepted) await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
+      else await expect(page.getByTestId('bundle-status'), label).toHaveText(/^Bundle could not be imported: .+$/);
       const current = await page.evaluate(() => localStorage.getItem('reading-plan-bundle-v1'));
       if (accepted) {
         expect(JSON.parse(current), label).toEqual(Object.fromEntries(names.map((name) => [name, Buffer.from(values[name]).toString('base64')])));

@@ -39,7 +39,7 @@ async function populate(page, withBaselines = false) {
   await page.getByLabel('Bundle files').setInputFiles(files);
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: 'Import bundle', exact: true }).click();
-  await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+  await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
 }
 
 const tab = async (page, name) => {

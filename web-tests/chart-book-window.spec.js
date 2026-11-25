@@ -31,7 +31,7 @@ test('charts and metrics fall back to the book schedule when no baseline is save
   await page.getByLabel('Bundle files').setInputFiles(files);
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: 'Import bundle' }).click();
-  await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+  await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
 
   await page.getByRole('button', { name: 'Charts', exact: true }).click();
   await page.getByRole('button', { name: 'All', exact: true }).click();

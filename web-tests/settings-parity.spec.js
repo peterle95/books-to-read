@@ -22,7 +22,7 @@ const importFiles = async (page, files) => {
   await page.getByLabel('Bundle files').setInputFiles(files);
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: 'Import bundle', exact: true }).click();
-  await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
+  await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
 };
 
 for (const width of [390, 1440]) {
@@ -96,7 +96,8 @@ test('imported summary options survive book edits and manual ZIP round-trip with
     await page.locator('#book-from').fill('1');
     await page.locator('#book-to').fill('20');
     await page.getByRole('button', { name: 'Add', exact: true }).click();
-    await expect(page.getByTestId('editor-status')).toHaveText('Book saved.');
+    await expect(page.getByTestId('editor-status')).toBeEmpty();
+    await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
     expect(await page.evaluate(() => readBundleFiles().plan.stats_options)).toEqual(options);
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     const download = page.waitForEvent('download');

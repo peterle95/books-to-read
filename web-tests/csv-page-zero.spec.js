@@ -29,8 +29,10 @@ test('page-zero physical and digital books survive CSV import, export and reimpo
     desktopCsv(desktop);
     await page.getByLabel('CSV plan file').setInputFiles(desktop);
     page.once('dialog', (dialog) => dialog.accept());
+    const firstRevision = await page.evaluate(() => readBundleFiles()?.manifest.revision ?? -1);
     await page.getByRole('button', { name: 'Import CSV plan', exact: true }).click();
-    await expect(page.getByTestId('csv-status')).toHaveText('CSV plan imported. Reading history is not included in CSV.');
+    await expect(page.getByTestId('csv-status')).toBeEmpty();
+    await expect.poll(() => page.evaluate(() => readBundleFiles()?.manifest.revision)).toBeGreaterThan(firstRevision);
     const imported = await read(page);
     expect(imported.books.sections[0].books.map((book) => [book.title, book.start_page, book.end_page, book.pages])).toEqual([['Zero start paper', 0, 100, 101]]);
     expect(imported.books.sections[1].books.map((book) => [book.title, book.start_page, book.end_page, book.pages])).toEqual([['Zero start digital', 0, 0, 1]]);
@@ -53,8 +55,10 @@ assert [(b.title, b.start_page, b.end_page, b.current_page) for b in sections[1]
     // The app must accept the CSV it just wrote for a page-zero book.
     await page.getByLabel('CSV plan file').setInputFiles(exported);
     page.once('dialog', (dialog) => dialog.accept());
+    const secondRevision = await page.evaluate(() => readBundleFiles().manifest.revision);
     await page.getByRole('button', { name: 'Import CSV plan', exact: true }).click();
-    await expect(page.getByTestId('csv-status')).toHaveText('CSV plan imported. Reading history is not included in CSV.');
+    await expect(page.getByTestId('csv-status')).toBeEmpty();
+    await expect.poll(() => page.evaluate(() => readBundleFiles()?.manifest.revision)).toBeGreaterThan(secondRevision);
     const reimported = await read(page);
     expect(reimported.books.sections[0].books.map((book) => [book.start_page, book.end_page, book.current_page, book.pages_read])).toEqual([[0, 100, 10, 11]]);
     expect(reimported.books.sections[1].books.map((book) => [book.start_page, book.end_page, book.current_page])).toEqual([[0, 0, null]]);
