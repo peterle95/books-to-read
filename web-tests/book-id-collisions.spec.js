@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { createHash } = require('node:crypto');
+const { confirmBundleImport } = require('./bundle-helper');
 
 const labels = ['Physical books', 'Digital books', 'Audiobooks'];
 const book = (id, title) => ({ id, title, start_page: 1, end_page: 100 });
@@ -25,8 +26,8 @@ const snapshot = (page) => page.evaluate(() => Object.fromEntries(Object.entries
 
 const importBundle = async (page, files, { confirm = false } = {}) => {
   await page.getByLabel('Bundle files').setInputFiles(files);
-  if (confirm) page.once('dialog', (dialog) => dialog.accept());
-  await page.getByRole('button', { name: 'Import bundle' }).click();
+  if (confirm) await confirmBundleImport(page);
+  else await page.getByRole('button', { name: 'Import bundle' }).click();
 };
 
 test.beforeEach(async ({ page }) => {

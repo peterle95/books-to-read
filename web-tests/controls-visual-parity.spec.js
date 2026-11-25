@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const { confirmBundleImport } = require('./bundle-helper');
 
 test.use({ viewport: { width: 360, height: 732 }, deviceScaleFactor: 3, timezoneId: 'Europe/Berlin', locale: 'en-US' });
 
@@ -76,8 +77,7 @@ test.describe('mobile display-sized history', () => {
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await page.getByLabel('Bundle files').setInputFiles(['plan.json', 'books.json', 'sessions.json', 'manifest.json']
       .map((name) => `fixtures/issue-45-populated/${name}`));
-    page.once('dialog', (dialog) => dialog.accept());
-    await page.getByRole('button', { name: 'Import bundle', exact: true }).click();
+    await confirmBundleImport(page);
     await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
     const before = await stored(page);
     await tab(page, 'Session');
@@ -104,13 +104,19 @@ test.describe('mobile display-sized history', () => {
   test('keeps the sheet usable when the viewport becomes shorter or taller', async ({ page }) => {
     await page.getByRole('button', { name: 'Entries', exact: true }).click();
     const sheet = page.getByRole('dialog', { name: 'Reading history', exact: true });
+    const cdp = await page.context().newCDPSession(page);
+    // setViewportSize also resizes window.screen; browser chrome only changes the viewport.
     for (const height of [600, 900]) {
-      await page.setViewportSize({ width: 360, height });
-      await expect.poll(async () => { const box = await sheet.boundingBox(); return box.y + box.height; }).toBe(height);
-      const box = await sheet.boundingBox();
-      const displayCap = await page.evaluate(() => screen.height * 0.86);
-      near(box.height, Math.min(height * 0.92, displayCap));
-      near(box.y + box.height, height);
+      await cdp.send('Emulation.setDeviceMetricsOverride', {
+        width: 360, height, screenWidth: 360, screenHeight: 780, deviceScaleFactor: 3, mobile: true,
+      });
+      const expectedHeight = Math.min(height * 0.92, 780 * 0.86);
+      await expect(async () => {
+        expect(await page.evaluate(() => screen.height)).toBe(780);
+        const box = await sheet.boundingBox();
+        near(box.height, expectedHeight);
+        near(box.y + box.height, height);
+      }).toPass({ timeout: 5000 });
       await expect(sheet.getByRole('button', { name: 'Close', exact: true })).toBeVisible();
     }
   });

@@ -74,3 +74,36 @@ test('reports a persistent read failure and keeps the stored bundle', async ({ p
   await expect(page.getByTestId('bundle-status')).toHaveText(`Bundle could not be imported: ${notReadable}`);
   expect(await storage(page)).toEqual(before);
 });
+
+test('keeps the import button disabled until replacement finishes', async ({ page }) => {
+  await openSettings(page);
+  const files = bundleFiles();
+  const input = page.getByLabel('Bundle files');
+  const submit = page.getByRole('button', { name: 'Import bundle' });
+  await input.setInputFiles(files);
+  page.once('dialog', (dialog) => dialog.accept());
+  await submit.click();
+  await expect(page.locator('#source-status')).toHaveText('JSON loaded in this browser. Transfers are manual.');
+
+  const replacement = bundleFiles();
+  const manifest = JSON.parse(replacement.at(-1).buffer);
+  manifest.revision = 2;
+  replacement.at(-1).buffer = Buffer.from(JSON.stringify(manifest));
+  await input.setInputFiles(replacement);
+  await page.evaluate(() => {
+    const read = File.prototype.arrayBuffer;
+    const pending = new Promise((resolve) => { window.finishFileReads = resolve; });
+    File.prototype.arrayBuffer = async function () {
+      await pending;
+      return read.call(this);
+    };
+  });
+
+  page.once('dialog', (dialog) => dialog.accept());
+  await submit.click();
+  await expect(submit).toBeDisabled({ timeout: 1000 });
+  expect(await page.evaluate(() => readBundleFiles().manifest.revision)).toBe(1);
+  await page.evaluate(() => { window.finishFileReads(); });
+  await expect(submit).toBeEnabled();
+  expect(await page.evaluate(() => readBundleFiles().manifest.revision)).toBe(2);
+});

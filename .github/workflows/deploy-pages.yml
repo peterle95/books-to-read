@@ -11,11 +11,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.event_name == 'pull_request' && github.ref || 'pages' }}
-  cancel-in-progress: false
+  group: ${{ github.event_name == 'pull_request' && format('pages-pr-{0}', github.event.pull_request.number) || format('pages-{0}', github.ref) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   test:
+    name: Pages checks
     # The native-geometry assertions were calibrated with Windows Chromium.
     # Linux Chromium renders the bundled font differently; see release verification.
     runs-on: windows-latest
@@ -25,8 +26,14 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m unittest discover
       - run: npm ci
       - run: npx playwright install --with-deps chromium
+      - name: Version offline cache
+        run: node -e "const fs = require('node:fs'); const path = 'web/sw.js'; fs.writeFileSync(path, fs.readFileSync(path, 'utf8').replaceAll('__VERSION__', process.env.GITHUB_SHA));"
       - run: npm run test:web
       - uses: actions/upload-artifact@v4
         if: failure()
@@ -34,6 +41,10 @@ jobs:
           name: playwright-failures
           path: test-results/
           if-no-files-found: ignore
+      - uses: actions/upload-pages-artifact@v3
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        with:
+          path: web
 
   deploy:
     needs: test
@@ -47,12 +58,6 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Version offline cache
-        run: sed -i "s/__VERSION__/${GITHUB_SHA}/g" web/sw.js
       - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: web
       - uses: actions/deploy-pages@v4
         id: deployment
