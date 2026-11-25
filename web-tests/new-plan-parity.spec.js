@@ -25,7 +25,7 @@ const fixture = () => {
   return files;
 };
 
-test('New plan cancellation preserves the bundle; replacement resets current data but keeps the planned quarter and draft', async ({ page }) => {
+test('New plan cancellation preserves the bundle; replacement resets current data but keeps the planned quarter', async ({ page }) => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'new-plan-parity-'));
   try {
     await page.goto('./');
@@ -36,8 +36,6 @@ test('New plan cancellation preserves the bundle; replacement resets current dat
     await expect(page.getByTestId('bundle-status')).toHaveText('Bundle imported on this device.');
     await page.getByRole('button', { name: 'Plan', exact: true }).click();
     await page.getByRole('button', { name: 'Plan next quarter', exact: true }).click();
-    await page.getByLabel('Reading plan').fill('Keep my draft');
-    await page.getByRole('button', { name: 'Save plan', exact: true }).click();
     const original = await page.evaluate(() => localStorage.getItem('reading-plan-bundle-v1'));
     await page.getByRole('button', { name: 'New plan', exact: true }).click();
     await expect(page.getByLabel('Start date', { exact: true })).toBeVisible();
@@ -64,7 +62,6 @@ test('New plan cancellation preserves the bundle; replacement resets current dat
     ]);
     expect(data.books.planned_quarter).toEqual(JSON.parse(fixture()[1].buffer).planned_quarter);
     expect(data.sessions.sessions).toEqual({});
-    await expect(page.getByLabel('Reading plan')).toHaveValue('Keep my draft');
 
     await page.getByLabel('Start date', { exact: true }).fill('2028-04-01');
     await page.getByLabel('Finish date', { exact: true }).fill('2028-03-31');
@@ -94,8 +91,6 @@ test('New plan cancellation preserves the bundle; replacement resets current dat
     expect((await page.evaluate(() => readBundleFiles())).books.planned_quarter).toEqual(data.books.planned_quarter);
     await page.reload();
     expect((await page.evaluate(() => readBundleFiles())).plan.end_date).toBe('2028-03-31');
-    await page.getByRole('button', { name: 'Plan', exact: true }).click();
-    await expect(page.getByLabel('Reading plan')).toHaveValue('Keep my draft');
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }

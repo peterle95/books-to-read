@@ -225,10 +225,11 @@ test('a due next-quarter plan activates on import, persists and exports to deskt
     await expect(page.getByTestId('quarter-status')).toHaveText(`Next quarter activated: ${dates.due} to ${dates.dueEnd}.`);
 
     // Unfinished books carry forward before the planned books; finished work is gone.
-    await expect(page.getByLabel('Plan start')).toHaveValue(dates.due);
     await page.getByRole('button', { name: 'Edit next-quarter plan' }).click();
     await expect(page.locator('#quarter-dialog-heading')).toHaveText(`Next quarter — ${dates.future}`);
     await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await page.getByRole('button', { name: 'Reading schedule', exact: true }).click();
+    await expect(page.getByLabel('Plan start')).toHaveValue(dates.due);
     await expect(row('Ongoing')).toHaveCount(1);
     await expect(row('Paired')).toHaveCount(1);
     await expect(row('Audio')).toHaveCount(1);
@@ -250,6 +251,7 @@ test('a due next-quarter plan activates on import, persists and exports to deskt
     await page.reload();
     await page.getByRole('button', { name: 'Plan', exact: true }).click();
     await expect(page.getByTestId('quarter-status')).toHaveText('No books are planned for the next quarter yet.');
+    await page.getByRole('button', { name: 'Reading schedule', exact: true }).click();
     await expect(row('Next story')).toHaveCount(1);
     await expect(row('Finished')).toHaveCount(0);
     await expect(page.getByLabel('Plan start')).toHaveValue(dates.due);

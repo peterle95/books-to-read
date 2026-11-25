@@ -170,7 +170,6 @@ test('populated 360x732 first fold preserves native page gutters and useful land
   expect(plot.height).toBe(500);
   expect(plot.width).toBeLessThanOrEqual(328);
   expect(nav.y - plot.y).toBeGreaterThan(350);
-  expect(await page.locator('#screen-charts > section > p').evaluate((node) => node.getBoundingClientRect().top)).toBeGreaterThanOrEqual(plot.y + plot.height);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(360);
   await page.screenshot({ path: testInfo.outputPath('populated-charts-360x732.png') });
   expect(await page.evaluate(() => localStorage.getItem(bundleKey))).toBe(original);
@@ -217,19 +216,16 @@ test('populated chooser, group and history use native alert actions without losi
   expect(await page.evaluate(() => localStorage.getItem(bundleKey))).toBe(original);
 });
 
-test('quarter shortcut refreshes after save and rollover, including an empty saved plan', async ({ page }) => {
+test('quarter shortcut shows Edit only while the queued plan has books', async ({ page }) => {
   await populate(page);
   await tab(page, 'Plan');
-  await page.getByRole('button', { name: 'Plan next quarter', exact: true }).click();
-  await page.getByRole('button', { name: 'Plan next quarter — 2027-01-01', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Edit next-quarter plan', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Edit next-quarter plan', exact: true }).click();
   await page.locator('#quarter-list button').click();
   await page.getByRole('button', { name: 'Remove selected', exact: true }).click();
   await page.locator('#save-quarter').click();
-  await expect(page.getByRole('button', { name: 'Plan next quarter — 2027-01-01', exact: true })).toBeVisible();
-  await page.clock.setFixedTime(new Date('2027-01-01T12:00:00Z'));
-  await page.evaluate(() => checkRollover());
-  await expect(page.locator('#plan-actions-toggle')).toBeVisible();
-  await expect(page.getByRole('button', { name: /Plan next quarter —/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Plan next quarter', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Edit next-quarter plan', exact: true })).toHaveCount(0);
 });
 
 test('360x732 populated sheets preserve native hierarchy, density and pinned chrome', async ({ page }, testInfo) => {

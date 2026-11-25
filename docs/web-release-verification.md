@@ -83,8 +83,8 @@ A 2026-11-07 round against supplied current-build references resolved the
 rest-day separator and label text, blank date fields (no `YYYY-MM-DD`
 placeholder), colon-free Session targets, the equal-width All/Metrics header and
 the 48 px Session control row; see `docs/evidence/issue-51/round2/capture.json`
-for measured geometry. The web-only text draft, the Settings presentation and
-all actual-device checks remain unresolved.
+for measured geometry. The Settings presentation and all actual-device checks
+remain unresolved.
 The History origin mismatch has a bounded automated correction and comparison
 in `docs/evidence/issue-45/verification.md`; actual-device confirmation remains
 pending. Known visual residuals remain:
@@ -174,8 +174,8 @@ deployment for this check.
 - Browser site data can be cleared by the reader, browser storage eviction,
   profile removal or device loss. Installing the PWA does not guarantee storage
   durability. A ZIP stored outside the browser is the recovery path.
-- A bundle ZIP backs up structured plan data, **not the separate text draft or
-  unsaved form fields**. Copy the text draft separately if it matters.
+- A bundle ZIP backs up structured plan data, **not unsaved form fields**.
+  Re-enter those if needed.
 - Update discovery and install availability depend on browser/OS policy.
   Offline use requires a successful initial online load and service-worker cache.
 - Downloads can be cancelled or fail after the browser starts them; check the

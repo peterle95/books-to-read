@@ -34,7 +34,7 @@ test('distributed assets retain exact API35 source hashes and are served locally
 test('local variable Roboto replaces browser and scoped history fallbacks', async ({ page }) => {
   await page.goto('./');
   await expectRoboto(page);
-  for (const selector of ['html', 'body', '#open-entries', '#session-date', '#entries-book', '#plan']) {
+  for (const selector of ['html', 'body', '#open-entries', '#session-date', '#entries-book']) {
     await expect(page.locator(selector)).toHaveCSS('font-family', 'AndroidRoboto, sans-serif');
   }
   await expect(page.locator('body')).toHaveCSS('font-weight', '400');

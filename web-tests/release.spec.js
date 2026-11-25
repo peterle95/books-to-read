@@ -58,13 +58,16 @@ ${assertions}
 test('saved web plan dates and rest days transfer to desktop', async ({ page }) => {
   await withPlan(page, async (directory) => {
     await tab(page, 'Plan');
+    await tab(page, 'Reading schedule');
     await page.getByLabel('Plan finish', { exact: true }).fill('2026-12-20');
     await page.getByRole('button', { name: 'Save plan dates' }).click();
+    await page.getByRole('navigation', { name: 'Plan sections' }).getByRole('button', { name: 'Plan', exact: true }).click();
     await chooseDate(page, page.getByLabel('Rest start date'), '2026-11-10');
     await chooseDate(page, page.getByLabel('Rest end date'), '2026-11-11');
     await page.getByRole('button', { name: 'Add rest-day range' }).click();
     await page.reload();
     await tab(page, 'Plan');
+    await tab(page, 'Reading schedule');
     await expect(page.getByLabel('Plan finish', { exact: true })).toHaveValue('2026-12-20');
     await checkExport(page, directory, `assert end.isoformat() == '2026-12-20'
 assert len(rest) == 1 and rest[0].start_date.isoformat() == '2026-11-10'`);
@@ -211,6 +214,7 @@ test('backdated history can be recorded, corrected and deleted without changing 
     await page.locator('#add-book').click();
     await expect(page.getByTestId('editor-status')).toHaveText('Book saved.');
     await tab(page, 'Plan');
+    await tab(page, 'Reading schedule');
     await page.getByRole('button', { name: 'Calculate schedule' }).click();
     await expect(page.getByTestId('schedule-status')).toHaveText('Baseline schedule calculated on this device.');
     await page.evaluate(() => navigator.serviceWorker.ready);
@@ -321,6 +325,7 @@ test('clock input, start-date overrides, preserved summary settings and planned-
     await page.locator('#add-book').click();
     await expect(page.getByTestId('editor-status')).toHaveText('Book saved.');
     await tab(page, 'Plan');
+    await tab(page, 'Reading schedule');
     await page.getByRole('button', { name: 'Calculate schedule' }).click();
     await expect(page.getByTestId('schedule-status')).toHaveText('Baseline schedule calculated on this device.');
     await chooseDate(page, page.getByLabel('Start date override for Clock audio', { exact: true }), '2026-11-10');
@@ -398,6 +403,7 @@ test('charts default to unfinished reading, All includes finished books, and met
       await expect(page.getByTestId('editor-status')).toHaveText('Book saved.');
     }
     await tab(page, 'Plan');
+    await tab(page, 'Reading schedule');
     await page.getByRole('button', { name: 'Calculate schedule' }).click();
     await expect(page.getByTestId('schedule-status')).toHaveText('Baseline schedule calculated on this device.');
     await tab(page, 'Session');

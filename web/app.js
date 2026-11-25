@@ -1,7 +1,3 @@
-const form = document.querySelector('#plan-form');
-const plan = document.querySelector('#plan');
-const status = document.querySelector('#status');
-const storageKey = 'reading-plan-draft-v1';
 const bundleKey = 'reading-plan-bundle-v1';
 const bundleNames = ['plan.json', 'books.json', 'sessions.json', 'manifest.json'];
 const bundleMessage = document.querySelector('#bundle-status');
@@ -20,10 +16,30 @@ window.addEventListener('resize', sizeNativeSheets);
 
 const screens = [...document.querySelectorAll('main > .screen')];
 const tabs = [...document.querySelectorAll('.tab-bar button')];
+const planScreen = document.querySelector('#screen-plan');
+const planSections = [...planScreen.querySelectorAll('[data-plan-section]')];
+const planPanels = [...planScreen.querySelectorAll('[data-plan-panel]')];
+const scheduleStatus = document.querySelector('#schedule-status');
+const planPeriodDates = document.querySelector('#plan-period-dates');
+const planBookCount = document.querySelector('#plan-book-count');
+const planRestCount = document.querySelector('#plan-rest-count');
+const planNextQuarter = document.querySelector('#plan-next-quarter');
+const planGroupCount = document.querySelector('#plan-group-count');
+const planDate = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+function showPlanSection(name) {
+  for (const button of planSections) button.setAttribute('aria-pressed', String(button.dataset.planSection === name));
+  for (const panel of planPanels) panel.hidden = panel.dataset.planPanel !== name;
+  scheduleStatus.hidden = name === 'projections';
+}
+planSections.forEach((button) => button.addEventListener('click', () => showPlanSection(button.dataset.planSection)));
+
 let previousScreen = 'session';
 function showScreen(name) {
+  const enteringPlan = name === 'plan' && planScreen.hidden;
+  if (enteringPlan) showPlanSection('setup');
   if (name !== 'settings') previousScreen = name;
   for (const screen of screens) screen.hidden = screen.id !== `screen-${name}`;
+  if (enteringPlan) window.scrollTo(0, 0);
   for (const tab of tabs) {
     if (tab.dataset.screen === name) tab.setAttribute('aria-current', 'page');
     else tab.removeAttribute('aria-current');
@@ -78,25 +94,10 @@ function showExports() {
 }
 
 try {
-  plan.value = localStorage.getItem(storageKey) || '';
   showExports();
 } catch {
-  status.textContent = 'Unable to read storage on this device.';
+  document.querySelector('#editor-status').textContent = 'Unable to read storage on this device.';
 }
-
-form.addEventListener('submit', (event) => {
-  event.preventDefault();
-  try {
-    localStorage.setItem(storageKey, plan.value);
-    status.textContent = 'Plan saved on this device.';
-  } catch {
-    status.textContent = 'Unable to save. Your plan has not been stored.';
-  }
-});
-
-plan.addEventListener('input', () => {
-  status.textContent = '';
-});
 
 // The browser reads a selected file from disk when the import asks for bytes,
 // not when the input changes. Antivirus, indexing or sync software can hold a
@@ -179,7 +180,7 @@ document.querySelector('#bundle-form').addEventListener('submit', async (event) 
       manifest.files['sessions.json'] = await digest(buffers['sessions.json']);
       buffers['manifest.json'] = encoder.encode(JSON.stringify(manifest));
     }
-    if (!window.confirm('Replace the stored reading-plan bundle with these files? The text draft will not change.')) {
+    if (!window.confirm('Replace the stored reading-plan bundle with these files?')) {
       bundleMessage.textContent = 'Import cancelled. Stored bundle unchanged.';
       return;
     }
@@ -223,19 +224,12 @@ exports.addEventListener('click', async () => {
 });
 
 const scheduleKey = 'reading-plan-schedule-v1';
-const scheduleForm = document.querySelector('#schedule-form');
-const startInput = document.querySelector('#plan-start');
-const finishInput = document.querySelector('#plan-finish');
-window.AndroidControls.date(startInput, { mode: 'text' });
-window.AndroidControls.date(finishInput, { mode: 'text' });
 const restForm = document.querySelector('#rest-form');
 const restStart = document.querySelector('#rest-start');
 const restEnd = document.querySelector('#rest-end');
 window.ReadingCalendar.attach(restStart);
 window.ReadingCalendar.attach(restEnd);
 const restList = document.querySelector('#rest-list');
-const calculateButton = document.querySelector('#calculate-schedule');
-const scheduleStatus = document.querySelector('#schedule-status');
 const scheduleTable = document.querySelector('#schedule-table');
 const scheduleRows = document.querySelector('#schedule-rows');
 const scheduleEmpty = document.querySelector('#schedule-empty');
@@ -312,6 +306,24 @@ const saveSchedule = async () => {
 
 const sectionsForState = (bundle, state) => window.ReadingSchedule.withLocalSettings(bundle.sections, state.groups, state.overrides, state.startOverrides);
 
+const calculatePlanBaselines = (sections, start, end, restDays) => {
+  const baselines = window.ReadingSchedule.calculateBaselines(sections, start, end, restDays);
+  window.ReadingSchedule.applyPersistedOverrides(sections, baselines, end, window.ReadingSchedule.today(), restDays);
+  return baselines;
+};
+
+const withPlanBaselines = (books, plan) => {
+  const baselines = calculatePlanBaselines(window.ReadingSchedule.sectionsFromBooksFile(books), plan.start_date, plan.end_date, plan.rest_days);
+  return { ...books, sections: books.sections.map((section) => ({
+    ...section, baseline_needs_recalculation: false,
+    books: section.books.map((book) => {
+      const baseline = baselines[String(book.id).trim()];
+      return { ...book, baseline_schedule: baseline
+        ? { start_date: baseline.startDate, deadline: baseline.deadline, daily_target: baseline.dailyTarget } : null };
+    }),
+  })) };
+};
+
 const setOverride = async (bookId, value, status = scheduleStatus) => {
   try {
     const bundle = readBundleData();
@@ -376,53 +388,6 @@ const renderGroups = (sections) => {
   groupList.replaceChildren(...items);
 };
 
-const overrideCell = (book) => {
-  const cell = document.createElement('td');
-  const input = document.createElement('input');
-  input.type = 'text';
-  input.value = scheduleState.overrides[book.id] || '';
-  input.setAttribute('aria-label', `Deadline override for ${book.title}`);
-  window.ReadingCalendar.attach(input);
-  const set = document.createElement('button');
-  set.type = 'button';
-  set.textContent = 'Set deadline';
-  set.setAttribute('aria-label', `Save the deadline for ${book.title}`);
-  set.addEventListener('click', () => {
-    try {
-      window.AndroidControls.parseDate(input.value);
-      setOverride(book.id, input.value);
-    } catch (error) { scheduleStatus.textContent = error.message; }
-  });
-  const clear = document.createElement('button');
-  clear.type = 'button';
-  clear.textContent = 'Clear';
-  clear.setAttribute('aria-label', `Clear the deadline for ${book.title}`);
-  clear.addEventListener('click', () => setOverride(book.id, ''));
-  cell.append(input, set, clear);
-  const start = document.createElement('input');
-  start.type = 'text';
-  start.value = scheduleState.startOverrides?.[book.id] || '';
-  start.setAttribute('aria-label', `Start date override for ${book.title}`);
-  window.ReadingCalendar.attach(start);
-  const saveStart = document.createElement('button');
-  saveStart.type = 'button';
-  saveStart.textContent = 'Set start date';
-  saveStart.setAttribute('aria-label', `Save the start date for ${book.title}`);
-  saveStart.addEventListener('click', () => {
-    try {
-      window.AndroidControls.parseDate(start.value);
-      setStartOverride(book.id, start.value);
-    } catch (error) { scheduleStatus.textContent = error.message; }
-  });
-  const clearStart = document.createElement('button');
-  clearStart.type = 'button';
-  clearStart.textContent = 'Clear start date';
-  clearStart.setAttribute('aria-label', `Clear the start date for ${book.title}`);
-  clearStart.addEventListener('click', () => setStartOverride(book.id, ''));
-  cell.append(start, saveStart, clearStart);
-  return cell;
-};
-
 // Projections read recorded history only; they never change the baseline schedule or required pace.
 const renderProjections = (bundle) => {
   const today = window.ReadingSchedule.today();
@@ -432,6 +397,7 @@ const renderProjections = (bundle) => {
     const books = section.books || [];
     if (!books.length) continue;
     const header = document.createElement('tr'), headerCell = document.createElement('th');
+    header.setAttribute('role', 'row');
     headerCell.scope = 'rowgroup';
     headerCell.colSpan = 3;
     headerCell.textContent = `${label} · ${label === 'Audiobooks' ? 'seconds' : 'pages'}`;
@@ -446,8 +412,11 @@ const renderProjections = (bundle) => {
         today,
       });
       const row = document.createElement('tr');
-      for (const value of [String(book.title ?? ''), forecast.projectionLabel, forecast.rangeLabel]) {
+      row.setAttribute('role', 'row');
+      for (const [index, value] of [String(book.title ?? ''), forecast.projectionLabel, forecast.rangeLabel].entries()) {
         const cell = document.createElement('td');
+        cell.setAttribute('role', 'cell');
+        cell.dataset.label = ['', 'Estimated finish', 'Estimated range'][index];
         cell.textContent = value;
         row.append(cell);
       }
@@ -465,10 +434,11 @@ const renderSchedule = (message = '') => {
   const bundle = readBundleData();
   scheduleEmpty.hidden = !!bundle;
   projectionEmpty.hidden = !!bundle;
-  scheduleForm.hidden = !bundle;
   restForm.hidden = !bundle;
-  calculateButton.hidden = !bundle;
   if (!bundle) {
+    planPeriodDates.textContent = 'No active plan';
+    planBookCount.textContent = '';
+    planRestCount.textContent = planGroupCount.textContent = 'None';
     showPlanActions();
     scheduleTable.hidden = true;
     projectionTable.hidden = true;
@@ -478,8 +448,13 @@ const renderSchedule = (message = '') => {
     return;
   }
   if (!scheduleState) scheduleState = loadSchedule(bundle);
-  window.AndroidControls.sync(startInput, scheduleState.startDate);
-  window.AndroidControls.sync(finishInput, scheduleState.endDate);
+  const { startDate, endDate } = scheduleState;
+  const start = new Date(startDate), end = new Date(endDate);
+  planPeriodDates.textContent = start.getUTCFullYear() === end.getUTCFullYear()
+    ? `${planDate.format(start)} – ${planDate.format(end)}`
+    : `${startDate} – ${endDate}`;
+  const ranges = scheduleState.restDays.length;
+  planRestCount.textContent = ranges ? `${ranges} ${ranges === 1 ? 'range' : 'ranges'}` : 'None';
   restList.replaceChildren(...scheduleState.restDays.map((range, index) => {
     const item = document.createElement('li');
     // ReadingPlanPlanView renders every range as "start ? end", including single days.
@@ -497,13 +472,18 @@ const renderSchedule = (message = '') => {
     return item;
   }));
   const sections = sectionsForState(bundle, scheduleState);
+  const activeBooks = sections.reduce((count, section) => count + section.books.filter((book) => book.remaining > 0).length, 0);
+  const groups = sections.reduce((count, section) => count + section.groups.length, 0);
+  planBookCount.textContent = `${activeBooks} ${activeBooks === 1 ? 'book' : 'books'} in progress`;
+  planGroupCount.textContent = groups ? String(groups) : 'None';
   const pace = window.ReadingSchedule.requiredPace(sections, scheduleState.baselines, window.ReadingSchedule.today(), scheduleState.restDays);
   const rows = [];
   for (const section of sections) {
     if (!section.books.length) continue;
     const header = document.createElement('tr'), headerCell = document.createElement('th');
+    header.setAttribute('role', 'row');
     headerCell.scope = 'rowgroup';
-    headerCell.colSpan = 7;
+    headerCell.colSpan = 6;
     headerCell.textContent = `${section.label} · ${section.audio ? 'seconds' : 'pages'}`;
     header.append(headerCell);
     rows.push(header);
@@ -513,12 +493,14 @@ const renderSchedule = (message = '') => {
         ? [book.title, book.remaining, baseline.startDate, baseline.deadline, formatUnits(baseline.dailyTarget), formatUnits(pace[book.id] ?? 0)]
         : [book.title, book.remaining, 'Not scheduled', 'Not scheduled', 'Not scheduled', 'Not scheduled'];
       const row = document.createElement('tr');
-      for (const value of values) {
+      row.setAttribute('role', 'row');
+      for (const [index, value] of values.entries()) {
         const cell = document.createElement('td');
+        cell.setAttribute('role', 'cell');
+        cell.dataset.label = ['', 'Left', 'Baseline start', 'Baseline finish', 'Baseline per day', 'Required now'][index];
         cell.textContent = String(value);
         row.append(cell);
       }
-      row.append(overrideCell(book));
       rows.push(row);
     }
   }
@@ -528,34 +510,26 @@ const renderSchedule = (message = '') => {
   renderProjections(bundle);
   showPlanActions();
   if (!Object.keys(scheduleState.baselines).length) {
-    scheduleStatus.textContent = 'No baseline schedule is saved yet. Calculate the schedule.';
+    scheduleStatus.textContent = activeBooks ? 'No baseline schedule is saved. The schedule will update when books or rest days change.' : '';
   } else if (scheduleState.needsRecalculation) {
-    scheduleStatus.textContent = 'Plan changes are saved. The saved baseline stays unchanged until you calculate the schedule again.';
+    scheduleStatus.textContent = 'The imported schedule will update when books or rest days change.';
   } else {
     scheduleStatus.textContent = message || 'Baseline schedule saved. Required pace reflects today.';
   }
 };
 
 const scheduleChanged = async () => {
-  if (Object.keys(scheduleState.baselines).length) scheduleState.needsRecalculation = true;
-  await saveSchedule();
-  renderSchedule();
-};
-
-scheduleForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
   try {
-    if (!startInput.value || !finishInput.value) throw new Error('Set both plan dates.');
-    window.AndroidControls.parseDate(startInput.value);
-    window.AndroidControls.parseDate(finishInput.value);
-    if (!window.ReadingSchedule.availableDayCount(startInput.value, finishInput.value)) throw new Error('The plan finish date is before its start date.');
-    scheduleState.startDate = startInput.value;
-    scheduleState.endDate = finishInput.value;
-    await scheduleChanged();
+    const sections = sectionsForState(readBundleData(), scheduleState);
+    scheduleState.baselines = calculatePlanBaselines(sections, scheduleState.startDate, scheduleState.endDate, scheduleState.restDays);
+    scheduleState.needsRecalculation = false;
+    await saveSchedule();
   } catch (error) {
-    scheduleStatus.textContent = error.message;
+    scheduleState = loadSchedule(readBundleData());
+    throw error;
   }
-});
+  renderSchedule('Reading schedule updated.');
+};
 
 restForm.addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -566,21 +540,6 @@ restForm.addEventListener('submit', async (event) => {
     const ranges = window.ReadingSchedule.normalizeRestDays([...scheduleState.restDays, { start: restStart.value, end: restEnd.value }]);
     scheduleState.restDays = ranges.map((range) => ({ start: window.ReadingSchedule.iso(range.start), end: window.ReadingSchedule.iso(range.end) }));
     await scheduleChanged();
-  } catch (error) {
-    scheduleStatus.textContent = error.message;
-  }
-});
-
-calculateButton.addEventListener('click', async () => {
-  try {
-    const bundle = readBundleData();
-    if (!bundle) throw new Error('Import a bundle before calculating the schedule.');
-    const sections = sectionsForState(bundle, scheduleState);
-    scheduleState.baselines = window.ReadingSchedule.calculateBaselines(sections, scheduleState.startDate, scheduleState.endDate, scheduleState.restDays);
-    window.ReadingSchedule.applyPersistedOverrides(sections, scheduleState.baselines, scheduleState.endDate, window.ReadingSchedule.today(), scheduleState.restDays);
-    scheduleState.needsRecalculation = false;
-    await saveSchedule();
-    renderSchedule('Baseline schedule calculated on this device.');
   } catch (error) {
     scheduleStatus.textContent = error.message;
   }
@@ -687,23 +646,23 @@ const newPlanStatus = document.querySelector('#new-plan-status');
 const quarterShortcut = document.querySelector('#quarter-shortcut');
 quarterShortcut.addEventListener('click', () => openQuarterDialog());
 const activePlanHint = document.querySelector('#active-plan-hint');
-const recalculatePlan = document.querySelector('#recalculate-plan');
-recalculatePlan.addEventListener('click', () => calculateButton.click());
 const plannedQuarterSummary = document.querySelector('#planned-quarter-summary');
 const deletePlannedQuarter = document.querySelector('#delete-planned-quarter');
 const showPlanActions = () => {
   const current = readBundleFiles();
   const active = !!current;
   const planned = current && window.ReadingQuarter.plannedFromBundle(current.books);
-  activePlanHint.hidden = !active || !newPlanForm.hidden;
-  recalculatePlan.hidden = activePlanHint.hidden;
+  planNextQuarter.textContent = planned ? planned.startDate : 'Not planned';
+  activePlanHint.hidden = !active;
   plannedQuarterSummary.hidden = !planned;
   deletePlannedQuarter.hidden = !planned;
   if (!planned) {
     plannedQuarterSummary.textContent = '';
+    quarterShortcut.textContent = 'Plan next quarter';
     return;
   }
   const count = planned.sections.reduce((total, section) => total + section.books.length, 0);
+  quarterShortcut.textContent = count > 0 ? 'Edit next-quarter plan' : 'Plan next quarter';
   const end = window.ReadingQuarter.periodEnd(planned.startDate);
   plannedQuarterSummary.textContent = `Queued: ${planned.startDate} to ${end} — ${count} ${count === 1 ? 'book' : 'books'}. The current plan is unchanged.`;
 };
@@ -719,52 +678,61 @@ deletePlannedQuarter.addEventListener('click', async () => {
     quarterStatus.textContent = error.message;
   }
 });
-const newPlanBooksFieldset = document.querySelector('#new-plan-books-fieldset');
-const newPlanBookChoices = document.querySelector('#new-plan-book-choices');
-const renderNewPlanBooks = () => {
-  const current = readBundleFiles();
-  const rows = [];
-  for (const section of current?.books.sections || []) {
-    const audio = String(section.label).trim() === 'Audiobooks';
-    for (const book of section.books || []) {
-      const remaining = window.ReadingSchedule.units(book, audio).remaining;
-      const label = document.createElement('label');
-      label.className = 'new-plan-book';
-      const input = document.createElement('input');
-      input.type = 'checkbox';
-      input.value = String(book.id).trim();
-      input.checked = remaining > 0;
-      label.append(input, ` ${book.title} — ${remaining} ${audio ? 'seconds' : 'pages'} left`);
-      rows.push(label);
-    }
-  }
-  newPlanBookChoices.replaceChildren(...rows);
-  newPlanBooksFieldset.hidden = !rows.length;
-};
-
-const showPlanDates = (refresh = false) => {
-  const current = refresh ? readBundleFiles() : null;
-  const start = current?.plan.start_date || window.ReadingSchedule.today();
-  let finish = current?.plan.end_date || start;
-  if (!current) {
-    try { finish = window.ReadingQuarter.periodEnd(start); } catch { /* an out-of-range today keeps the start date */ }
-  }
-  window.AndroidControls.sync(newPlanStart, start);
-  window.AndroidControls.sync(newPlanFinish, finish);
-  renderNewPlanBooks();
-  newPlanForm.hidden = false;
-  showPlanActions();
-};
-
-// Opening the form changes nothing; the current plan is replaced only on submit.
-document.querySelector('#new-plan').addEventListener('click', () => {
-  newPlanStatus.textContent = '';
-  showPlanDates();
+const newPlanDialog = document.querySelector('#create-plan-dialog');
+const newPlanBooks = document.querySelector('#new-plan-books');
+const newPlanError = document.querySelector('#new-plan-error');
+const newPlanAddBook = document.querySelector('#new-plan-add-book');
+let creatingPlan = false;
+document.querySelector('#cancel-new-plan').addEventListener('click', () => {
+  if (!creatingPlan) newPlanDialog.close();
+});
+newPlanDialog.addEventListener('cancel', (event) => { if (creatingPlan) event.preventDefault(); });
+newPlanAddBook.addEventListener('click', () => {
+  const row = document.createElement('fieldset');
+  row.innerHTML = `<legend>New book</legend>
+    <label>Book type <select name="type"><option>Physical books</option><option>Digital books</option><option>Audiobooks</option></select></label>
+    <label>Book name <input name="title" required></label>
+    <label><span>Start page</span><input name="from" value="1" inputmode="numeric" required></label>
+    <label><span>End page</span><input name="to" inputmode="numeric" required></label>
+    <button type="button">Remove book</button>`;
+  const type = row.querySelector('select');
+  const from = row.querySelector('[name="from"]'), to = row.querySelector('[name="to"]');
+  type.addEventListener('change', () => {
+    const audio = type.value === 'Audiobooks';
+    const unit = audio ? 'time' : 'page';
+    from.previousElementSibling.textContent = `Start ${unit}`;
+    to.previousElementSibling.textContent = `End ${unit}`;
+    from.inputMode = to.inputMode = audio ? 'text' : 'numeric';
+    from.value = audio ? '0:00' : '1';
+    to.value = '';
+    to.placeholder = audio ? 'HH:MM or HH:MM:SS' : '';
+  });
+  row.querySelector('button').addEventListener('click', () => {
+    row.remove();
+    newPlanAddBook.focus();
+  });
+  newPlanBooks.append(row);
+  row.querySelector('[name="title"]').focus();
 });
 
-// Replace the current plan: unticked books leave with their history, ticked ones are rescheduled.
+document.querySelector('#new-plan').addEventListener('click', () => {
+  if (readBundleFiles() && !window.confirm('Replace the current plan? Creating the new plan will remove all existing books, reading history, rest days, and the queued quarter.')) return;
+  newPlanStatus.textContent = '';
+  newPlanError.textContent = '';
+  newPlanBooks.replaceChildren();
+  const start = window.ReadingSchedule.today();
+  let finish = start;
+  try { finish = window.ReadingQuarter.periodEnd(start); } catch { /* Keep today at the supported date limit. */ }
+  window.AndroidControls.sync(newPlanStart, start);
+  window.AndroidControls.sync(newPlanFinish, finish);
+  newPlanDialog.showModal();
+});
+
 newPlanForm.addEventListener('submit', async (event) => {
   event.preventDefault();
+  if (creatingPlan) return;
+  creatingPlan = true;
+  newPlanError.textContent = '';
   try {
     const start = newPlanStart.value, finish = newPlanFinish.value;
     if (!start || !finish || finish < start) throw new Error('Finish date must be on or after the start date.');
@@ -773,64 +741,39 @@ newPlanForm.addEventListener('submit', async (event) => {
     const end = finish;
     let endLabel = 'Target finish date';
     try { if (finish === window.ReadingQuarter.periodEnd(start)) endLabel = 'Quarter end'; } catch { /* an out-of-range start keeps the target label */ }
-    const current = readBundleFiles();
-    const keep = new Set([...newPlanBookChoices.querySelectorAll('input[type="checkbox"]')]
-      .filter((input) => input.checked).map((input) => input.value));
-    const sections = window.ReadingQuarter.blankSections().map((blank) => {
-      const source = (current?.books.sections || []).find((section) => String(section.label).trim() === blank.label);
-      const books = [];
-      const numbers = new Map();
-      for (const [index, book] of (source?.books || []).entries()) {
-        const id = String(book.id).trim();
-        if (!keep.has(id)) continue;
-        books.push({ ...book, number: books.length + 1, deadline_override: null, start_date_override: null, target_completed_date: null });
-        numbers.set(index + 1, books.length);
-        numbers.set(id, books.length);
-      }
-      const groups = (source?.simultaneous_groups || []).map((group) => {
-        const kept = [];
-        for (const entry of group) {
-          const number = numbers.get(entry) ?? numbers.get(Number(entry));
-          if (number != null && !kept.includes(number)) kept.push(number);
-        }
-        return kept;
-      }).filter((group) => group.length > 1).map((group) => group.map((number) => books[number - 1].id));
-      return { label: blank.label, baseline_needs_recalculation: false, books, simultaneous_groups: groups };
-    });
-    const baselines = window.ReadingSchedule.calculateBaselines(
-      window.ReadingSchedule.sectionsFromBooksFile({ sections }), start, end, [], true);
-    const scheduled = sections.map((section) => ({ ...section, books: section.books.map((book) => {
-      const baseline = baselines[String(book.id).trim()];
-      return { ...book, baseline_schedule: baseline
-        ? { start_date: baseline.startDate, deadline: baseline.deadline, daily_target: baseline.dailyTarget }
-        : null };
-    }) }));
-    const sessions = { ...(current?.sessions || { schema_version: 2 }), sessions: {} };
-    for (const section of scheduled) for (const book of section.books) {
-      const id = String(book.id).trim();
-      sessions.sessions[id] = current?.sessions.sessions?.[id] || [];
+    const sections = window.ReadingQuarter.blankSections();
+    for (const row of newPlanBooks.children) {
+      const section = sections.find((item) => item.label === row.querySelector('select').value);
+      const audio = section.label === 'Audiobooks';
+      const title = row.querySelector('[name="title"]').value.trim();
+      if (!title) throw new Error('Enter a book name for each book, or remove the empty row.');
+      const from = window.parseBookField(row.querySelector('[name="from"]').value, audio);
+      const to = window.parseBookField(row.querySelector('[name="to"]').value, audio);
+      if (from < 0 || to < from) throw new Error(`${title}: the end ${audio ? 'time' : 'page'} must be at or after the start, and neither can be negative.`);
+      section.books.push({ ...window.ReadingQuarter.newBook(section.label, title, from, to), number: section.books.length + 1 });
     }
+    const plan = {
+      schema_version: 2, start_date: start, end_date: end, end_label: endLabel, rest_days: [],
+      stats_options: { book_counts: true, page_share: true, average_pages: true, reading_period: true, pace_driver: true },
+    };
+    const sessions = Object.fromEntries(sections.flatMap((section) => section.books.map((book) => [book.id, []])));
     await writeBundleFiles({
-      'plan.json': {
-        ...(current?.plan || {}), schema_version: 2, start_date: start, end_date: end,
-        end_label: endLabel, rest_days: [],
-        stats_options: current?.plan?.stats_options || { book_counts: true, page_share: true, average_pages: true, reading_period: true, pace_driver: true },
-      },
-      'books.json': { ...(current?.books || {}), schema_version: 2, sections: scheduled },
-      'sessions.json': sessions,
+      'plan.json': plan,
+      'books.json': withPlanBaselines({ schema_version: 2, sections }, plan),
+      'sessions.json': { schema_version: 2, sessions },
     });
+    newPlanDialog.close();
     localStorage.removeItem(scheduleKey);
     scheduleState = null;
     if (typeof resetBook === 'function') resetBook();
     if (typeof resetSession === 'function') resetSession();
     renderSchedule();
     renderQuarter();
-    newPlanForm.hidden = true;
-    renderNewPlanBooks();
-    showPlanActions();
     newPlanStatus.textContent = 'New plan saved.';
   } catch (error) {
-    newPlanStatus.textContent = error.message;
+    (newPlanDialog.open ? newPlanError : newPlanStatus).textContent = error.message;
+  } finally {
+    creatingPlan = false;
   }
 });
 
@@ -1057,6 +1000,6 @@ if ('serviceWorker' in navigator) {
       if (!document.hidden) checkForUpdate();
     });
   }).catch(() => {
-    status.textContent = 'Offline access is unavailable. Please reconnect and reload.';
+    document.querySelector('#editor-status').textContent = 'Offline access is unavailable. Please reconnect and reload.';
   });
 }

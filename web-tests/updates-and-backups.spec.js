@@ -30,12 +30,7 @@ test('an update is offered without interrupting the reader and saved data surviv
   await page.goto('./');
   await page.evaluate(() => navigator.serviceWorker.ready);
   await page.waitForFunction(() => !!navigator.serviceWorker.controller);
-  await page.getByRole('button', { name: 'Plan', exact: true }).click();
-  await page.getByLabel('Reading plan').fill('Saved before the update');
-  await page.getByRole('button', { name: 'Save plan' }).click();
   await importBundle(page);
-  await page.getByRole('button', { name: 'Plan', exact: true }).click();
-  await page.getByLabel('Reading plan', { exact: true }).fill('Unsaved during the update');
   await page.getByRole('button', { name: 'Books', exact: true }).click();
   await page.locator('#book-title').fill('Unfinished book edit');
   await expect(page.getByTestId('update-notice')).toBeHidden();
@@ -47,18 +42,14 @@ test('an update is offered without interrupting the reader and saved data surviv
   });
   await expect(page.getByTestId('update-notice')).toBeVisible();
   await expect(page.getByTestId('update-notice')).toContainText(/new version/i);
-  // The reader is not interrupted: the page did not reload and the draft is untouched.
+  // The reader is not interrupted: the page did not reload and the unfinished book edit is untouched.
   expect(await page.evaluate(() => window.__noAutomaticReload)).toBe(true);
-  await page.getByRole('button', { name: 'Plan', exact: true }).click();
-  await expect(page.getByLabel('Reading plan')).toHaveValue('Unsaved during the update');
   await page.getByRole('button', { name: 'Books', exact: true }).click();
   await expect(page.locator('#book-title')).toHaveValue('Unfinished book edit');
   await page.getByRole('button', { name: 'Reload to update' }).click();
   await page.waitForFunction(() => !window.__noAutomaticReload);
   await expect(page.getByTestId('update-notice')).toBeHidden();
   // Saved data and the imported bundle survive the update.
-  await page.getByRole('button', { name: 'Plan', exact: true }).click();
-  await expect(page.getByLabel('Reading plan')).toHaveValue('Saved before the update');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Export bundle ZIP' })).toBeVisible();
 });
