@@ -217,3 +217,44 @@ write_json_bundle(sys.argv[1], [BookSection('Physical books', [paper], []), Book
     fs.rmSync(directory, { recursive: true, force: true });
   }
 });
+
+test('book chooser defaults to the reading window and All reveals scheduled books', async ({ page }) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'reading-session-window-'));
+  try {
+    execFileSync('python', ['-c', `
+import sys
+from datetime import date, timedelta
+from reading_plan import Book, BookSection, SummaryStatsOptions, add_reading_session, write_json_bundle
+today = date.today()
+active = [Book(number, f'Active {number}', 1, 100, id=f'active-{number}') for number in range(1, 5)]
+done = Book(5, 'Done', 1, 100, id='done')
+add_reading_session(done, today, 100)
+future = Book(6, 'Future', 1, 100, id='future', start_date_override=today + timedelta(days=10))
+write_json_bundle(sys.argv[1], [BookSection('Physical books', active + [done, future], [(1, 2, 3, 4)]),
+  BookSection('Digital books', [], []), BookSection('Audiobooks', [], [])], today, today + timedelta(days=30), 'Quarter end',
+  SummaryStatsOptions(True, True, True, True, True))
+`, directory]);
+    await page.goto('./');
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    await page.getByLabel('Bundle files').setInputFiles(['plan.json', 'books.json', 'sessions.json', 'manifest.json'].map((name) => path.join(directory, name)));
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.getByRole('button', { name: 'Import bundle' }).click();
+    await page.getByRole('button', { name: 'Session', exact: true }).click();
+    const all = page.locator('#session-all');
+    await expect(all).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.locator('#session-books button')).toHaveText(['1. Active 1', '2. Active 2', '3. Active 3', '4. Active 4']);
+    await expect(page.locator('#session-book')).toHaveValue('active-1');
+    await all.click();
+    await expect(all).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('#session-books button')).toHaveText(['1. Active 1', '2. Active 2', '3. Active 3', '4. Active 4', '5. Done', '6. Future']);
+    await page.getByRole('button', { name: 'Choose book Future', exact: true }).click();
+    await expect(page.locator('#session-book')).toHaveValue('future');
+    await all.click();
+    await expect(all).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.locator('#session-books button')).toHaveCount(4);
+    await expect(page.locator('#session-book')).toHaveValue('active-1');
+    await expect(page.getByRole('button', { name: 'Add session' })).toBeEnabled();
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});

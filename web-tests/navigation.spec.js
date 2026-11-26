@@ -38,7 +38,11 @@ for (const width of [320, 1440]) {
     const projections = sections.getByRole('button', { name: 'Reading projections' });
     await main.getByRole('button', { name: 'Plan' }).click();
     await expect(plan).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.locator('#plan-rest')).toBeVisible();
+    const restDays = page.getByRole('button', { name: 'Rest days', exact: true });
+    await restDays.click();
+    const restDaysDialog = page.getByRole('dialog', { name: 'Rest days', exact: true });
+    await expect(restDaysDialog).toBeVisible();
+    await restDaysDialog.getByRole('button', { name: 'Close', exact: true }).click();
     await expect(page.locator('#plan-book-count')).toContainText('in progress');
     await schedule.focus();
     await page.keyboard.press('Enter');
@@ -47,7 +51,7 @@ for (const width of [320, 1440]) {
     await expect(page.locator('#schedule-table')).toBeVisible();
     await expect(page.locator('#schedule-rows input, #schedule-rows button')).toHaveCount(0);
     await expect(page.locator('#plan-setup')).toBeHidden();
-    await expect(page.locator('#plan-rest')).toBeHidden();
+    await expect(restDays).toBeHidden();
     await projections.click();
     await expect(projections).toHaveAttribute('aria-pressed', 'true');
     await expect(schedule).toHaveAttribute('aria-pressed', 'false');

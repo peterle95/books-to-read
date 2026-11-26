@@ -28,7 +28,7 @@ The **Plan** screen opens on its **Plan** section each time you return. Use the 
 
 In **Plan → New plan**, choose the start and finish dates and optionally add books. Replacing an existing plan clears its books, reading history, rest days, and queued quarter only after the new plan saves. **Reading schedule** shows the saved baseline in pages for physical and digital books and seconds for audiobooks.
 
-The **baseline per day** updates automatically when a plan is created or books, book ranges, book order, groups, or rest days change. Book and group edits update only the affected format. **Required now** is what you need to read each reading day to reach the baseline finish; reading history updates this pace and projections without changing the baseline. Saved dates, rest days, groups, overrides and baselines are included in bundle exports. Importing a bundle replaces the previous plan and schedule.
+The **original pace** updates automatically when a plan is created or books, book ranges, book order, groups, or rest days change. Book and group edits update only the affected format. **Required now** is what you need to read each reading day to reach the baseline finish; reading history updates this pace and projections without changing the baseline. Saved dates, rest days, groups, overrides and baselines are included in bundle exports. Importing a bundle replaces the previous plan and schedule.
 
 Simultaneous groups stored in a bundle are scheduled together, as in the desktop app. To plan one, choose two or more adjacent books in **Books**. The members share a start date and finish, and the schedule updates as soon as you save or remove the group.
 
@@ -50,7 +50,7 @@ Planning the next quarter only stores it. Saving writes `planned_quarter` with t
 
 ## Deploy and install
 
-In the repository's **Settings → Pages**, select **GitHub Actions** as the build and deployment source. **Deploy web app** runs browser tests on pull requests to `main` without publishing. A push to `main` or a manual run from `main` publishes this directory only after the tests pass. Confirm the workflow succeeds and open its Pages URL over HTTPS. On Android, use the browser's **Install app** or **Add to Home screen** menu. Wording and availability depend on the browser.
+In the repository's **Settings → Pages**, select **GitHub Actions** as the build and deployment source. **Deploy web app** runs the required checks on pull requests to `main` without publishing. A push to `main` or a manual run from `main` publishes this directory only after those checks pass. Confirm the workflow succeeds and open its Pages URL over HTTPS. On Android, use the browser's **Install app** or **Add to Home screen** menu. Wording and availability depend on the browser.
 
 ## Update the app
 
@@ -75,8 +75,10 @@ Real-device verification has not been performed by the automated tests. PWA inst
 
 ## Automated checks
 
-From the repository root, use Node 22 and Python 3.12. Run `python -m unittest discover`, then `npm ci`, `npx playwright install chromium`, and `npm run test:web`. Browser tests serve the app at the Pages subpath and cover offline edits, schedules, groups, overrides, history repair, quarter rollover, charts/metrics, CSV, and desktop bundle loading. The release tests transfer a synthetic plan in both directions and check that its source files are untouched.
+From the repository root, use Node 22 and Python 3.12. Run `npm run build` to check browser JavaScript syntax, the manifest, and required site files without a bundler or browser. Run `python -m unittest discover` for the Python unit tests.
 
-**Production gate:** `Pages checks` runs on PRs into `main` and on `main` itself. The workflow versions the offline cache before the browser tests, then publishes that same tested directory automatically from `main` only if the checks pass. Red checks skip deployment; they do not block merges until a GitHub ruleset or branch protection requires PRs and the `Pages checks` status check on `main`. Enable **Require branches to be up to date before merging** so the check also covers changes that landed while the PR was open.
+**Production gate:** `Pages checks` runs the static web checks and Python unit tests on PRs into `main` and on `main` itself. The workflow versions the offline cache before validating the site, then publishes that same directory automatically from `main` only if the checks pass. The repository ruleset requires `Pages checks` on up-to-date PRs before merging.
+
+**Full browser suite (optional):** Select **Actions → Full browser tests → Run workflow** on GitHub, or run `npm ci`, `npx playwright install chromium`, and `npm run test:web` locally. The suite serves the app at the Pages subpath and covers offline edits, schedules, groups, overrides, history repair, quarter rollover, charts/metrics, CSV, and desktop bundle loading. The release tests transfer a synthetic plan in both directions and check that its source files are untouched.
 
 The update test publishes a simulated deployment through the test server, then checks that the notice appears without reloading the page, that an edit is untouched, and that saved data survives applying the update. The backup test checks the export, the reminder, and that the reminder returns once the last backup is a week old.

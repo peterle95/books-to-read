@@ -120,6 +120,8 @@ test('session book is internal state, not an extra accessible combobox', async (
   expect(snapshot).not.toContain('Reading session book');
   await expect(page.getByRole('button', { name: `Choose book ${title}`, exact: true })).toHaveCount(1);
   await expect(page.getByRole('button', { name: 'Choose Physical books', exact: true })).toHaveCount(1);
+  // Short is scheduled after the current book, so the default window hides it.
+  await page.locator('#session-all').click();
   await page.getByRole('button', { name: 'Choose book Short', exact: true }).click();
   await expect(page.locator('#session-book')).toHaveValue('short');
   await page.locator('#session-position').fill('10');

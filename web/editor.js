@@ -276,6 +276,7 @@ const sessionDate = document.querySelector('#session-date');
 window.AndroidControls.date(sessionDate, { mode: 'text' });
 window.AndroidControls.sync(sessionDate, window.ReadingSchedule.today());
 const sessionPosition = document.querySelector('#session-position');
+const saveSession = document.querySelector('#save-session');
 const sessionMetrics = document.createElement('div');
 sessionMetrics.className = 'session-metrics';
 const targetLabel = document.createElement('span');
@@ -284,8 +285,8 @@ const targetCaption = document.createElement('small'), targetValue = document.cr
 const paceCaption = document.createElement('small'), paceValue = document.createElement('strong');
 targetLabel.append(targetCaption, targetValue);
 paceLabel.append(paceCaption, paceValue);
-sessionMetrics.append(targetLabel, paceLabel);
-sessionPosition.after(sessionMetrics);
+sessionMetrics.append(targetLabel, paceLabel, saveSession);
+sessionPosition.closest('.session-field-row').after(sessionMetrics);
 const updateSessionTarget = () => {
   const current = readBundleFiles();
   const section = current?.books.sections.find((item) => item.books.some((book) => book.id === sessionBook.value));
@@ -312,8 +313,8 @@ const entriesBook = document.querySelector('#entries-book');
 window.AndroidControls.select(entriesBook);
 const sessionFormats = document.querySelector('#session-formats');
 const sessionBooks = document.querySelector('#session-books');
+const sessionAll = document.querySelector('#session-all');
 const positionLabel = document.querySelector('#session-position-label');
-const saveSession = document.querySelector('#save-session');
 const selectSessionBook = (id) => {
   sessionBook.value = id;
   entriesBook.value = id;
@@ -447,14 +448,29 @@ const renderHistory = (current) => {
   sessionFormats.replaceChildren(...['Physical books', 'Digital books', 'Audiobooks'].map((label, index) => {
     const button = editorButton(['Physical', 'Digital', 'Audiobooks'][index], `Choose ${label}`, () => {
       sessionFormat = label;
-      const next = books.find(({ section }) => section.label.trim() === label);
-      sessionBook.value = next?.book.id || '';
+      sessionBook.value = '';
       renderHistory(current);
     });
     button.setAttribute('aria-pressed', String(format === label));
     return button;
   }));
-  const matching = books.filter(({ section }) => section.label.trim() === format);
+  const formatBooks = books.filter(({ section }) => section.label.trim() === format);
+  const formatAudio = format === 'Audiobooks';
+  // Session defaults to books inside their reading window, like Charts; All reveals the rest.
+  let targets = null;
+  if (sessionAll.getAttribute('aria-pressed') !== 'true' && current) {
+    try { targets = window.ReadingSchedule.todayReading(current.plan, current.books, format); }
+    catch { targets = null; }
+  }
+  const today = window.ReadingSchedule.today();
+  const matching = formatBooks.filter(({ book }) => {
+    if (!targets) return true;
+    const target = targets[String(book.id).trim()];
+    return window.ReadingSchedule.units(book, formatAudio).remaining > 0 && target &&
+      target.startDate <= today && today <= target.deadline;
+  });
+  // Prefer a visible book; if none is in the window, keep the current metrics target.
+  if (matching.length && !matching.some(({ book }) => book.id === sessionBook.value)) sessionBook.value = matching[0].book.id;
   sessionBooks.replaceChildren(...matching.map(({ book }) => {
     const button = editorButton(`${book.number}. ${book.title}`, `Choose book ${book.title}`, () => {
       selectSessionBook(book.id);
@@ -462,7 +478,8 @@ const renderHistory = (current) => {
     button.setAttribute('aria-pressed', String(sessionBook.value === book.id));
     return button;
   }));
-  if (!matching.length) sessionBooks.textContent = 'Add a book to record a reading session.';
+  if (!formatBooks.length) sessionBooks.textContent = 'Add a book to record a reading session.';
+  else if (!matching.length) sessionBooks.textContent = 'No books are currently in the reading window.';
   saveSession.disabled = !matching.some(({ book }) => book.id === sessionBook.value);
   positionLabel.textContent = format === 'Audiobooks' ? 'Time left' : 'Current page';
   sessionPosition.inputMode = format === 'Audiobooks' ? 'text' : 'numeric';
@@ -525,6 +542,10 @@ const renderHistory = (current) => {
   document.querySelector('#history-list').replaceChildren(...items);
   content.dataset.bookId = book.id;
 };
+sessionAll.addEventListener('click', () => {
+  sessionAll.setAttribute('aria-pressed', String(sessionAll.getAttribute('aria-pressed') !== 'true'));
+  renderHistory(readBundleFiles());
+});
 bookFormat.addEventListener('change', () => { const format = bookFormat.value; resetBook(); bookFormat.value = format; window.renderEditor(); });
 
 const selectedBook = (current) => {

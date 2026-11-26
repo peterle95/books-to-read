@@ -138,16 +138,20 @@ test('populated 360x732 first fold preserves native page gutters and useful land
   await tab(page, 'Plan');
   const quarter = await page.locator('#quarter-shortcut').boundingBox();
   expect(quarter.y + quarter.height).toBeLessThan(nav.y);
-  await page.locator('#rest-form button').scrollIntoViewIfNeeded();
-  await expect(page.locator('#rest-form button')).toBeInViewport();
-  expect(await page.locator('#rest-start').getAttribute('placeholder')).toBeNull();
-  await expect(page.locator('#rest-list li').first()).toHaveText('2026-11-08 ? 2026-11-09 Remove');
-  const range = await page.locator('#rest-list li').boundingBox();
-  const remove = await page.getByRole('button', { name: /Remove rest days/ }).boundingBox();
+  const restOpen = page.getByRole('button', { name: 'Rest days', exact: true });
+  await restOpen.scrollIntoViewIfNeeded();
+  await expect(restOpen).toBeInViewport();
+  await restOpen.click();
+  const restDialog = page.locator('#rest-days-dialog');
+  await expect(restDialog).toBeVisible();
+  await expect(restDialog.locator('#rest-days-list li').first()).toHaveText('2026-11-08 ? 2026-11-09 Remove');
+  const range = await restDialog.locator('#rest-days-list li').first().boundingBox();
+  const remove = await restDialog.getByRole('button', { name: /Remove rest days/ }).boundingBox();
   expect(remove.y).toBeGreaterThanOrEqual(range.y);
   expect(remove.y + remove.height).toBeLessThanOrEqual(range.y + range.height);
   expect(range.height).toBe(56); // 4dp row padding above and below the 48dp Remove button.
-  await expect(page.locator('#rest-list')).toHaveCSS('list-style-type', 'none');
+  await expect(restDialog.locator('#rest-days-list')).toHaveCSS('list-style-type', 'none');
+  await page.locator('#close-rest-days').click();
   await page.screenshot({ path: testInfo.outputPath('populated-plan-360x732.png') });
 
   await tab(page, 'Charts');

@@ -26,19 +26,27 @@
       <button id="reload-update" type="button">Reload to update</button>
     </section>
     <div id="screen-session" class="screen" aria-label="Session">
-      <div class="session-heading"><h2>Reading session</h2><button id="open-entries" type="button" aria-haspopup="dialog" aria-controls="entries-dialog">Entries</button></div>
+      <div class="session-heading"><h2>Reading session</h2></div>
       <section class="session-card" aria-labelledby="session-format-heading">
-        <h3 id="session-format-heading">Choose a format</h3>
+        <div class="session-card-heading">
+          <h3 id="session-format-heading">Choose a format</h3>
+          <button id="open-entries" type="button" aria-haspopup="dialog" aria-controls="entries-dialog">Entries</button>
+        </div>
         <div id="session-formats" class="session-choices" role="group" aria-label="Choose a format"></div>
       </section>
       <section class="session-card" aria-labelledby="session-books-heading">
-        <h3 id="session-books-heading">Choose a book</h3>
+        <div class="session-card-heading">
+          <h3 id="session-books-heading">Choose a book</h3>
+          <button id="session-all" type="button" aria-pressed="false">All</button>
+        </div>
         <div id="session-books" class="session-choices" role="group" aria-label="Choose a book"></div>
       </section>
       <form id="session-form" hidden>
         <label for="session-book" hidden aria-hidden="true">Reading session book</label><select id="session-book" hidden aria-hidden="true" tabindex="-1"></select>
-        <label for="session-date">Date</label><input id="session-date" type="text" data-date-mode="text" required>
-        <label for="session-position" id="session-position-label">Current page</label><input id="session-position" required>
+        <div class="session-field-row">
+          <div class="session-field"><label for="session-date">Date</label><input id="session-date" type="text" data-date-mode="text" required></div>
+          <div class="session-field"><label for="session-position" id="session-position-label">Current page</label><input id="session-position" required></div>
+        </div>
         <button type="submit" id="save-session">Add session</button>
       </form>
     </div>
@@ -107,8 +115,7 @@
       <button type="button" data-plan-section="projections" aria-pressed="false" aria-controls="plan-projections">Reading projections</button>
     </nav>
     <section id="plan-setup" data-plan-panel="setup" aria-label="Plan actions">
-      <h2 class="plan-panel-title">Plan</h2>
-      <p class="plan-intro">Plan dates, rest days and next quarter at a glance.</p>
+      <div class="plan-heading-row"><h2 class="plan-panel-title">Plan</h2><button id="rest-days-open" type="button" aria-haspopup="dialog" aria-controls="rest-days-dialog">Rest days</button></div>
       <div class="plan-overview">
         <div class="plan-period-card"><p class="plan-kicker">Current plan</p><p id="plan-period-dates" class="plan-display">No active plan</p><p id="plan-book-count"></p></div>
         <dl class="plan-facts">
@@ -122,7 +129,6 @@
           <button id="new-plan" type="button">New plan</button>
           <button id="quarter-shortcut" type="button" aria-haspopup="dialog" aria-controls="quarter-dialog">Plan next quarter</button>
         </div>
-        <p id="active-plan-hint">New plan replaces the current plan. Plan next quarter stores the next quarter without replacing it.</p>
         <p id="planned-quarter-summary" hidden></p>
         <button id="delete-planned-quarter" type="button" hidden>Delete queued quarter</button>
         <dialog id="create-plan-dialog" aria-labelledby="create-plan-heading">
@@ -141,38 +147,34 @@
         <p id="new-plan-status" role="status" aria-live="polite"></p>
         <p id="quarter-status" data-testid="quarter-status" role="status" aria-live="polite"></p>
       </div>
-    <section id="plan-rest" aria-labelledby="rest-heading">
-      <h3 id="rest-heading">Rest-day ranges</h3>
-      <ul id="rest-list" aria-label="Rest days"></ul>
-      <form id="rest-form">
-        <label for="rest-start">Rest start date</label>
-        <input id="rest-start" type="text" readonly required>
-        <label for="rest-end">Rest end date</label>
-        <input id="rest-end" type="text" readonly required>
-        <button type="submit">Add rest-day range</button>
+    <dialog id="rest-days-dialog" aria-labelledby="rest-days-heading">
+      <h2 id="rest-days-heading">Rest days</h2>
+      <ul id="rest-days-list" aria-label="Rest-day ranges"></ul>
+      <p id="rest-days-empty">No rest days planned.</p>
+      <form id="rest-days-form">
+        <label for="rest-days-start">Rest-day start</label>
+        <input id="rest-days-start" type="text" readonly required>
+        <label for="rest-days-end">Rest-day end</label>
+        <input id="rest-days-end" type="text" readonly required>
+        <p id="rest-days-status" role="status" aria-live="polite"></p>
+        <div class="dialog-actions"><button type="button" id="close-rest-days">Close</button><button type="submit">Add rest-day range</button></div>
       </form>
-    </section>
+    </dialog>
     </section>
     <section id="plan-schedule" data-plan-panel="schedule" aria-labelledby="schedule-heading" hidden>
       <h2 class="plan-panel-title" id="schedule-heading">Reading schedule</h2>
-      <p class="plan-intro">The baseline is the saved schedule. Required pace can change as you read.</p>
       <p id="schedule-empty">Import a bundle to schedule its books.</p>
       <table id="schedule-table" class="plan-results" role="table" hidden>
         <caption class="visually-hidden">Baseline schedule and current required pace. Pages are used for physical and digital books; seconds are used for audiobooks.</caption>
         <thead class="visually-hidden" role="rowgroup">
-          <tr role="row"><th scope="col">Book</th><th scope="col">Left</th><th scope="col">Baseline start</th><th scope="col">Baseline finish</th><th scope="col">Baseline per day</th><th scope="col">Required now</th></tr>
+          <tr role="row"><th scope="col">Book</th><th scope="col">Left</th><th scope="col">Baseline start</th><th scope="col">Baseline finish</th><th scope="col">Original pace</th><th scope="col">Required now</th></tr>
         </thead>
         <tbody id="schedule-rows" role="rowgroup"></tbody>
       </table>
-      <details class="plan-help">
-        <summary>How the schedule works</summary>
-        <p>The schedule updates automatically when books, groups, or rest days change. Reading sessions update required pace without rewriting the baseline. Set individual start dates and deadlines in Books.</p>
-      </details>
       <ul id="group-list" aria-label="Simultaneous groups"></ul>
     </section>
     <section id="plan-projections" data-plan-panel="projections" aria-labelledby="projection-heading" hidden>
       <h2 class="plan-panel-title" id="projection-heading">Reading projections</h2>
-      <p class="plan-intro">Estimates come from reading history and never change the schedule. A finish range shows uncertainty; it is not a guarantee.</p>
       <p id="projection-empty" data-testid="projection-empty">Import a bundle to see its reading projections.</p>
       <table id="projection-table" class="plan-results" role="table" hidden>
         <caption class="visually-hidden">History-based projection and estimated finish range for each book.</caption>

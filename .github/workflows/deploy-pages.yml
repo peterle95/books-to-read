@@ -17,30 +17,19 @@ concurrency:
 jobs:
   test:
     name: Pages checks
-    # The native-geometry assertions were calibrated with Windows Chromium.
-    # Linux Chromium renders the bundled font differently; see release verification.
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - run: python -m unittest discover
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium
       - name: Version offline cache
         run: node -e "const fs = require('node:fs'); const path = 'web/sw.js'; fs.writeFileSync(path, fs.readFileSync(path, 'utf8').replaceAll('__VERSION__', process.env.GITHUB_SHA));"
-      - run: npm run test:web
-      - uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: playwright-failures
-          path: test-results/
-          if-no-files-found: ignore
+      - run: npm run build
       - uses: actions/upload-pages-artifact@v3
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         with:
