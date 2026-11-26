@@ -315,7 +315,7 @@ test('readers see projections for an imported bundle without changing its schedu
   await expect(rows.nth(1).locator('td').nth(0)).toHaveText('Projection example');
   await expect(rows.nth(1).locator('td').nth(1)).toHaveText(`Projection · est. end date: ${labelOn(10)}`);
   await expect(rows.nth(1).locator('td').nth(2)).toHaveText(`Estimated finish range: ${labelOn(8)}–${labelOn(13)}`);
-  await expect(page.getByText('it is not a guarantee')).toBeVisible();
+  await expect(page.getByText('it is not a guarantee')).toHaveCount(0);
 
   // A range day count that is visible to readers does not change the stored bundle or draft.
   const stored = await page.evaluate(() => localStorage.getItem('reading-plan-bundle-v1'));

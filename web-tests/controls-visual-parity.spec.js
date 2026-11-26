@@ -162,7 +162,8 @@ test('quarter popup keeps native horizontal bounds inside the wider custom-conte
 test('calendar preserves framework month boxes and a styled scrollable year list', async ({ page }, info) => {
   const before = await stored(page);
   await tab(page, 'Plan');
-  const field = page.locator('#rest-start');
+  await page.getByRole('button', { name: 'Rest days', exact: true }).click();
+  const field = page.locator('#rest-days-start');
   await field.click();
   const calendar = page.getByRole('dialog', { name: 'Choose date', exact: true });
   const box = await calendar.boundingBox();

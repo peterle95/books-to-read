@@ -193,17 +193,22 @@ write_json_bundle(sys.argv[1], [
     await expect(row('Audio').locator('td').nth(4)).toHaveText('40');
 
     await page.getByRole('navigation', { name: 'Plan sections' }).getByRole('button', { name: 'Plan', exact: true }).click();
-    await chooseDate(page, page.getByLabel('Rest start date'), '2026-02-01');
-    await chooseDate(page, page.getByLabel('Rest end date'), '2026-02-02');
-    await page.getByRole('button', { name: 'Add rest-day range' }).click();
-    await expect(page.getByLabel('Rest days').locator('li')).toHaveText('2026-02-01 ? 2026-02-02 Remove');
+    await page.getByRole('button', { name: 'Rest days', exact: true }).click();
+    const restDialog = page.locator('#rest-days-dialog');
+    await chooseDate(page, restDialog.getByLabel('Rest-day start'), '2026-02-01');
+    await chooseDate(page, restDialog.getByLabel('Rest-day end'), '2026-02-02');
+    await restDialog.getByRole('button', { name: 'Add rest-day range' }).click();
+    await expect(restDialog.locator('#rest-days-list li')).toHaveText('2026-02-01 ? 2026-02-02 Remove');
+    await page.locator('#close-rest-days').click();
     await page.getByRole('button', { name: 'Reading schedule', exact: true }).click();
     await expect(row('First').locator('td').nth(3)).toHaveText('2026-02-14');
     await expect(row('First').locator('td').nth(4)).toHaveText('0.47');
 
     await page.reload();
     await page.getByRole('button', { name: 'Plan', exact: true }).click();
-    await expect(page.getByLabel('Rest days').locator('li')).toHaveText('2026-02-01 ? 2026-02-02 Remove');
+    await page.getByRole('button', { name: 'Rest days', exact: true }).click();
+    await expect(restDialog.locator('#rest-days-list li')).toHaveText('2026-02-01 ? 2026-02-02 Remove');
+    await page.locator('#close-rest-days').click();
     await page.getByRole('button', { name: 'Reading schedule', exact: true }).click();
     await expect(row('Second').locator('td').nth(3)).toHaveText('2026-03-31');
     await expect(row('First').locator('td').nth(3)).toHaveText('2026-02-14');
@@ -226,10 +231,12 @@ write_json_bundle(sys.argv[1], [
     await page.getByRole('button', { name: 'Import bundle' }).click();
     await page.getByRole('button', { name: 'Plan', exact: true }).click();
     await expect(page.getByTestId('schedule-status')).toHaveText(/No baseline schedule/);
-    await chooseDate(page, page.getByLabel('Rest start date'), '2026-02-01');
-    await chooseDate(page, page.getByLabel('Rest end date'), '2026-02-02');
-    await page.getByRole('button', { name: 'Add rest-day range' }).click();
-    await expect(page.getByLabel('Rest days').locator('li')).toHaveText('2026-02-01 ? 2026-02-02 Remove');
+    await page.getByRole('button', { name: 'Rest days', exact: true }).click();
+    await chooseDate(page, restDialog.getByLabel('Rest-day start'), '2026-02-01');
+    await chooseDate(page, restDialog.getByLabel('Rest-day end'), '2026-02-02');
+    await restDialog.getByRole('button', { name: 'Add rest-day range' }).click();
+    await expect(restDialog.locator('#rest-days-list li')).toHaveText('2026-02-01 ? 2026-02-02 Remove');
+    await page.locator('#close-rest-days').click();
     await page.getByRole('button', { name: 'Reading schedule', exact: true }).click();
     await expect(row('First').locator('td').nth(3)).toHaveText('2026-02-14');
     await expect(row('First').locator('td').nth(4)).toHaveText('0.47');

@@ -65,10 +65,13 @@ test('saved web plan dates and rest days transfer to desktop', async ({ page }) 
     await page.getByRole('button', { name: 'Create plan' }).click();
     await expect(page.locator('#new-plan-status')).toBeEmpty();
     await page.waitForFunction(() => typeof bundleWritePending === 'undefined' || !bundleWritePending);
-    await chooseDate(page, page.getByLabel('Rest start date'), '2026-11-10');
-    await chooseDate(page, page.getByLabel('Rest end date'), '2026-11-11');
-    await page.getByRole('button', { name: 'Add rest-day range' }).click();
-    await expect(page.locator('#rest-list')).toContainText('2026-11-10');
+    await page.getByRole('button', { name: 'Rest days', exact: true }).click();
+    const restDialog = page.locator('#rest-days-dialog');
+    await chooseDate(page, restDialog.getByLabel('Rest-day start'), '2026-11-10');
+    await chooseDate(page, restDialog.getByLabel('Rest-day end'), '2026-11-11');
+    await restDialog.getByRole('button', { name: 'Add rest-day range' }).click();
+    await expect(restDialog.locator('#rest-days-list')).toContainText('2026-11-10');
+    await page.locator('#close-rest-days').click();
     await page.reload();
     await tab(page, 'Plan');
     await expect(page.locator('#plan-period-dates')).toHaveText('Oct 1 – Dec 20');

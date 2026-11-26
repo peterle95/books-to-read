@@ -28,7 +28,7 @@ The **Plan** screen opens on its **Plan** section each time you return. Use the 
 
 In **Plan → New plan**, choose the start and finish dates and optionally add books. Replacing an existing plan clears its books, reading history, rest days, and queued quarter only after the new plan saves. **Reading schedule** shows the saved baseline in pages for physical and digital books and seconds for audiobooks.
 
-The **baseline per day** updates automatically when a plan is created or books, book ranges, book order, groups, or rest days change. Book and group edits update only the affected format. **Required now** is what you need to read each reading day to reach the baseline finish; reading history updates this pace and projections without changing the baseline. Saved dates, rest days, groups, overrides and baselines are included in bundle exports. Importing a bundle replaces the previous plan and schedule.
+The **original pace** updates automatically when a plan is created or books, book ranges, book order, groups, or rest days change. Book and group edits update only the affected format. **Required now** is what you need to read each reading day to reach the baseline finish; reading history updates this pace and projections without changing the baseline. Saved dates, rest days, groups, overrides and baselines are included in bundle exports. Importing a bundle replaces the previous plan and schedule.
 
 Simultaneous groups stored in a bundle are scheduled together, as in the desktop app. To plan one, choose two or more adjacent books in **Books**. The members share a start date and finish, and the schedule updates as soon as you save or remove the group.
 

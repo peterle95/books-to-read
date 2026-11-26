@@ -228,12 +228,16 @@ exports.addEventListener('click', async () => {
 });
 
 const scheduleKey = 'reading-plan-schedule-v1';
-const restForm = document.querySelector('#rest-form');
-const restStart = document.querySelector('#rest-start');
-const restEnd = document.querySelector('#rest-end');
-window.ReadingCalendar.attach(restStart);
-window.ReadingCalendar.attach(restEnd);
-const restList = document.querySelector('#rest-list');
+const restDaysDialog = document.querySelector('#rest-days-dialog');
+const restDaysOpen = document.querySelector('#rest-days-open');
+const restDaysList = document.querySelector('#rest-days-list');
+const restDaysEmpty = document.querySelector('#rest-days-empty');
+const restDaysForm = document.querySelector('#rest-days-form');
+const restDaysStart = document.querySelector('#rest-days-start');
+const restDaysEnd = document.querySelector('#rest-days-end');
+const restDaysStatus = document.querySelector('#rest-days-status');
+window.ReadingCalendar.attach(restDaysStart);
+window.ReadingCalendar.attach(restDaysEnd);
 const scheduleTable = document.querySelector('#schedule-table');
 const scheduleRows = document.querySelector('#schedule-rows');
 const scheduleEmpty = document.querySelector('#schedule-empty');
@@ -447,6 +451,27 @@ const renderProjections = (bundle) => {
   projectionTable.hidden = !rows.length;
 };
 
+const renderRestDays = () => {
+  const ranges = scheduleState?.restDays ?? [];
+  restDaysList.replaceChildren(...ranges.map((range, index) => {
+    const item = document.createElement('li');
+    // ReadingPlanPlanView renders every range as "start ? end", including single days.
+    const label = `${range.start} ? ${range.end}`;
+    const remove = document.createElement('button');
+    item.append(`${label} `);
+    remove.type = 'button';
+    remove.textContent = 'Remove';
+    remove.setAttribute('aria-label', `Remove rest days ${label}`);
+    remove.addEventListener('click', async () => {
+      scheduleState.restDays = scheduleState.restDays.filter((_, position) => position !== index);
+      try { await scheduleChanged(); restDaysStatus.textContent = ''; } catch (error) { restDaysStatus.textContent = error.message; }
+    });
+    item.append(remove);
+    return item;
+  }));
+  restDaysEmpty.hidden = ranges.length > 0;
+};
+
 const renderSchedule = () => {
   if (window.renderEditor) window.renderEditor();
   if (window.renderCharts) window.renderCharts();
@@ -454,7 +479,7 @@ const renderSchedule = () => {
   const bundle = readBundleData();
   scheduleEmpty.hidden = !!bundle;
   projectionEmpty.hidden = !!bundle;
-  restForm.hidden = !bundle;
+  restDaysOpen.hidden = !bundle;
   if (!bundle) {
     planPeriodDates.textContent = 'No active plan';
     planBookCount.textContent = '';
@@ -463,7 +488,8 @@ const renderSchedule = () => {
     scheduleTable.hidden = true;
     projectionTable.hidden = true;
     projectionRows.replaceChildren();
-    restList.replaceChildren();
+    restDaysList.replaceChildren();
+    restDaysEmpty.hidden = false;
     groupList.replaceChildren();
     return;
   }
@@ -475,22 +501,7 @@ const renderSchedule = () => {
     : `${startDate} – ${endDate}`;
   const ranges = scheduleState.restDays.length;
   planRestCount.textContent = ranges ? `${ranges} ${ranges === 1 ? 'range' : 'ranges'}` : 'None';
-  restList.replaceChildren(...scheduleState.restDays.map((range, index) => {
-    const item = document.createElement('li');
-    // ReadingPlanPlanView renders every range as "start ? end", including single days.
-    const label = `${range.start} ? ${range.end}`;
-    const remove = document.createElement('button');
-    item.append(`${label} `);
-    remove.type = 'button';
-    remove.textContent = 'Remove';
-    remove.setAttribute('aria-label', `Remove rest days ${label}`);
-      remove.addEventListener('click', async () => {
-        scheduleState.restDays = scheduleState.restDays.filter((_, position) => position !== index);
-        try { await scheduleChanged(); } catch (error) { scheduleStatus.textContent = error.message; }
-    });
-    item.append(remove);
-    return item;
-  }));
+  renderRestDays();
   const sections = sectionsForState(bundle, scheduleState);
   const activeBooks = sections.reduce((count, section) => count + section.books.filter((book) => book.remaining > 0).length, 0);
   const groups = sections.reduce((count, section) => count + section.groups.length, 0);
@@ -517,7 +528,7 @@ const renderSchedule = () => {
       for (const [index, value] of values.entries()) {
         const cell = document.createElement('td');
         cell.setAttribute('role', 'cell');
-        cell.dataset.label = ['', 'Left', 'Baseline start', 'Baseline finish', 'Baseline per day', 'Required now'][index];
+        cell.dataset.label = ['', 'Left', 'Baseline start', 'Baseline finish', 'Original pace', 'Required now'][index];
         cell.textContent = String(value);
         row.append(cell);
       }
@@ -551,19 +562,34 @@ const scheduleChanged = async () => {
   renderSchedule();
 };
 
-restForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
+const addRestDays = async (start, end, status) => {
   try {
-    if (!restStart.value || !restEnd.value) throw new Error('Set both rest-day dates.');
-    window.AndroidControls.parseDate(restStart.value);
-    window.AndroidControls.parseDate(restEnd.value);
-    const ranges = window.ReadingSchedule.normalizeRestDays([...scheduleState.restDays, { start: restStart.value, end: restEnd.value }]);
+    if (!scheduleState) throw new Error('Import a bundle before adding rest days.');
+    if (!start.value || !end.value) throw new Error('Set both rest-day dates.');
+    window.AndroidControls.parseDate(start.value);
+    window.AndroidControls.parseDate(end.value);
+    const ranges = window.ReadingSchedule.normalizeRestDays([...scheduleState.restDays, { start: start.value, end: end.value }]);
     scheduleState.restDays = ranges.map((range) => ({ start: window.ReadingSchedule.iso(range.start), end: window.ReadingSchedule.iso(range.end) }));
     await scheduleChanged();
+    status.textContent = '';
   } catch (error) {
-    scheduleStatus.textContent = error.message;
+    status.textContent = error.message;
   }
+};
+
+restDaysForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  addRestDays(restDaysStart, restDaysEnd, restDaysStatus);
 });
+
+restDaysOpen.addEventListener('click', () => {
+  if (!scheduleState) return;
+  restDaysStatus.textContent = '';
+  renderRestDays();
+  restDaysDialog.showModal();
+});
+
+document.querySelector('#close-rest-days').addEventListener('click', () => restDaysDialog.close());
 
 const quarterDialog = document.querySelector('#quarter-dialog');
 const quarterDraftStatus = document.querySelector('#quarter-draft-status');
@@ -665,15 +691,12 @@ window.AndroidControls.date(newPlanFinish, { mode: 'text' });
 const newPlanStatus = document.querySelector('#new-plan-status');
 const quarterShortcut = document.querySelector('#quarter-shortcut');
 quarterShortcut.addEventListener('click', () => openQuarterDialog());
-const activePlanHint = document.querySelector('#active-plan-hint');
 const plannedQuarterSummary = document.querySelector('#planned-quarter-summary');
 const deletePlannedQuarter = document.querySelector('#delete-planned-quarter');
 const showPlanActions = () => {
   const current = readBundleFiles();
-  const active = !!current;
   const planned = current && window.ReadingQuarter.plannedFromBundle(current.books);
   planNextQuarter.textContent = planned ? planned.startDate : 'Not planned';
-  activePlanHint.hidden = !active;
   plannedQuarterSummary.hidden = !planned;
   deletePlannedQuarter.hidden = !planned;
   if (!planned) {

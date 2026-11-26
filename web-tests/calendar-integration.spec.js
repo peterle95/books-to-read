@@ -81,11 +81,13 @@ test('four ISO fields remain editable; only rest and override fields attach read
   await expect(page.locator('#create-plan-finish')).toHaveValue(finish);
   await expect(calendar(page)).not.toBeVisible();
   await tab(page, 'Cancel');
-  for (const id of ['rest-start', 'rest-end']) {
+  await page.getByRole('button', { name: 'Rest days', exact: true }).click();
+  for (const id of ['rest-days-start', 'rest-days-end']) {
     await page.locator(`#${id}`).click();
     await expect(calendar(page)).toBeVisible();
     await page.keyboard.press('Escape');
   }
+  await page.locator('#close-rest-days').click();
   await selectFirst(page);
   for (const [id, month] of [['book-start-override', 'March 2030'], ['book-deadline-override', 'November 2030']]) {
     await page.locator(`#${id}`).click();
@@ -142,32 +144,36 @@ test('Books OK only changes draft/events; Cancel, Set and Clear retain unrelated
 test('rest ranges reject absent, invalid and reversed drafts; calendar OK never saves before Add', async ({ page }) => {
   await load(page);
   await tab(page, 'Plan');
-  const raw = await rawBundle(page), start = page.locator('#rest-start'), end = page.locator('#rest-end');
-  await tab(page, 'Add rest-day range');
-  await expect(page.getByTestId('schedule-status')).toHaveText('Set both rest-day dates.');
+  const raw = await rawBundle(page);
+  await page.getByRole('button', { name: 'Rest days', exact: true }).click();
+  const dialog = page.locator('#rest-days-dialog');
+  const start = dialog.locator('#rest-days-start'), end = dialog.locator('#rest-days-end');
+  const add = dialog.getByRole('button', { name: 'Add rest-day range' });
+  await add.click();
+  await expect(dialog.locator('#rest-days-status')).toHaveText('Set both rest-day dates.');
   await start.click();
   await expect(page.locator('#reading-calendar-month')).toHaveText('November 2028');
   await page.keyboard.press('Escape');
   await expect(start).toHaveValue('');
   await chooseDate(page, start, '2030-03-12');
-  await tab(page, 'Add rest-day range');
-  await expect(page.getByTestId('schedule-status')).toHaveText('Set both rest-day dates.');
+  await add.click();
+  await expect(dialog.locator('#rest-days-status')).toHaveText('Set both rest-day dates.');
   await chooseDate(page, end, '2030-03-11');
-  await tab(page, 'Add rest-day range');
-  await expect(page.getByTestId('schedule-status')).toContainText('on or after');
+  await add.click();
+  await expect(dialog.locator('#rest-days-status')).toContainText('on or after');
   expect(await rawBundle(page)).toBe(raw);
   await end.evaluate((field) => { field.value = '2030-02-30'; });
-  await tab(page, 'Add rest-day range');
-  await expect(page.getByTestId('schedule-status')).toContainText('real date');
+  await add.click();
+  await expect(dialog.locator('#rest-days-status')).toContainText('real date');
   expect(await rawBundle(page)).toBe(raw);
   await end.evaluate((field) => { field.value = '0000-02-29'; });
-  await tab(page, 'Add rest-day range');
-  await expect(page.getByTestId('schedule-status')).toContainText('real date');
+  await add.click();
+  await expect(dialog.locator('#rest-days-status')).toContainText('real date');
   expect(await rawBundle(page)).toBe(raw);
   await chooseDate(page, end, '2030-03-13');
   expect(await rawBundle(page)).toBe(raw);
-  await tab(page, 'Add rest-day range');
-  await expect(page.locator('#rest-list')).toContainText('2030-03-12 ? 2030-03-13');
+  await add.click();
+  await expect(dialog.locator('#rest-days-list')).toContainText('2030-03-12 ? 2030-03-13');
   expect((await snapshot(page)).plan.rest_days).toEqual([{ start_date: '2030-03-12', end_date: '2030-03-13' }]);
 });
 
@@ -222,6 +228,7 @@ test('editable ISO fields and readonly overrides validate real and required date
     }
   }
   await tab(page, 'Session');
+  await page.locator('#session-all').click();
   await page.locator('#session-position').fill('10');
   for (const value of ['', '2028-02-30']) {
     await page.locator('#session-date').evaluate((field, next) => { field.value = next; }, value);
@@ -234,6 +241,7 @@ test('editable ISO fields and readonly overrides validate real and required date
 test('nested history editor types ISO dates without a calendar; Cancel retains records and parent sheet', async ({ page }) => {
   await load(page);
   await tab(page, 'Session');
+  await page.locator('#session-all').click();
   await page.locator('#session-position').fill('10');
   await tab(page, 'Add session');
   await expect(page.getByTestId('editor-status')).toBeEmpty();
@@ -260,6 +268,7 @@ for (const timezoneId of ['America/Los_Angeles', 'Pacific/Auckland']) {
     test('session ISO typing saves dates across DST without shifting day', async ({ page }) => {
       await load(page);
       await tab(page, 'Session');
+      await page.locator('#session-all').click();
       const input = page.locator('#session-date');
       for (const date of ['2028-03-12', '2028-04-02', '2028-11-05']) {
         const raw = await rawBundle(page);
