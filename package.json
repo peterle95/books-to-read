@@ -2,7 +2,7 @@
   "private": true,
   "scripts": {
     "dev": "node web-tests/server.js",
-    "build": "node -e \"console.log('No local build: web/ is a static PWA deployed as-is by .github/workflows/deploy-pages.yml (push to main).')\"",
+    "build": "node scripts/check-web.cjs",
     "test:web": "playwright test"
   },
   "devDependencies": {
