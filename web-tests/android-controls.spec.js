@@ -16,6 +16,8 @@ const seed = async (page) => {
   });
   await page.reload();
   await expect(page.locator('#session-form')).toBeVisible();
+  // The fixture plan starts in 2028; reveal its book for the date-control checks.
+  await page.locator('#session-all').click();
 };
 const snapshot = (page) => page.evaluate(() => localStorage.getItem('reading-plan-bundle-v1'));
 
