@@ -276,6 +276,7 @@ const sessionDate = document.querySelector('#session-date');
 window.AndroidControls.date(sessionDate, { mode: 'text' });
 window.AndroidControls.sync(sessionDate, window.ReadingSchedule.today());
 const sessionPosition = document.querySelector('#session-position');
+const saveSession = document.querySelector('#save-session');
 const sessionMetrics = document.createElement('div');
 sessionMetrics.className = 'session-metrics';
 const targetLabel = document.createElement('span');
@@ -284,8 +285,8 @@ const targetCaption = document.createElement('small'), targetValue = document.cr
 const paceCaption = document.createElement('small'), paceValue = document.createElement('strong');
 targetLabel.append(targetCaption, targetValue);
 paceLabel.append(paceCaption, paceValue);
-sessionMetrics.append(targetLabel, paceLabel);
-sessionPosition.after(sessionMetrics);
+sessionMetrics.append(targetLabel, paceLabel, saveSession);
+sessionPosition.closest('.session-field-row').after(sessionMetrics);
 const updateSessionTarget = () => {
   const current = readBundleFiles();
   const section = current?.books.sections.find((item) => item.books.some((book) => book.id === sessionBook.value));
@@ -313,7 +314,6 @@ window.AndroidControls.select(entriesBook);
 const sessionFormats = document.querySelector('#session-formats');
 const sessionBooks = document.querySelector('#session-books');
 const positionLabel = document.querySelector('#session-position-label');
-const saveSession = document.querySelector('#save-session');
 const selectSessionBook = (id) => {
   sessionBook.value = id;
   entriesBook.value = id;

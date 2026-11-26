@@ -26,9 +26,12 @@
       <button id="reload-update" type="button">Reload to update</button>
     </section>
     <div id="screen-session" class="screen" aria-label="Session">
-      <div class="session-heading"><h2>Reading session</h2><button id="open-entries" type="button" aria-haspopup="dialog" aria-controls="entries-dialog">Entries</button></div>
+      <div class="session-heading"><h2>Reading session</h2></div>
       <section class="session-card" aria-labelledby="session-format-heading">
-        <h3 id="session-format-heading">Choose a format</h3>
+        <div class="session-card-heading">
+          <h3 id="session-format-heading">Choose a format</h3>
+          <button id="open-entries" type="button" aria-haspopup="dialog" aria-controls="entries-dialog">Entries</button>
+        </div>
         <div id="session-formats" class="session-choices" role="group" aria-label="Choose a format"></div>
       </section>
       <section class="session-card" aria-labelledby="session-books-heading">
@@ -37,8 +40,10 @@
       </section>
       <form id="session-form" hidden>
         <label for="session-book" hidden aria-hidden="true">Reading session book</label><select id="session-book" hidden aria-hidden="true" tabindex="-1"></select>
-        <label for="session-date">Date</label><input id="session-date" type="text" data-date-mode="text" required>
-        <label for="session-position" id="session-position-label">Current page</label><input id="session-position" required>
+        <div class="session-field-row">
+          <div class="session-field"><label for="session-date">Date</label><input id="session-date" type="text" data-date-mode="text" required></div>
+          <div class="session-field"><label for="session-position" id="session-position-label">Current page</label><input id="session-position" required></div>
+        </div>
         <button type="submit" id="save-session">Add session</button>
       </form>
     </div>
